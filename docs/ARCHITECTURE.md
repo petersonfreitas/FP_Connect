@@ -509,6 +509,11 @@ Telas devem prever, quando aplicável:
 - bloqueio por permissão;
 - bloqueio por módulo contratado.
 
+No Admin Console, a navegação principal deve usar grupos recolhíveis. Os grupos iniciais são:
+
+- `Cadastro`: cadastros mestres e configurações estruturais, como empresas, usuários, planos, módulos, papéis e permissões;
+- `Movimentação`: dados operacionais, fluxos de trabalho e registros já cadastrados que podem evoluir por CRUD ou mudança de status.
+
 Não criar telas fora do backlog atual sem autorização.
 
 ---
