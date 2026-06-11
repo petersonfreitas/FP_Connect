@@ -39,6 +39,8 @@ Endpoints iniciais do Admin Console:
 
 Essas rotas usam Supabase server-side com `SUPABASE_SERVICE_ROLE_KEY` e exigem o header `X-FP-Internal-Token` com o valor de `FP_INTERNAL_API_TOKEN`.
 
+O front server-side usa `FP_API_INTERNAL_URL` para chamar a API interna. Em desenvolvimento local, o padrao esperado e `http://localhost:3001/api`.
+
 ## Supabase
 
 O Supabase CLI é instalado como dev dependency local.

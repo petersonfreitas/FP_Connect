@@ -1,11 +1,11 @@
 import { Injectable, InternalServerErrorException } from "@nestjs/common";
-import { SupabaseService } from "../../supabase/supabase.service";
-import {
+import type {
   AdminApplicationContract,
   AdminBasicPlanContract,
   AdminCompanyContract,
   AdminConsoleOverviewContract
 } from "./admin-console.contracts";
+import { SupabaseService } from "../../supabase/supabase.service";
 
 type SupabaseFailure = {
   message: string;

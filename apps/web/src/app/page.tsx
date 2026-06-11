@@ -1,67 +1,43 @@
 import Image from "next/image";
+import type { AdminApplicationContract } from "@fp/types";
+import { getAdminConsoleOverview } from "@/lib/internal-api";
 
-const modules = [
-  {
-    name: "Admin Console",
-    description: "Empresas, usuários, permissões, módulos contratados e auditoria.",
-    status: "Fundação",
-    tone: "Ativo"
-  },
-  {
-    name: "FP Robots",
-    description: "Eventos, automações, webhooks, logs, retries e reprocessamento.",
-    status: "Planejado",
-    tone: "Base"
-  },
-  {
-    name: "FP Food",
-    description: "Loja, vitrine, cardápio, pedidos, cozinha e entrega simples.",
-    status: "Frontend próprio futuro",
-    tone: "Produto"
-  },
-  {
-    name: "FP Tracking",
-    description: "Entregas, entregadores, localização, ocorrências e rastreamento.",
-    status: "Frontend próprio futuro",
-    tone: "Produto"
-  },
-  {
-    name: "FP Marketing",
-    description: "Campanhas, canais, leads, qualificação e conversão para Sales.",
-    status: "Futuro",
-    tone: "Crescimento"
-  },
-  {
-    name: "FP Sales",
-    description: "Clientes, oportunidades, propostas, pipeline e visão 360.",
-    status: "Futuro",
-    tone: "Comercial"
-  },
-  {
-    name: "FP Tickets",
-    description: "Chamados, atendimento, implantação, anexos e SLA visual.",
-    status: "Futuro",
-    tone: "Suporte"
-  },
-  {
-    name: "FP Billing",
-    description: "Planos, assinaturas, cobranças manuais e status financeiro.",
-    status: "Futuro",
-    tone: "Financeiro"
-  }
-];
+export const dynamic = "force-dynamic";
 
 const foundationItems = [
-  "Banco único Supabase por schemas",
+  "Banco unico Supabase por schemas",
   "Auth centralizado no core",
-  "APIs internas por domínio",
-  "Frontends separados quando necessário"
+  "APIs internas por dominio",
+  "Frontends separados quando necessario"
 ];
 
-export default function Home() {
+const applicationStatusLabels: Record<AdminApplicationContract["status"], string> = {
+  active: "Ativo",
+  hidden: "Oculto",
+  inactive: "Inativo"
+};
+
+const applicationToneByKey: Record<string, string> = {
+  "admin-console": "Core",
+  billing: "Financeiro",
+  food: "Produto",
+  marketing: "Crescimento",
+  robots: "Automacao",
+  sales: "Comercial",
+  tickets: "Suporte",
+  tracking: "Produto"
+};
+
+export default async function Home() {
+  const overviewResult = await getAdminConsoleOverview();
+  const overview = overviewResult.data;
+  const applications = overview?.applications ?? [];
+  const basicPlans = overview?.basicPlans ?? [];
+  const companies = overview?.companies ?? [];
+
   return (
     <main className="app-shell">
-      <aside className="sidebar" aria-label="Navegação principal">
+      <aside className="sidebar" aria-label="Navegacao principal">
         <div className="sidebar-brand">
           <Image
             src="/brand/logo-b.png"
@@ -79,7 +55,7 @@ export default function Home() {
             Admin Console
           </a>
           <a className="nav-item" href="/">
-            Módulos
+            Modulos
           </a>
           <a className="nav-item" href="/">
             Auditoria
@@ -95,10 +71,19 @@ export default function Home() {
         <header className="topbar">
           <div>
             <div className="eyebrow">Portal principal</div>
-            <strong>Empresa atual: FP WebTech</strong>
+            <strong>Empresas cadastradas: {companies.length}</strong>
           </div>
-          <div className="status-pill">Fundação em construção</div>
+          <div className="status-pill">
+            {overviewResult.error ? "API interna indisponivel" : "Core conectado"}
+          </div>
         </header>
+
+        {overviewResult.error ? (
+          <section className="data-alert" role="status">
+            <strong>Nao foi possivel carregar dados reais do core.</strong>
+            <span>{overviewResult.error}</span>
+          </section>
+        ) : null}
 
         <section className="hero">
           <div className="hero-copy">
@@ -111,11 +96,11 @@ export default function Home() {
             />
             <h1>Centro operacional do ecossistema FP WebTech.</h1>
             <p>
-              Uma base comum para administrar empresas, liberar módulos, controlar
-              permissões e preparar integrações entre produtos SaaS.
+              Uma base comum para administrar empresas, liberar modulos, controlar
+              permissoes e preparar integracoes entre produtos SaaS.
             </p>
           </div>
-          <div className="foundation-panel" aria-label="Contratos da fundação">
+          <div className="foundation-panel" aria-label="Contratos da fundacao">
             <span>Contratos de arquitetura</span>
             {foundationItems.map((item) => (
               <div className="foundation-item" key={item}>
@@ -125,25 +110,46 @@ export default function Home() {
           </div>
         </section>
 
+        <section className="summary-strip" aria-label="Resumo do core">
+          <div className="summary-item">
+            <span>Modulos no core</span>
+            <strong>{applications.length}</strong>
+          </div>
+          <div className="summary-item">
+            <span>Planos base</span>
+            <strong>{basicPlans.length}</strong>
+          </div>
+          <div className="summary-item">
+            <span>Empresas</span>
+            <strong>{companies.length}</strong>
+          </div>
+        </section>
+
         <section className="section-heading">
           <div>
             <div className="eyebrow">Meus sistemas</div>
-            <h2>Módulos do ecossistema</h2>
+            <h2>Modulos do ecossistema</h2>
           </div>
-          <span className="muted">Modelo visual para os próximos produtos</span>
+          <span className="muted">Dados carregados do schema core</span>
         </section>
 
-        <section className="module-grid" aria-label="Módulos do ecossistema">
-          {modules.map((module) => (
-            <article className="module-card" key={module.name}>
-              <div className="module-card-top">
-                <span>{module.tone}</span>
-                <small>{module.status}</small>
-              </div>
-              <h3>{module.name}</h3>
-              <p>{module.description}</p>
-            </article>
-          ))}
+        <section className="module-grid" aria-label="Modulos do ecossistema">
+          {applications.length > 0 ? (
+            applications.map((application) => (
+              <article className="module-card" key={application.id}>
+                <div className="module-card-top">
+                  <span>{applicationToneByKey[application.key] ?? "Modulo"}</span>
+                  <small>{applicationStatusLabels[application.status]}</small>
+                </div>
+                <h3>{application.name}</h3>
+                <p>{application.description ?? "Descricao pendente no catalogo do core."}</p>
+              </article>
+            ))
+          ) : (
+            <div className="empty-state">
+              Nenhum modulo retornado pela API interna ate o momento.
+            </div>
+          )}
         </section>
       </section>
     </main>
