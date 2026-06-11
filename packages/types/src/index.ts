@@ -1,4 +1,5 @@
 export type CompanyStatus = "implementation" | "active" | "suspended" | "cancelled";
+export type CompanyPersonType = "individual" | "legal_entity";
 export type ApplicationStatus = "active" | "inactive" | "hidden";
 export type BasicPlanStatus = "active" | "inactive";
 
@@ -22,6 +23,7 @@ export type AdminBasicPlanContract = {
 
 export type AdminCompanyContract = {
   id: string;
+  personType: CompanyPersonType;
   legalName: string;
   tradeName: string | null;
   document: string | null;
@@ -42,6 +44,7 @@ export type AdminConsoleOverviewContract = {
 };
 
 export type CreateAdminCompanyInput = {
+  personType: CompanyPersonType;
   legalName: string;
   tradeName?: string | null;
   document?: string | null;
@@ -51,4 +54,13 @@ export type CreateAdminCompanyInput = {
   primaryResponsibleEmail?: string | null;
   basicPlanId?: string | null;
   implementationNotes?: string | null;
+};
+
+export type CnpjLookupContract = {
+  cnpj: string;
+  legalName: string;
+  tradeName: string | null;
+  primaryEmail: string | null;
+  primaryPhone: string | null;
+  address: string | null;
 };

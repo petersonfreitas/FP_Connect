@@ -11,6 +11,11 @@ const statusLabels = {
   suspended: "Suspensa"
 };
 
+const personTypeLabels = {
+  individual: "Pessoa Fisica",
+  legal_entity: "Pessoa Juridica"
+};
+
 export default async function CompaniesPage() {
   const companiesResult = await listAdminCompanies();
   const companies = companiesResult.data ?? [];
@@ -47,7 +52,7 @@ export default async function CompaniesPage() {
           <div className="data-table" role="table" aria-label="Empresas cadastradas">
             <div className="data-row data-row-head" role="row">
               <span>Empresa</span>
-              <span>Responsavel</span>
+              <span>Documento</span>
               <span>Status</span>
               <span />
             </div>
@@ -57,7 +62,10 @@ export default async function CompaniesPage() {
                   <strong>{company.tradeName ?? company.legalName}</strong>
                   <small>{company.legalName}</small>
                 </span>
-                <span>{company.primaryResponsibleName}</span>
+                <span>
+                  {company.document}
+                  <small>{personTypeLabels[company.personType]}</small>
+                </span>
                 <span>{statusLabels[company.status]}</span>
                 <Link href={`/cadastro/empresas/${company.id}`}>Detalhes</Link>
               </div>

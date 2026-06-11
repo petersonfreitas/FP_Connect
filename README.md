@@ -41,6 +41,8 @@ Essas rotas usam Supabase server-side com `SUPABASE_SERVICE_ROLE_KEY` e exigem o
 
 O front server-side usa `FP_API_INTERNAL_URL` para chamar a API interna. Em desenvolvimento local, o padrao esperado e `http://localhost:3001/api`.
 
+O cadastro de empresas pode consultar CNPJ no server-side do Next usando `FP_CNPJ_LOOKUP_BASE_URL`. O padrao atual usa `https://brasilapi.com.br/api/cnpj/v1`.
+
 ## Supabase
 
 O Supabase CLI é instalado como dev dependency local.

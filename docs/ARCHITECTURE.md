@@ -509,6 +509,13 @@ Telas devem prever, quando aplicável:
 - bloqueio por permissão;
 - bloqueio por módulo contratado.
 
+Formulários devem respeitar o mesmo contrato do banco:
+
+- campos textuais com limite explícito por constraint;
+- validação equivalente no backend;
+- `maxLength` no frontend;
+- validação de documentos oficiais quando aplicável, como CPF e CNPJ.
+
 No Admin Console, a navegação principal deve usar grupos recolhíveis. Os grupos iniciais são:
 
 - `Cadastro`: cadastros mestres e configurações estruturais, como empresas, usuários, planos, módulos, papéis e permissões;

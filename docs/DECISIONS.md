@@ -35,6 +35,7 @@ Este arquivo registra decisões arquiteturais e operacionais para evitar retraba
 | DEC-027 | Webhooks de entrada devem validar origem, assinatura ou token; webhooks de saída, automações, retries e reprocessamentos pertencem preferencialmente ao FP Robots. | Aprovada |
 | DEC-028 | FP Monitor será um módulo de plataforma previsto para observar APIs, serviços, integrações, disponibilidade, latência e incidentes; fica deferido para o final do projeto, salvo necessidade operacional antecipada. | Aprovada |
 | DEC-029 | A navegação do Admin Console deve agrupar rotas em menus principais recolhíveis, começando por `Cadastro` para cadastros mestres e `Movimentação` para dados operacionais e fluxos com CRUD. | Aprovada |
+| DEC-030 | Formulários devem limitar caracteres conforme o contrato do banco; campos textuais precisam de constraint no banco, validação no backend e `maxLength` no frontend. | Aprovada |
 
 ---
 

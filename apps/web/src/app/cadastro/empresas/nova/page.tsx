@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation";
 import { AppShell } from "@/components/app-shell";
+import { CompanyForm } from "@/components/company-form";
 import { createAdminCompany, listAdminBasicPlans } from "@/lib/internal-api";
 
 export const dynamic = "force-dynamic";
@@ -19,6 +20,7 @@ export default async function NewCompanyPage({ searchParams }: NewCompanyPagePro
     "use server";
 
     const result = await createAdminCompany({
+      personType: readFormValue(formData, "personType") === "individual" ? "individual" : "legal_entity",
       legalName: readFormValue(formData, "legalName"),
       tradeName: readOptionalFormValue(formData, "tradeName"),
       document: readOptionalFormValue(formData, "document"),
@@ -72,68 +74,7 @@ export default async function NewCompanyPage({ searchParams }: NewCompanyPagePro
           </div>
         </div>
 
-        <form className="form-grid" action={createCompanyAction}>
-          <label>
-            Razao social
-            <input name="legalName" required />
-          </label>
-
-          <label>
-            Nome fantasia
-            <input name="tradeName" />
-          </label>
-
-          <label>
-            Documento
-            <input name="document" />
-          </label>
-
-          <label>
-            Plano base
-            <select name="basicPlanId" defaultValue="">
-              <option value="">Sem plano definido</option>
-              {basicPlans.map((plan) => (
-                <option key={plan.id} value={plan.id}>
-                  {plan.name}
-                </option>
-              ))}
-            </select>
-          </label>
-
-          <label>
-            E-mail principal
-            <input name="primaryEmail" type="email" />
-          </label>
-
-          <label>
-            Telefone principal
-            <input name="primaryPhone" />
-          </label>
-
-          <label>
-            Responsavel principal
-            <input name="primaryResponsibleName" required />
-          </label>
-
-          <label>
-            E-mail do responsavel
-            <input name="primaryResponsibleEmail" type="email" />
-          </label>
-
-          <label className="form-full">
-            Observacoes de implantacao
-            <textarea name="implementationNotes" rows={4} />
-          </label>
-
-          <div className="form-actions">
-            <a className="secondary-action" href="/cadastro/empresas">
-              Cancelar
-            </a>
-            <button className="primary-action" type="submit">
-              Salvar empresa
-            </button>
-          </div>
-        </form>
+        <CompanyForm action={createCompanyAction} basicPlans={basicPlans} />
       </section>
     </AppShell>
   );

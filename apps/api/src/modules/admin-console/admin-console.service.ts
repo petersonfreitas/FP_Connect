@@ -37,6 +37,7 @@ type BasicPlanRow = {
 
 type CompanyRow = {
   id: string;
+  person_type: AdminCompanyContract["personType"];
   legal_name: string;
   trade_name: string | null;
   document: string | null;
@@ -51,7 +52,7 @@ type CompanyRow = {
 };
 
 const companySelect =
-  "id,legal_name,trade_name,document,primary_email,primary_phone,primary_responsible_name,primary_responsible_email,status,basic_plan_id,implementation_notes,created_at";
+  "id,person_type,legal_name,trade_name,document,primary_email,primary_phone,primary_responsible_name,primary_responsible_email,status,basic_plan_id,implementation_notes,created_at";
 
 @Injectable()
 export class AdminConsoleService {
@@ -142,6 +143,7 @@ export class AdminConsoleService {
     const { data, error } = await this.supabase.core
       .from("companies")
       .insert({
+        person_type: company.personType,
         legal_name: company.legalName,
         trade_name: company.tradeName,
         document: company.document,
@@ -221,6 +223,7 @@ function mapBasicPlan(row: BasicPlanRow): AdminBasicPlanContract {
 function mapCompany(row: CompanyRow): AdminCompanyContract {
   return {
     id: row.id,
+    personType: row.person_type,
     legalName: row.legal_name,
     tradeName: row.trade_name,
     document: row.document,
@@ -236,43 +239,135 @@ function mapCompany(row: CompanyRow): AdminCompanyContract {
 }
 
 function normalizeCreateCompanyInput(input: CreateAdminCompanyInput): CreateAdminCompanyInput {
-  const legalName = normalizeRequired(input.legalName, "legalName");
+  const personType = normalizePersonType(input.personType);
+  const legalName = normalizeRequired(input.legalName, "legalName", 180);
   const primaryResponsibleName = normalizeRequired(
     input.primaryResponsibleName,
-    "primaryResponsibleName"
+    "primaryResponsibleName",
+    140
   );
+  const document = normalizeDocument(input.document, personType);
 
   return {
+    personType,
     legalName,
     primaryResponsibleName,
-    tradeName: normalizeOptional(input.tradeName),
-    document: normalizeOptional(input.document),
-    primaryEmail: normalizeOptional(input.primaryEmail),
-    primaryPhone: normalizeOptional(input.primaryPhone),
-    primaryResponsibleEmail: normalizeOptional(input.primaryResponsibleEmail),
+    tradeName: normalizeOptional(input.tradeName, 140),
+    document,
+    primaryEmail: normalizeOptional(input.primaryEmail, 254),
+    primaryPhone: normalizeOptional(input.primaryPhone, 20),
+    primaryResponsibleEmail: normalizeOptional(input.primaryResponsibleEmail, 254),
     basicPlanId: normalizeOptional(input.basicPlanId),
-    implementationNotes: normalizeOptional(input.implementationNotes)
+    implementationNotes: normalizeOptional(input.implementationNotes, 1000)
   };
 }
 
-function normalizeRequired(value: unknown, field: string): string {
+function normalizeRequired(value: unknown, field: string, maxLength: number): string {
   if (typeof value !== "string" || !value.trim()) {
     throw new BadRequestException(`${field} is required`);
   }
 
-  return value.trim();
+  const normalized = value.trim();
+  if (normalized.length > maxLength) {
+    throw new BadRequestException(`${field} must have at most ${maxLength} characters`);
+  }
+
+  return normalized;
 }
 
-function normalizeOptional(value: unknown): string | null {
+function normalizeOptional(value: unknown, maxLength?: number): string | null {
   if (typeof value !== "string") {
     return null;
   }
 
-  return value.trim() || null;
+  const normalized = value.trim();
+  if (!normalized) {
+    return null;
+  }
+
+  if (maxLength && normalized.length > maxLength) {
+    throw new BadRequestException(`Field must have at most ${maxLength} characters`);
+  }
+
+  return normalized;
+}
+
+function normalizePersonType(value: unknown): CreateAdminCompanyInput["personType"] {
+  if (value === "individual" || value === "legal_entity") {
+    return value;
+  }
+
+  throw new BadRequestException("personType must be individual or legal_entity");
+}
+
+function normalizeDocument(
+  value: unknown,
+  personType: CreateAdminCompanyInput["personType"]
+): string {
+  const digits = onlyDigits(typeof value === "string" ? value : "");
+
+  if (personType === "individual") {
+    if (!isValidCpf(digits)) {
+      throw new BadRequestException("CPF invalido");
+    }
+
+    return digits;
+  }
+
+  if (!isValidCnpj(digits)) {
+    throw new BadRequestException("CNPJ invalido");
+  }
+
+  return digits;
 }
 
 function isUuid(value: string): boolean {
   return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
     value
   );
+}
+
+function onlyDigits(value: string): string {
+  return value.replace(/\D/g, "");
+}
+
+function isValidCpf(value: string): boolean {
+  if (!/^\d{11}$/.test(value) || /^(\d)\1+$/.test(value)) {
+    return false;
+  }
+
+  const firstDigit = calculateCpfDigit(value.slice(0, 9));
+  const secondDigit = calculateCpfDigit(`${value.slice(0, 9)}${firstDigit}`);
+
+  return value === `${value.slice(0, 9)}${firstDigit}${secondDigit}`;
+}
+
+function calculateCpfDigit(base: string): number {
+  const weightStart = base.length + 1;
+  const sum = [...base].reduce((total, digit, index) => {
+    return total + Number(digit) * (weightStart - index);
+  }, 0);
+  const rest = (sum * 10) % 11;
+
+  return rest === 10 ? 0 : rest;
+}
+
+function isValidCnpj(value: string): boolean {
+  if (!/^\d{14}$/.test(value) || /^(\d)\1+$/.test(value)) {
+    return false;
+  }
+
+  const firstDigit = calculateCnpjDigit(value.slice(0, 12));
+  const secondDigit = calculateCnpjDigit(`${value.slice(0, 12)}${firstDigit}`);
+
+  return value === `${value.slice(0, 12)}${firstDigit}${secondDigit}`;
+}
+
+function calculateCnpjDigit(base: string): number {
+  const weights =
+    base.length === 12 ? [5, 4, 3, 2, 9, 8, 7, 6, 5, 4, 3, 2] : [6, 5, 4, 3, 2, 9, 8, 7, 6, 5, 4, 3, 2];
+  const sum = [...base].reduce((total, digit, index) => total + Number(digit) * weights[index], 0);
+  const rest = sum % 11;
+
+  return rest < 2 ? 0 : 11 - rest;
 }

@@ -17,6 +17,11 @@ const statusLabels = {
   suspended: "Suspensa"
 };
 
+const personTypeLabels = {
+  individual: "Pessoa Fisica",
+  legal_entity: "Pessoa Juridica"
+};
+
 export default async function CompanyDetailPage({ params }: CompanyDetailPageProps) {
   const { id } = await params;
   const companyResult = await getAdminCompany(id);
@@ -51,6 +56,10 @@ export default async function CompanyDetailPage({ params }: CompanyDetailPagePro
           </div>
 
           <dl className="detail-grid">
+            <div>
+              <dt>Tipo de pessoa</dt>
+              <dd>{personTypeLabels[company.personType]}</dd>
+            </div>
             <div>
               <dt>Nome fantasia</dt>
               <dd>{company.tradeName ?? "Nao informado"}</dd>

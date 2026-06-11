@@ -420,6 +420,38 @@ button.primary-action {
   text-transform: none;
 }
 
+.input-with-action {
+  display: grid;
+  gap: 8px;
+  grid-template-columns: minmax(0, 1fr) auto;
+}
+
+.input-with-action button {
+  white-space: nowrap;
+}
+
+.form-alert {
+  background: #fff7ed;
+  border: 1px solid #fed7aa;
+  border-radius: 8px;
+  color: #7c2d12;
+  font-weight: 700;
+  grid-column: 1 / -1;
+  padding: 12px 14px;
+  text-transform: none;
+}
+
+.form-alert.neutral {
+  background: var(--accent-soft);
+  border-color: #c6d8df;
+  color: var(--accent);
+}
+
+button:disabled {
+  cursor: not-allowed;
+  opacity: 0.65;
+}
+
 .form-grid textarea {
   resize: vertical;
 }
@@ -571,6 +603,10 @@ button.primary-action {
 
   .form-actions {
     justify-content: stretch;
+  }
+
+  .input-with-action {
+    grid-template-columns: 1fr;
   }
 
   .form-actions a,
