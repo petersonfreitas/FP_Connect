@@ -11,10 +11,17 @@
     "build:web": "pnpm --filter @fp/web build",
     "build:api": "pnpm --filter @fp/api build",
     "lint": "turbo lint",
-    "typecheck": "turbo typecheck"
+    "typecheck": "turbo typecheck",
+    "supabase": "supabase",
+    "supabase:version": "supabase --version",
+    "supabase:start": "supabase start",
+    "supabase:stop": "supabase stop",
+    "supabase:status": "supabase status",
+    "db:reset": "supabase db reset"
   },
   "devDependencies": {
     "eslint": "9.39.4",
+    "supabase": "2.106.0",
     "turbo": "2.9.17",
     "typescript": "6.0.3",
     "typescript-eslint": "8.61.0"
