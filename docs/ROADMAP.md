@@ -231,6 +231,15 @@ Depois da base Admin Console + Robots + Food + Tracking, integrar progressivamen
    - qualificação;
    - conversão para Sales.
 
+5. **FP Monitor** — módulo de plataforma/deferido
+   - disponibilidade de APIs internas;
+   - latência e falhas por módulo;
+   - checks de saúde e incidentes;
+   - observabilidade de integrações externas quando existirem;
+   - visual inicial dentro do Admin Console.
+
+O FP Monitor fica planejado para o final do projeto. Pode ser antecipado apenas se a operação exigir visibilidade de saúde das APIs antes da conclusão dos módulos principais.
+
 ---
 
 ## 6. Funcionalidades sensíveis

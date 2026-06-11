@@ -33,6 +33,7 @@ Este arquivo registra decisões arquiteturais e operacionais para evitar retraba
 | DEC-025 | A fundação inicial priorizará APIs internas; APIs públicas/externas ficam como capacidade planejada e só serão implementadas com backlog específico ou autorização explícita. | Aprovada |
 | DEC-026 | APIs públicas/externas deverão usar namespace/versionamento próprios, autenticação de integração, resolução segura de empresa, idempotência quando aplicável, logs e auditoria. | Aprovada |
 | DEC-027 | Webhooks de entrada devem validar origem, assinatura ou token; webhooks de saída, automações, retries e reprocessamentos pertencem preferencialmente ao FP Robots. | Aprovada |
+| DEC-028 | FP Monitor será um módulo de plataforma previsto para observar APIs, serviços, integrações, disponibilidade, latência e incidentes; fica deferido para o final do projeto, salvo necessidade operacional antecipada. | Aprovada |
 
 ---
 

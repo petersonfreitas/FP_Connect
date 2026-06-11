@@ -48,6 +48,12 @@ Módulos futuros:
 3. FP Sales;
 4. FP Marketing.
 
+Módulo de plataforma previsto:
+
+1. FP Monitor.
+
+O FP Monitor deve observar disponibilidade, latência, falhas, saúde de APIs, integrações e incidentes operacionais. Ele fica deferido para o final do projeto, salvo se uma necessidade operacional justificar antecipação.
+
 Os módulos devem ser independentes em responsabilidade, mas integráveis por contratos claros, eventos e APIs internas.
 
 ---
@@ -104,6 +110,7 @@ modules/
   sales/
   tickets/
   billing/
+  monitoring/
 ```
 
 APIs por módulo podem ser extraídas no futuro se houver necessidade real de escala, isolamento operacional ou deploy independente. Até lá, a separação deve ser feita por módulos internos, contratos, rotas, services, DTOs, policies e migrations.
@@ -295,6 +302,7 @@ marketing
 sales
 tickets
 billing
+monitoring
 ```
 
 `auth` é gerenciado pelo Supabase Auth.
@@ -320,6 +328,7 @@ tracking.deliveries
 robots.events
 sales.opportunities
 billing.charges
+monitoring.api_checks
 ```
 
 Schemas por módulo não substituem segurança. Toda entidade de negócio continua exigindo `company_id`, RLS, escopo por empresa, validação de módulo contratado e validação de permissão.
@@ -463,7 +472,28 @@ Nenhum endpoint público, webhook ou integração externa deve ser criado apenas
 
 ---
 
-## 14. Frontend
+## 14. Observabilidade e FP Monitor
+
+O FP Monitor é um módulo de plataforma previsto para observabilidade operacional do ecossistema.
+
+Responsabilidades previstas:
+
+- monitorar disponibilidade das APIs internas;
+- acompanhar latência, status e falhas por módulo;
+- registrar checks, estados de saúde e incidentes operacionais;
+- exibir saúde de serviços no Admin Console;
+- futuramente monitorar integrações externas e APIs públicas.
+
+Separação de responsabilidades:
+
+- FP Robots executa eventos, automações, webhooks, retries e reprocessamentos.
+- FP Monitor observa saúde, disponibilidade, incidentes, latência e degradação.
+
+O FP Monitor deve usar o schema `monitoring` quando for implementado, mantendo o banco único Supabase/PostgreSQL. A primeira versão deve evitar armazenar logs brutos de alto volume no Supabase; priorize resumos, checks, incidentes e estados. Logs pesados, tracing e métricas de alta cardinalidade podem ser integrados futuramente com ferramenta especializada.
+
+---
+
+## 15. Frontend
 
 Interface deve usar português do Brasil.
 
@@ -483,7 +513,7 @@ Não criar telas fora do backlog atual sem autorização.
 
 ---
 
-## 15. Arquivos e anexos
+## 16. Arquivos e anexos
 
 Arquivos devem usar storage adequado.
 
@@ -500,7 +530,7 @@ Evite URLs públicas para arquivos sensíveis.
 
 ---
 
-## 16. Convenções
+## 17. Convenções
 
 Preferir inglês técnico para:
 
@@ -523,7 +553,7 @@ Preferir português do Brasil para:
 
 ---
 
-## 17. Evitar
+## 18. Evitar
 
 Evite:
 
@@ -544,7 +574,7 @@ Evite:
 
 ---
 
-## 18. Diretriz final
+## 19. Diretriz final
 
 A arquitetura deve favorecer:
 

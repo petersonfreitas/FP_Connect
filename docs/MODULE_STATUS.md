@@ -26,6 +26,7 @@ Este arquivo controla o avanço dos módulos do ecossistema.
 | FP Tickets | Futura | 0 | Aguardando fase posterior | Entrará após base operacional. |
 | FP Sales | Futura | 0 | Aguardando fase posterior | Entrará após base operacional. |
 | FP Marketing | Futura | 0 | Aguardando fase posterior | Entrará após base operacional. |
+| FP Monitor | Plataforma/Futura | 0 | Deferido | Módulo de observabilidade de APIs, serviços, integrações e incidentes; pode antecipar se houver necessidade operacional. |
 
 ---
 
