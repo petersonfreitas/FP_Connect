@@ -3,12 +3,24 @@
   "private": true,
   "version": "0.1.0",
   "scripts": {
-    "dev": "node -e \"console.log('apps/api: NestJS scaffold pendente')\"",
-    "build": "node -e \"console.log('apps/api: build pendente ate o scaffold NestJS')\"",
-    "lint": "node -e \"console.log('apps/api: lint pendente ate o scaffold NestJS')\"",
+    "dev": "nest start --watch",
+    "build": "nest build",
+    "start": "node dist/main.js",
+    "lint": "eslint .",
     "typecheck": "tsc --noEmit -p tsconfig.json"
   },
   "devDependencies": {
+    "@nestjs/cli": "11.0.23",
+    "@nestjs/schematics": "11.1.0",
+    "@types/node": "25.9.2",
     "typescript": "6.0.3"
+  },
+  "dependencies": {
+    "@nestjs/common": "11.1.26",
+    "@nestjs/core": "11.1.26",
+    "@nestjs/platform-express": "11.1.26",
+    "@supabase/supabase-js": "2.108.1",
+    "reflect-metadata": "0.2.2",
+    "rxjs": "7.8.2"
   }
 }

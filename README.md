@@ -18,6 +18,14 @@ pnpm lint
 pnpm build
 ```
 
+### Desenvolvimento local
+
+```bash
+pnpm dev:web
+pnpm dev:api
+pnpm dev:stack
+```
+
 ## Supabase
 
 O Supabase CLI é instalado como dev dependency local.
