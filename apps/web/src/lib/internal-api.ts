@@ -2,9 +2,12 @@ import "server-only";
 
 import type {
   AdminBasicPlanContract,
+  AdminCompanyUserContract,
   AdminCompanyContract,
   AdminConsoleOverviewContract,
-  CreateAdminCompanyInput
+  AdminUserContract,
+  CreateAdminCompanyInput,
+  CreateAdminUserInput
 } from "@fp/types";
 import { loadServerEnv } from "./server-env";
 
@@ -36,6 +39,12 @@ export async function getAdminCompany(
   return fetchInternal<AdminCompanyContract>(`admin-console/companies/${id}`);
 }
 
+export async function listAdminCompanyUsers(
+  companyId: string
+): Promise<InternalApiResult<AdminCompanyUserContract[]>> {
+  return fetchInternal<AdminCompanyUserContract[]>(`admin-console/companies/${companyId}/users`);
+}
+
 export async function createAdminCompany(
   input: CreateAdminCompanyInput
 ): Promise<InternalApiResult<AdminCompanyContract>> {
@@ -49,6 +58,19 @@ export async function listAdminBasicPlans(): Promise<
   InternalApiResult<AdminBasicPlanContract[]>
 > {
   return fetchInternal<AdminBasicPlanContract[]>("admin-console/basic-plans");
+}
+
+export async function listAdminUsers(): Promise<InternalApiResult<AdminUserContract[]>> {
+  return fetchInternal<AdminUserContract[]>("admin-console/users");
+}
+
+export async function createAdminUser(
+  input: CreateAdminUserInput
+): Promise<InternalApiResult<AdminCompanyUserContract>> {
+  return fetchInternal<AdminCompanyUserContract>("admin-console/users", {
+    body: JSON.stringify(input),
+    method: "POST"
+  });
 }
 
 async function fetchInternal<T>(

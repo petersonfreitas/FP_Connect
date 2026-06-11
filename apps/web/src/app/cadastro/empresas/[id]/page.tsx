@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { AppShell } from "@/components/app-shell";
-import { getAdminCompany } from "@/lib/internal-api";
+import { getAdminCompany, listAdminCompanyUsers } from "@/lib/internal-api";
 
 export const dynamic = "force-dynamic";
 
@@ -24,8 +24,12 @@ const personTypeLabels = {
 
 export default async function CompanyDetailPage({ params }: CompanyDetailPageProps) {
   const { id } = await params;
-  const companyResult = await getAdminCompany(id);
+  const [companyResult, usersResult] = await Promise.all([
+    getAdminCompany(id),
+    listAdminCompanyUsers(id)
+  ]);
   const company = companyResult.data;
+  const users = usersResult.data ?? [];
 
   return (
     <AppShell activePath="/cadastro/empresas">
@@ -91,6 +95,49 @@ export default async function CompanyDetailPage({ params }: CompanyDetailPagePro
           </dl>
         </section>
       ) : null}
+
+      <section className="content-panel stack-panel">
+        <div className="panel-heading">
+          <div>
+            <h1>Usuarios vinculados</h1>
+            <p>Perfis com vinculo ativo ou convite pendente nesta empresa.</p>
+          </div>
+          <Link className="primary-action" href="/cadastro/usuarios/novo">
+            Novo usuario
+          </Link>
+        </div>
+
+        {usersResult.error ? (
+          <div className="data-alert inline-alert" role="status">
+            <strong>Nao foi possivel carregar usuarios vinculados.</strong>
+            <span>{usersResult.error}</span>
+          </div>
+        ) : null}
+
+        {users.length > 0 ? (
+          <div className="data-table" role="table" aria-label="Usuarios vinculados">
+            <div className="data-row data-row-head" role="row">
+              <span>Usuario</span>
+              <span>E-mail</span>
+              <span>Status</span>
+              <span>Contato</span>
+            </div>
+            {users.map((user) => (
+              <div className="data-row" role="row" key={user.membershipId}>
+                <span>
+                  <strong>{user.fullName}</strong>
+                  <small>{user.id}</small>
+                </span>
+                <span>{user.email ?? "Nao informado"}</span>
+                <span>{user.membershipStatus}</span>
+                <span>{user.isPrimaryContact ? "Principal" : "-"}</span>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <div className="empty-state">Nenhum usuario vinculado a esta empresa ainda.</div>
+        )}
+      </section>
     </AppShell>
   );
 }

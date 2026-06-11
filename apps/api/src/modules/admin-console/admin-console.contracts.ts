@@ -1,5 +1,6 @@
 export type CompanyStatus = "implementation" | "active" | "suspended" | "cancelled";
 export type CompanyPersonType = "individual" | "legal_entity";
+export type UserStatus = "invited" | "active" | "inactive";
 export type ApplicationStatus = "active" | "inactive" | "hidden";
 export type BasicPlanStatus = "active" | "inactive";
 
@@ -54,4 +55,26 @@ export type CreateAdminCompanyInput = {
   primaryResponsibleEmail?: string | null;
   basicPlanId?: string | null;
   implementationNotes?: string | null;
+};
+
+export type AdminUserContract = {
+  id: string;
+  fullName: string;
+  email: string | null;
+  status: UserStatus;
+  createdAt: string;
+};
+
+export type AdminCompanyUserContract = AdminUserContract & {
+  membershipId: string;
+  companyId: string;
+  membershipStatus: UserStatus;
+  isPrimaryContact: boolean;
+};
+
+export type CreateAdminUserInput = {
+  fullName: string;
+  email: string;
+  companyId: string;
+  isPrimaryContact?: boolean;
 };

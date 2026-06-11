@@ -1,15 +1,20 @@
 import {
   BadRequestException,
+  ConflictException,
   Injectable,
   InternalServerErrorException,
   NotFoundException
 } from "@nestjs/common";
+import { randomBytes } from "node:crypto";
 import type {
   AdminApplicationContract,
   AdminBasicPlanContract,
+  AdminCompanyUserContract,
   AdminCompanyContract,
   AdminConsoleOverviewContract,
-  CreateAdminCompanyInput
+  AdminUserContract,
+  CreateAdminCompanyInput,
+  CreateAdminUserInput
 } from "./admin-console.contracts";
 import { SupabaseService } from "../../supabase/supabase.service";
 
@@ -51,8 +56,25 @@ type CompanyRow = {
   created_at: string;
 };
 
+type UserRow = {
+  id: string;
+  full_name: string;
+  email: string | null;
+  status: AdminUserContract["status"];
+  created_at: string;
+};
+
+type CompanyUserRow = {
+  id: string;
+  company_id: string;
+  user_id: string;
+  status: AdminCompanyUserContract["membershipStatus"];
+  is_primary_contact: boolean;
+};
+
 const companySelect =
   "id,person_type,legal_name,trade_name,document,primary_email,primary_phone,primary_responsible_name,primary_responsible_email,status,basic_plan_id,implementation_notes,created_at";
+const userSelect = "id,full_name,email,status,created_at";
 
 @Injectable()
 export class AdminConsoleService {
@@ -114,6 +136,39 @@ export class AdminConsoleService {
     return ((data ?? []) as CompanyRow[]).map(mapCompany);
   }
 
+  async listUsers(): Promise<AdminUserContract[]> {
+    const { data, error } = await this.supabase.core
+      .from("profiles")
+      .select(userSelect)
+      .is("deleted_at", null)
+      .order("created_at", { ascending: false });
+
+    if (error) {
+      throwSupabaseError(error);
+    }
+
+    return ((data ?? []) as UserRow[]).map(mapUser);
+  }
+
+  async listCompanyUsers(companyId: string): Promise<AdminCompanyUserContract[]> {
+    if (!isUuid(companyId)) {
+      throw new BadRequestException("Invalid company id");
+    }
+
+    const { data, error } = await this.supabase.core
+      .from("company_memberships")
+      .select("id,company_id,user_id,status,is_primary_contact")
+      .eq("company_id", companyId)
+      .is("deleted_at", null)
+      .order("created_at", { ascending: false });
+
+    if (error) {
+      throwSupabaseError(error);
+    }
+
+    return this.hydrateCompanyUsers((data ?? []) as CompanyUserRow[]);
+  }
+
   async getCompany(id: string): Promise<AdminCompanyContract> {
     if (!isUuid(id)) {
       throw new BadRequestException("Invalid company id");
@@ -168,6 +223,122 @@ export class AdminConsoleService {
     });
 
     return createdCompany;
+  }
+
+  async createUser(input: CreateAdminUserInput): Promise<AdminCompanyUserContract> {
+    const userInput = normalizeCreateUserInput(input);
+    await this.ensureCompanyExists(userInput.companyId);
+
+    const { data: authData, error: authError } = await this.supabase.admin.auth.admin.createUser({
+      email: userInput.email,
+      email_confirm: false,
+      password: createTemporaryPassword(),
+      user_metadata: {
+        full_name: userInput.fullName
+      }
+    });
+
+    if (authError) {
+      if (authError.message.toLowerCase().includes("already")) {
+        throw new ConflictException("Usuario ja existe no Supabase Auth");
+      }
+
+      throw new InternalServerErrorException({
+        message: "Supabase auth user creation failed",
+        detail: authError.message
+      });
+    }
+
+    const userId = authData.user?.id;
+    if (!userId) {
+      throw new InternalServerErrorException("Supabase Auth did not return a user id");
+    }
+
+    try {
+      const { error: profileError } = await this.supabase.core.from("profiles").insert({
+        id: userId,
+        full_name: userInput.fullName,
+        email: userInput.email,
+        status: "invited",
+        global_role: "company_user"
+      });
+
+      if (profileError) {
+        throw profileError;
+      }
+
+      const { data: membershipData, error: membershipError } = await this.supabase.core
+        .from("company_memberships")
+        .insert({
+          company_id: userInput.companyId,
+          user_id: userId,
+          status: "invited",
+          is_primary_contact: userInput.isPrimaryContact,
+          invited_at: new Date().toISOString()
+        })
+        .select("id,company_id,user_id,status,is_primary_contact")
+        .single();
+
+      if (membershipError) {
+        throw membershipError;
+      }
+
+      const [companyUser] = await this.hydrateCompanyUsers([membershipData as CompanyUserRow]);
+
+      await this.createAuditLog(userInput.companyId, "core.user.invited", "profiles", userId, {
+        email: userInput.email,
+        fullName: userInput.fullName
+      });
+
+      return companyUser;
+    } catch (error) {
+      await this.supabase.admin.auth.admin.deleteUser(userId).catch(() => undefined);
+
+      if (error instanceof Error) {
+        throw new InternalServerErrorException({
+          message: "Core user creation failed",
+          detail: error.message
+        });
+      }
+
+      throw new InternalServerErrorException("Core user creation failed");
+    }
+  }
+
+  private async ensureCompanyExists(companyId: string): Promise<void> {
+    await this.getCompany(companyId);
+  }
+
+  private async hydrateCompanyUsers(
+    memberships: CompanyUserRow[]
+  ): Promise<AdminCompanyUserContract[]> {
+    const userIds = memberships.map((membership) => membership.user_id);
+
+    if (userIds.length === 0) {
+      return [];
+    }
+
+    const { data, error } = await this.supabase.core
+      .from("profiles")
+      .select(userSelect)
+      .in("id", userIds)
+      .is("deleted_at", null);
+
+    if (error) {
+      throwSupabaseError(error);
+    }
+
+    const usersById = new Map(((data ?? []) as UserRow[]).map((user) => [user.id, user]));
+
+    return memberships.flatMap((membership) => {
+      const user = usersById.get(membership.user_id);
+
+      if (!user) {
+        return [];
+      }
+
+      return [mapCompanyUser(membership, user)];
+    });
   }
 
   private async createAuditLog(
@@ -238,6 +409,29 @@ function mapCompany(row: CompanyRow): AdminCompanyContract {
   };
 }
 
+function mapUser(row: UserRow): AdminUserContract {
+  return {
+    id: row.id,
+    fullName: row.full_name,
+    email: row.email,
+    status: row.status,
+    createdAt: row.created_at
+  };
+}
+
+function mapCompanyUser(
+  membership: CompanyUserRow,
+  user: UserRow
+): AdminCompanyUserContract {
+  return {
+    ...mapUser(user),
+    membershipId: membership.id,
+    companyId: membership.company_id,
+    membershipStatus: membership.status,
+    isPrimaryContact: membership.is_primary_contact
+  };
+}
+
 function normalizeCreateCompanyInput(input: CreateAdminCompanyInput): CreateAdminCompanyInput {
   const personType = normalizePersonType(input.personType);
   const legalName = normalizeRequired(input.legalName, "legalName", 180);
@@ -260,6 +454,29 @@ function normalizeCreateCompanyInput(input: CreateAdminCompanyInput): CreateAdmi
     basicPlanId: normalizeOptional(input.basicPlanId),
     implementationNotes: normalizeOptional(input.implementationNotes, 1000)
   };
+}
+
+function normalizeCreateUserInput(input: CreateAdminUserInput): Required<CreateAdminUserInput> {
+  const companyId = normalizeRequired(input.companyId, "companyId", 36);
+  if (!isUuid(companyId)) {
+    throw new BadRequestException("Invalid company id");
+  }
+
+  return {
+    companyId,
+    fullName: normalizeRequired(input.fullName, "fullName", 140),
+    email: normalizeEmail(input.email),
+    isPrimaryContact: Boolean(input.isPrimaryContact)
+  };
+}
+
+function normalizeEmail(value: unknown): string {
+  const email = normalizeRequired(value, "email", 254).toLowerCase();
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+    throw new BadRequestException("E-mail invalido");
+  }
+
+  return email;
 }
 
 function normalizeRequired(value: unknown, field: string, maxLength: number): string {
@@ -394,4 +611,8 @@ function calculateCnpjDigit(base: string): number {
   const rest = sum % 11;
 
   return rest < 2 ? 0 : 11 - rest;
+}
+
+function createTemporaryPassword(): string {
+  return `${randomBytes(24).toString("base64url")}Aa1!`;
 }
