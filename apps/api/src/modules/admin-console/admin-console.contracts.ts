@@ -25,9 +25,13 @@ export type AdminCompanyContract = {
   legalName: string;
   tradeName: string | null;
   document: string | null;
+  primaryEmail: string | null;
+  primaryPhone: string | null;
   primaryResponsibleName: string;
+  primaryResponsibleEmail: string | null;
   status: CompanyStatus;
   basicPlanId: string | null;
+  implementationNotes: string | null;
   createdAt: string;
 };
 
@@ -35,4 +39,16 @@ export type AdminConsoleOverviewContract = {
   applications: AdminApplicationContract[];
   basicPlans: AdminBasicPlanContract[];
   companies: AdminCompanyContract[];
+};
+
+export type CreateAdminCompanyInput = {
+  legalName: string;
+  tradeName?: string | null;
+  document?: string | null;
+  primaryEmail?: string | null;
+  primaryPhone?: string | null;
+  primaryResponsibleName: string;
+  primaryResponsibleEmail?: string | null;
+  basicPlanId?: string | null;
+  implementationNotes?: string | null;
 };

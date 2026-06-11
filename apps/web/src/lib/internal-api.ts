@@ -1,6 +1,11 @@
 import "server-only";
 
-import type { AdminConsoleOverviewContract } from "@fp/types";
+import type {
+  AdminBasicPlanContract,
+  AdminCompanyContract,
+  AdminConsoleOverviewContract,
+  CreateAdminCompanyInput
+} from "@fp/types";
 import { loadServerEnv } from "./server-env";
 
 const DEFAULT_INTERNAL_API_BASE_URL = "http://localhost:3001/api";
@@ -21,7 +26,35 @@ export async function getAdminConsoleOverview(): Promise<
   return fetchInternal<AdminConsoleOverviewContract>("admin-console/overview");
 }
 
-async function fetchInternal<T>(path: string): Promise<InternalApiResult<T>> {
+export async function listAdminCompanies(): Promise<InternalApiResult<AdminCompanyContract[]>> {
+  return fetchInternal<AdminCompanyContract[]>("admin-console/companies");
+}
+
+export async function getAdminCompany(
+  id: string
+): Promise<InternalApiResult<AdminCompanyContract>> {
+  return fetchInternal<AdminCompanyContract>(`admin-console/companies/${id}`);
+}
+
+export async function createAdminCompany(
+  input: CreateAdminCompanyInput
+): Promise<InternalApiResult<AdminCompanyContract>> {
+  return fetchInternal<AdminCompanyContract>("admin-console/companies", {
+    body: JSON.stringify(input),
+    method: "POST"
+  });
+}
+
+export async function listAdminBasicPlans(): Promise<
+  InternalApiResult<AdminBasicPlanContract[]>
+> {
+  return fetchInternal<AdminBasicPlanContract[]>("admin-console/basic-plans");
+}
+
+async function fetchInternal<T>(
+  path: string,
+  init: RequestInit = {}
+): Promise<InternalApiResult<T>> {
   loadServerEnv();
 
   const token = process.env.FP_INTERNAL_API_TOKEN?.trim();
@@ -35,8 +68,11 @@ async function fetchInternal<T>(path: string): Promise<InternalApiResult<T>> {
   const baseUrl = getInternalApiBaseUrl();
   const response = await fetch(`${baseUrl}/${path}`, {
     cache: "no-store",
+    ...init,
     headers: {
-      "X-FP-Internal-Token": token
+      "Content-Type": "application/json",
+      "X-FP-Internal-Token": token,
+      ...init.headers
     }
   }).catch((error: unknown) => {
     const message = error instanceof Error ? error.message : "erro desconhecido";

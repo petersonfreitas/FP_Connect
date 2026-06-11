@@ -1,5 +1,6 @@
-import { Controller, Get, UseGuards } from "@nestjs/common";
+import { Body, Controller, Get, Param, Post, UseGuards } from "@nestjs/common";
 import { InternalApiGuard } from "../../auth/internal-api.guard";
+import type { CreateAdminCompanyInput } from "./admin-console.contracts";
 import { AdminConsoleService } from "./admin-console.service";
 
 @Controller("admin-console")
@@ -25,5 +26,15 @@ export class AdminConsoleController {
   @Get("companies")
   listCompanies() {
     return this.adminConsole.listCompanies();
+  }
+
+  @Get("companies/:id")
+  getCompany(@Param("id") id: string) {
+    return this.adminConsole.getCompany(id);
+  }
+
+  @Post("companies")
+  createCompany(@Body() input: CreateAdminCompanyInput) {
+    return this.adminConsole.createCompany(input);
   }
 }

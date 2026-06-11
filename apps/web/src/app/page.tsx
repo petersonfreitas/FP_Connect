@@ -1,5 +1,6 @@
 import Image from "next/image";
 import type { AdminApplicationContract } from "@fp/types";
+import { AppShell } from "@/components/app-shell";
 import { getAdminConsoleOverview } from "@/lib/internal-api";
 
 export const dynamic = "force-dynamic";
@@ -36,38 +37,7 @@ export default async function Home() {
   const companies = overview?.companies ?? [];
 
   return (
-    <main className="app-shell">
-      <aside className="sidebar" aria-label="Navegacao principal">
-        <div className="sidebar-brand">
-          <Image
-            src="/brand/logo-b.png"
-            alt="FP WebTech"
-            width={270}
-            height={95}
-            priority
-          />
-        </div>
-        <nav className="nav-list">
-          <a className="nav-item active" href="/">
-            Portal
-          </a>
-          <a className="nav-item" href="/">
-            Admin Console
-          </a>
-          <a className="nav-item" href="/">
-            Modulos
-          </a>
-          <a className="nav-item" href="/">
-            Auditoria
-          </a>
-        </nav>
-        <div className="sidebar-foot">
-          <Image src="/brand/icon.png" alt="" width={40} height={40} />
-          <span>FP Connect Foundation</span>
-        </div>
-      </aside>
-
-      <section className="workspace">
+    <AppShell activePath="/">
         <header className="topbar">
           <div>
             <div className="eyebrow">Portal principal</div>
@@ -151,7 +121,6 @@ export default async function Home() {
             </div>
           )}
         </section>
-      </section>
-    </main>
+    </AppShell>
   );
 }
