@@ -1,0 +1,4 @@
+google Maps - Geocoding API
+heigit - polígono
+API Brasil - Dados cadastrais de CNPJ
+

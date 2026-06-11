@@ -1,0 +1,14 @@
+{
+  "name": "@fp/api",
+  "private": true,
+  "version": "0.1.0",
+  "scripts": {
+    "dev": "node -e \"console.log('apps/api: NestJS scaffold pendente')\"",
+    "build": "node -e \"console.log('apps/api: build pendente ate o scaffold NestJS')\"",
+    "lint": "node -e \"console.log('apps/api: lint pendente ate o scaffold NestJS')\"",
+    "typecheck": "tsc --noEmit -p tsconfig.json"
+  },
+  "devDependencies": {
+    "typescript": "6.0.3"
+  }
+}

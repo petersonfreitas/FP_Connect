@@ -1,0 +1,23 @@
+{
+  "name": "fp-connect",
+  "private": true,
+  "version": "0.1.0",
+  "scripts": {
+    "dev": "turbo dev",
+    "dev:web": "pnpm --filter @fp/web dev",
+    "dev:api": "pnpm --filter @fp/api dev",
+    "dev:stack": "turbo dev --filter=@fp/web --filter=@fp/api",
+    "build": "turbo build",
+    "build:web": "pnpm --filter @fp/web build",
+    "build:api": "pnpm --filter @fp/api build",
+    "lint": "turbo lint",
+    "typecheck": "turbo typecheck"
+  },
+  "devDependencies": {
+    "eslint": "9.39.4",
+    "turbo": "2.9.17",
+    "typescript": "6.0.3",
+    "typescript-eslint": "8.61.0"
+  },
+  "packageManager": "pnpm@9.0.0"
+}

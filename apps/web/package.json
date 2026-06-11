@@ -1,0 +1,14 @@
+{
+  "name": "@fp/web",
+  "private": true,
+  "version": "0.1.0",
+  "scripts": {
+    "dev": "node -e \"console.log('apps/web: Next.js scaffold pendente')\"",
+    "build": "node -e \"console.log('apps/web: build pendente ate o scaffold Next.js')\"",
+    "lint": "node -e \"console.log('apps/web: lint pendente ate o scaffold Next.js')\"",
+    "typecheck": "tsc --noEmit -p tsconfig.json"
+  },
+  "devDependencies": {
+    "typescript": "6.0.3"
+  }
+}

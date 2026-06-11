@@ -1,0 +1,5 @@
+Vercel para Next.js
+Supabase para banco/Auth
+Railway para APIs NestJS no MVP
+Render para produção mais estável quando começar a ter clientes reais
+Redis gerenciado separado quando o IPaaS/workers entrarem
