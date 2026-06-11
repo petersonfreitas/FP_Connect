@@ -26,6 +26,19 @@ pnpm dev:api
 pnpm dev:stack
 ```
 
+Copie `.env.example` para `.env` e preencha as variaveis antes de iniciar a API.
+
+### API interna
+
+Endpoints iniciais do Admin Console:
+
+- `GET /api/admin-console/overview`
+- `GET /api/admin-console/applications`
+- `GET /api/admin-console/basic-plans`
+- `GET /api/admin-console/companies`
+
+Essas rotas usam Supabase server-side com `SUPABASE_SERVICE_ROLE_KEY` e exigem o header `X-FP-Internal-Token` com o valor de `FP_INTERNAL_API_TOKEN`.
+
 ## Supabase
 
 O Supabase CLI é instalado como dev dependency local.

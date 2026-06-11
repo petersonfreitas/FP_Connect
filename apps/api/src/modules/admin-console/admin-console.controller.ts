@@ -1,0 +1,29 @@
+import { Controller, Get, UseGuards } from "@nestjs/common";
+import { InternalApiGuard } from "../../auth/internal-api.guard";
+import { AdminConsoleService } from "./admin-console.service";
+
+@Controller("admin-console")
+@UseGuards(InternalApiGuard)
+export class AdminConsoleController {
+  constructor(private readonly adminConsole: AdminConsoleService) {}
+
+  @Get("overview")
+  getOverview() {
+    return this.adminConsole.getOverview();
+  }
+
+  @Get("applications")
+  listApplications() {
+    return this.adminConsole.listApplications();
+  }
+
+  @Get("basic-plans")
+  listBasicPlans() {
+    return this.adminConsole.listBasicPlans();
+  }
+
+  @Get("companies")
+  listCompanies() {
+    return this.adminConsole.listCompanies();
+  }
+}
