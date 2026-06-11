@@ -1,7 +1,5 @@
 import { Injectable } from "@nestjs/common";
 
-type RuntimeEnv = NodeJS.ProcessEnv;
-
 @Injectable()
 export class AppConfigService {
   readonly nodeEnv: string;
@@ -11,7 +9,9 @@ export class AppConfigService {
   readonly supabaseServiceRoleKey: string;
   readonly supabaseAnonKey?: string;
 
-  constructor(env: RuntimeEnv = process.env) {
+  constructor() {
+    const env = process.env;
+
     this.nodeEnv = env.NODE_ENV ?? "development";
     this.port = parsePort(env.PORT);
     this.internalApiToken = readRequired(env, "FP_INTERNAL_API_TOKEN");
@@ -34,7 +34,7 @@ function parsePort(value: string | undefined): number {
   return port;
 }
 
-function readRequired(env: RuntimeEnv, key: string): string {
+function readRequired(env: NodeJS.ProcessEnv, key: string): string {
   const value = env[key]?.trim();
   if (!value) {
     throw new Error(`Missing required environment variable: ${key}`);
@@ -43,12 +43,12 @@ function readRequired(env: RuntimeEnv, key: string): string {
   return value;
 }
 
-function readOptional(env: RuntimeEnv, key: string): string | undefined {
+function readOptional(env: NodeJS.ProcessEnv, key: string): string | undefined {
   const value = env[key]?.trim();
   return value || undefined;
 }
 
-function readRequiredUrl(env: RuntimeEnv, key: string): string {
+function readRequiredUrl(env: NodeJS.ProcessEnv, key: string): string {
   const value = readRequired(env, key);
 
   try {

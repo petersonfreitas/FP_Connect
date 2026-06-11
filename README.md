@@ -53,3 +53,5 @@ pnpm supabase:stop
 ```
 
 O banco é único e separado por schemas de módulo, com `core` centralizando empresas, usuários, permissões, módulos contratados e helpers de autorização.
+
+Para a API Nest consultar `core` via `@supabase/supabase-js`, o schema `core` precisa estar em Supabase Dashboard > Project Settings > Data API > Exposed schemas. No ambiente local, `supabase/config.toml` ja declara `core` em `[api].schemas`.

@@ -48,9 +48,13 @@ async function fetchInternal<T>(path: string): Promise<InternalApiResult<T>> {
   });
 
   if (!response.ok) {
+    const detail = await readErrorDetail(response);
+
     return {
       data: null,
-      error: `API interna respondeu ${response.status} ${response.statusText}`.trim()
+      error: [`API interna respondeu ${response.status} ${response.statusText}`.trim(), detail]
+        .filter(Boolean)
+        .join(": ")
     };
   }
 
@@ -63,4 +67,21 @@ async function fetchInternal<T>(path: string): Promise<InternalApiResult<T>> {
 function getInternalApiBaseUrl(): string {
   const value = process.env.FP_API_INTERNAL_URL?.trim() || DEFAULT_INTERNAL_API_BASE_URL;
   return value.replace(/\/$/, "");
+}
+
+async function readErrorDetail(response: Response): Promise<string | undefined> {
+  const contentType = response.headers.get("content-type") ?? "";
+
+  if (contentType.includes("application/json")) {
+    const body = (await response.json().catch(() => undefined)) as
+      | { detail?: unknown; message?: unknown }
+      | undefined;
+    const detail = typeof body?.detail === "string" ? body.detail : undefined;
+    const message = typeof body?.message === "string" ? body.message : undefined;
+
+    return detail ?? message;
+  }
+
+  const text = await response.text().catch(() => "");
+  return text || undefined;
 }
