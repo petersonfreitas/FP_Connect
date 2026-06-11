@@ -2,6 +2,46 @@ export function onlyDigits(value: string): string {
   return value.replace(/\D/g, "");
 }
 
+export type NormalizedBrazilPhone = {
+  isMobile: boolean;
+  isValid: boolean;
+  value: string;
+};
+
+export function normalizeBrazilPhone(value: string): NormalizedBrazilPhone {
+  const digits = onlyDigits(value);
+
+  if (!digits) {
+    return {
+      isMobile: false,
+      isValid: true,
+      value: ""
+    };
+  }
+
+  const nationalNumber =
+    digits.startsWith("55") && (digits.length === 12 || digits.length === 13)
+      ? digits.slice(2)
+      : digits;
+
+  const isLandline = nationalNumber.length === 10;
+  const isMobile = nationalNumber.length === 11 && nationalNumber[2] === "9";
+
+  if (!isLandline && !isMobile) {
+    return {
+      isMobile: false,
+      isValid: false,
+      value
+    };
+  }
+
+  return {
+    isMobile,
+    isValid: true,
+    value: `+55${nationalNumber}`
+  };
+}
+
 export function isValidCpf(value: string): boolean {
   const digits = onlyDigits(value);
 

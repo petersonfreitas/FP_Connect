@@ -2,7 +2,7 @@
 
 import type { AdminBasicPlanContract, CnpjLookupContract, CompanyPersonType } from "@fp/types";
 import { useState, type FormEvent } from "react";
-import { isValidCnpj, isValidCpf, onlyDigits } from "@/lib/br-documents";
+import { isValidCnpj, isValidCpf, normalizeBrazilPhone, onlyDigits } from "@/lib/br-documents";
 
 type CompanyFormProps = {
   action: (formData: FormData) => void | Promise<void>;
@@ -28,12 +28,25 @@ export function CompanyForm({ action, basicPlans }: CompanyFormProps) {
     const digits = onlyDigits(document);
     const isValidDocument =
       personType === "individual" ? isValidCpf(digits) : isValidCnpj(digits);
+    const normalizedPhone = normalizeBrazilPhone(primaryPhone);
 
     if (!isValidDocument) {
       event.preventDefault();
       setValidationError(`${documentLabel} invalido.`);
       return;
     }
+
+    if (!normalizedPhone.isValid) {
+      event.preventDefault();
+      setValidationError("Telefone invalido. Informe DDD + numero ou +55 + DDD + numero.");
+      return;
+    }
+
+    const phoneInput = event.currentTarget.elements.namedItem("primaryPhone");
+    if (phoneInput instanceof HTMLInputElement) {
+      phoneInput.value = normalizedPhone.value;
+    }
+    setPrimaryPhone(normalizedPhone.value);
 
     setValidationError(null);
   }
@@ -65,7 +78,7 @@ export function CompanyForm({ action, basicPlans }: CompanyFormProps) {
     setLegalName(body.legalName.slice(0, 180));
     setTradeName((body.tradeName ?? "").slice(0, 140));
     setPrimaryEmail((body.primaryEmail ?? "").slice(0, 254));
-    setPrimaryPhone((body.primaryPhone ?? "").slice(0, 20));
+    setPrimaryPhone(normalizeBrazilPhone(body.primaryPhone ?? "").value.slice(0, 20));
 
     if (body.address && !implementationNotes) {
       setImplementationNotes(`Endereco consultado: ${body.address}`.slice(0, 1000));
@@ -179,7 +192,15 @@ export function CompanyForm({ action, basicPlans }: CompanyFormProps) {
         <input
           maxLength={20}
           name="primaryPhone"
+          onBlur={() => {
+            const normalizedPhone = normalizeBrazilPhone(primaryPhone);
+
+            if (normalizedPhone.isValid) {
+              setPrimaryPhone(normalizedPhone.value);
+            }
+          }}
           onChange={(event) => setPrimaryPhone(event.target.value)}
+          placeholder="+55DD9XXXXXXXX"
           value={primaryPhone}
         />
       </label>

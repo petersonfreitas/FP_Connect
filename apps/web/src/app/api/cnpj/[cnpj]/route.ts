@@ -1,6 +1,6 @@
 import type { CnpjLookupContract } from "@fp/types";
 import { NextResponse } from "next/server";
-import { isValidCnpj, onlyDigits } from "@/lib/br-documents";
+import { isValidCnpj, normalizeBrazilPhone, onlyDigits } from "@/lib/br-documents";
 
 const DEFAULT_CNPJ_LOOKUP_BASE_URL = "https://brasilapi.com.br/api/cnpj/v1";
 
@@ -50,7 +50,7 @@ export async function GET(_request: Request, { params }: CnpjRouteProps) {
     legalName: body.razao_social ?? "",
     tradeName: body.nome_fantasia || null,
     primaryEmail: body.email || null,
-    primaryPhone: body.ddd_telefone_1 || null,
+    primaryPhone: normalizeBrazilPhone(body.ddd_telefone_1 ?? "").value || null,
     address: formatAddress(body)
   };
 

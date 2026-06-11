@@ -255,7 +255,7 @@ function normalizeCreateCompanyInput(input: CreateAdminCompanyInput): CreateAdmi
     tradeName: normalizeOptional(input.tradeName, 140),
     document,
     primaryEmail: normalizeOptional(input.primaryEmail, 254),
-    primaryPhone: normalizeOptional(input.primaryPhone, 20),
+    primaryPhone: normalizePhone(input.primaryPhone),
     primaryResponsibleEmail: normalizeOptional(input.primaryResponsibleEmail, 254),
     basicPlanId: normalizeOptional(input.basicPlanId),
     implementationNotes: normalizeOptional(input.implementationNotes, 1000)
@@ -319,6 +319,30 @@ function normalizeDocument(
   }
 
   return digits;
+}
+
+function normalizePhone(value: unknown): string | null {
+  const rawValue = normalizeOptional(value, 20);
+
+  if (!rawValue) {
+    return null;
+  }
+
+  const digits = onlyDigits(rawValue);
+  const nationalNumber =
+    digits.startsWith("55") && (digits.length === 12 || digits.length === 13)
+      ? digits.slice(2)
+      : digits;
+  const isLandline = nationalNumber.length === 10;
+  const isMobile = nationalNumber.length === 11 && nationalNumber[2] === "9";
+
+  if (!isLandline && !isMobile) {
+    throw new BadRequestException(
+      "Telefone invalido. Informe DDD + numero ou +55 + DDD + numero."
+    );
+  }
+
+  return `+55${nationalNumber}`;
 }
 
 function isUuid(value: string): boolean {
