@@ -29,6 +29,11 @@ export class AdminConsoleController {
     return this.adminConsole.listBasicPlans();
   }
 
+  @Get("audit-logs")
+  listAuditLogs() {
+    return this.adminConsole.listAuditLogs();
+  }
+
   @Get("companies")
   listCompanies() {
     return this.adminConsole.listCompanies();

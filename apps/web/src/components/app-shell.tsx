@@ -16,7 +16,7 @@ const cadastroItems = [
 
 const movimentacaoItems = [
   { href: "/", label: "Modulos contratados" },
-  { href: "/", label: "Auditoria" }
+  { href: "/movimentacao/auditoria", label: "Auditoria" }
 ];
 
 export function AppShell({ activePath = "/", children }: AppShellProps) {

@@ -650,6 +650,61 @@ button:disabled {
   font-weight: 800;
 }
 
+.audit-list {
+  display: grid;
+}
+
+.audit-row {
+  align-items: start;
+  border-bottom: 1px solid var(--line);
+  display: grid;
+  gap: 16px;
+  grid-template-columns: minmax(220px, 1.3fr) minmax(180px, 1fr) minmax(180px, 1fr) 150px;
+  padding: 16px 0;
+}
+
+.audit-row:last-child {
+  border-bottom: 0;
+}
+
+.audit-row div,
+.audit-row time {
+  min-width: 0;
+}
+
+.audit-row small {
+  color: var(--muted);
+  display: block;
+  margin-top: 4px;
+  overflow-wrap: anywhere;
+}
+
+.audit-row span,
+.audit-row time {
+  font-weight: 800;
+}
+
+.audit-metadata {
+  grid-column: 1 / -1;
+}
+
+.audit-metadata summary {
+  color: var(--accent);
+  cursor: pointer;
+  font-weight: 900;
+}
+
+.audit-metadata pre {
+  background: var(--accent-soft);
+  border-radius: 8px;
+  color: var(--foreground);
+  font: 13px/1.5 ui-monospace, SFMono-Regular, Consolas, "Liberation Mono", monospace;
+  margin: 12px 0 0;
+  max-height: 240px;
+  overflow: auto;
+  padding: 14px;
+}
+
 .module-grid {
   display: grid;
   gap: 16px;
@@ -747,6 +802,7 @@ button:disabled {
   .data-row,
   .access-grant-form,
   .access-role-row,
+  .audit-row,
   .company-module-row,
   .form-grid,
   .module-status-row,

@@ -7,6 +7,7 @@ import {
 } from "@nestjs/common";
 import { randomBytes } from "node:crypto";
 import type {
+  AdminAuditLogContract,
   AdminApplicationContract,
   AdminBasicPlanContract,
   AdminCompanyApplicationContract,
@@ -122,6 +123,24 @@ type UserApplicationRoleRow = {
   created_at: string;
 };
 
+type AuditLogRow = {
+  id: string;
+  company_id: string | null;
+  actor_user_id: string | null;
+  action: string;
+  entity_schema: string;
+  entity_table: string;
+  entity_id: string | null;
+  metadata: Record<string, unknown>;
+  created_at: string;
+};
+
+type AuditCompanyRow = {
+  id: string;
+  legal_name: string;
+  trade_name: string | null;
+};
+
 const companySelect =
   "id,person_type,legal_name,trade_name,document,primary_email,primary_phone,primary_responsible_name,primary_responsible_email,status,basic_plan_id,implementation_notes,created_at";
 const userSelect = "id,full_name,email,status,created_at";
@@ -132,6 +151,8 @@ const permissionSelect = "id,application_id,key,name,description";
 const roleSelect = "id,application_id,key,name,description";
 const rolePermissionSelect = "role_id,permission_id";
 const userApplicationRoleSelect = "id,company_id,user_id,application_id,role_id,created_at";
+const auditLogSelect =
+  "id,company_id,actor_user_id,action,entity_schema,entity_table,entity_id,metadata,created_at";
 
 @Injectable()
 export class AdminConsoleService {
@@ -216,6 +237,24 @@ export class AdminConsoleService {
     }
 
     return ((data ?? []) as BasicPlanRow[]).map(mapBasicPlan);
+  }
+
+  async listAuditLogs(): Promise<AdminAuditLogContract[]> {
+    const { data, error } = await this.supabase.core
+      .from("audit_logs")
+      .select(auditLogSelect)
+      .order("created_at", { ascending: false })
+      .limit(100);
+
+    if (error) {
+      throwSupabaseError(error);
+    }
+
+    const rows = (data ?? []) as AuditLogRow[];
+    const companyIds = unique(rows.flatMap((row) => (row.company_id ? [row.company_id] : [])));
+    const companiesById = await this.listAuditCompaniesById(companyIds);
+
+    return rows.map((row) => mapAuditLog(row, companiesById.get(row.company_id ?? "")));
   }
 
   async listCompanies(): Promise<AdminCompanyContract[]> {
@@ -664,6 +703,23 @@ export class AdminConsoleService {
     return data as CompanyUserRow;
   }
 
+  private async listAuditCompaniesById(companyIds: string[]): Promise<Map<string, AuditCompanyRow>> {
+    if (companyIds.length === 0) {
+      return new Map();
+    }
+
+    const { data, error } = await this.supabase.core
+      .from("companies")
+      .select("id,legal_name,trade_name")
+      .in("id", companyIds);
+
+    if (error) {
+      throwSupabaseError(error);
+    }
+
+    return new Map(((data ?? []) as AuditCompanyRow[]).map((company) => [company.id, company]));
+  }
+
   private async getApplication(applicationId: string): Promise<ApplicationRow> {
     const { data, error } = await this.supabase.core
       .from("applications")
@@ -934,6 +990,21 @@ function mapCompanyApplication(
     activatedAt: companyApplication?.activated_at ?? null,
     suspendedAt: companyApplication?.suspended_at ?? null,
     cancelledAt: companyApplication?.cancelled_at ?? null
+  };
+}
+
+function mapAuditLog(row: AuditLogRow, company?: AuditCompanyRow): AdminAuditLogContract {
+  return {
+    id: row.id,
+    companyId: row.company_id,
+    companyName: company ? (company.trade_name ?? company.legal_name) : null,
+    actorUserId: row.actor_user_id,
+    action: row.action,
+    entitySchema: row.entity_schema,
+    entityTable: row.entity_table,
+    entityId: row.entity_id,
+    metadata: row.metadata,
+    createdAt: row.created_at
   };
 }
 

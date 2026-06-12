@@ -1,6 +1,7 @@
 import "server-only";
 
 import type {
+  AdminAuditLogContract,
   AdminBasicPlanContract,
   AdminCompanyUserAccessContract,
   AdminCompanyApplicationContract,
@@ -95,6 +96,10 @@ export async function listAdminBasicPlans(): Promise<
   InternalApiResult<AdminBasicPlanContract[]>
 > {
   return fetchInternal<AdminBasicPlanContract[]>("admin-console/basic-plans");
+}
+
+export async function listAdminAuditLogs(): Promise<InternalApiResult<AdminAuditLogContract[]>> {
+  return fetchInternal<AdminAuditLogContract[]>("admin-console/audit-logs");
 }
 
 export async function listAdminUsers(): Promise<InternalApiResult<AdminUserContract[]>> {

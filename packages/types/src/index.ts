@@ -99,6 +99,19 @@ export type AdminCompanyUserAccessContract = {
   grants: AdminUserApplicationRoleContract[];
 };
 
+export type AdminAuditLogContract = {
+  id: string;
+  companyId: string | null;
+  companyName: string | null;
+  actorUserId: string | null;
+  action: string;
+  entitySchema: string;
+  entityTable: string;
+  entityId: string | null;
+  metadata: Record<string, unknown>;
+  createdAt: string;
+};
+
 export type CreateAdminCompanyInput = {
   personType: CompanyPersonType;
   legalName: string;
