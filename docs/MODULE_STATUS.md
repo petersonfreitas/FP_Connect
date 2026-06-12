@@ -1,53 +1,62 @@
-# MODULE_STATUS.md — Status dos Módulos FP WebTech
+# MODULE_STATUS.md - Status dos Modulos FP WebTech
 
-Este arquivo controla o avanço dos módulos do ecossistema.
+Este arquivo controla o avanco dos modulos do ecossistema.
 
-## Níveis de maturidade
+## Niveis de maturidade
 
-| Nível | Nome | Significado |
+| Nivel | Nome | Significado |
 |---|---|---|
-| 0 | Não iniciado | Módulo ainda não possui base validada. |
-| 1 | Shell criado | Rotas, menu, layout e proteção básica existem. |
-| 2 | Base funcional | Entidades, APIs e telas mínimas existem. |
-| 3 | Integração necessária | Módulo chegou até a função necessária para outro fluxo. |
-| 4 | MVP do módulo | Escopo MVP do backlog foi concluído e validado. |
+| 0 | Nao iniciado | Modulo ainda nao possui base validada. |
+| 1 | Shell criado | Rotas, menu, layout e protecao basica existem. |
+| 2 | Base funcional | Entidades, APIs e telas minimas existem. |
+| 3 | Integracao necessaria | Modulo chegou ate a funcao necessaria para outro fluxo. |
+| 4 | MVP do modulo | Escopo MVP do backlog foi concluido e validado. |
 
 ---
 
 ## Status geral
 
-| Módulo | Prioridade atual | Nível | Status | Observação |
+| Modulo | Prioridade atual | Nivel | Status | Observacao |
 |---|---:|---:|---|---|
-| FP Connect Admin Console | Alta | 0 | A confirmar no repositório | Base obrigatória do ecossistema. |
-| FP Robots | Alta | 0 | A confirmar no repositório | Necessário para eventos e automações. |
-| FP Food | Alta | 0 | A confirmar no repositório | Primeiro produto operacional. |
-| FP Tracking | Alta | 0 | A confirmar no repositório | Complemento operacional do Food. |
-| FP Billing | Futura | 0 | Aguardando fase posterior | Entrará após base operacional. |
-| FP Tickets | Futura | 0 | Aguardando fase posterior | Entrará após base operacional. |
-| FP Sales | Futura | 0 | Aguardando fase posterior | Entrará após base operacional. |
-| FP Marketing | Futura | 0 | Aguardando fase posterior | Entrará após base operacional. |
-| FP Monitor | Plataforma/Futura | 0 | Deferido | Módulo de observabilidade de APIs, serviços, integrações e incidentes; pode antecipar se houver necessidade operacional. |
+| FP Connect Admin Console | Alta | 2 | Base funcional em fechamento | Empresas, usuarios, permissoes, modulos contratados, catalogo e auditoria ja possuem API e telas principais. |
+| FP Robots | Alta | 0 | Nao iniciado | Proximo modulo de plataforma recomendado apos hardening final do Admin Console. |
+| FP Food | Alta | 0 | Nao iniciado | Deve nascer como frontend separado quando entrar em desenvolvimento. |
+| FP Tracking | Alta | 0 | Nao iniciado | Deve nascer como frontend separado quando entrar em desenvolvimento. |
+| FP Billing | Futura | 0 | Aguardando fase posterior | Entrara apos base operacional. |
+| FP Tickets | Futura | 0 | Aguardando fase posterior | Entrara apos base operacional. |
+| FP Sales | Futura | 0 | Aguardando fase posterior | Entrara apos base operacional. |
+| FP Marketing | Futura | 0 | Aguardando fase posterior | Entrara apos base operacional. |
+| FP Monitor | Plataforma/Futura | 0 | Deferido | Modulo de observabilidade de APIs, servicos, integracoes e incidentes; pode antecipar se houver necessidade operacional. |
 
 ---
 
-## Checklist — FP Connect Admin Console
+## Checklist - FP Connect Admin Console
 
-- [ ] Empresas
-- [ ] Usuários
-- [ ] Vínculo usuário/empresa
-- [ ] Perfis/permissões
-- [ ] Catálogo de módulos
-- [ ] Módulos contratados por empresa
-- [ ] Bloqueio por empresa/módulo
-- [ ] Layout administrativo base
-- [ ] Auditoria básica
-- [ ] Soft delete
+- [x] Empresas
+- [x] Edicao de empresas
+- [x] Usuarios
+- [x] Edicao de usuarios
+- [x] Vinculo usuario/empresa
+- [x] Perfis/permissoes por usuario, empresa e modulo
+- [x] Catalogo de modulos
+- [x] Catalogo de planos
+- [x] Modulos contratados por empresa
+- [x] Layout administrativo base
+- [x] Menu agrupado em Cadastro, Movimentacao e Auditoria
+- [x] Auditoria basica
+- [x] API interna Nest consumida pelo Next server-side
+- [ ] Autenticacao real da sessao no frontend
+- [ ] `actor_user_id` real nas acoes auditadas
+- [ ] Guards/policies completos por usuario, empresa, permissao e modulo
+- [ ] Bloqueio efetivo por empresa/modulo em todas as rotas sensiveis
+- [ ] Soft delete/inativacao exposto na UI quando autorizado
+- [ ] Smoke test manual dos fluxos principais
 
 ---
 
-## Checklist — FP Robots
+## Checklist - FP Robots
 
-- [ ] Estrutura do módulo
+- [ ] Estrutura do modulo
 - [ ] Registro de eventos
 - [ ] Outbox/event log
 - [ ] Payload
@@ -55,56 +64,70 @@ Este arquivo controla o avanço dos módulos do ecossistema.
 - [ ] Logs de erro
 - [ ] Listagem de eventos
 - [ ] Detalhe de evento
-- [ ] Reprocessamento básico
-- [ ] Integração inicial com Food/Tracking
+- [ ] Reprocessamento basico
+- [ ] Integracao inicial com Food/Tracking
 
 ---
 
-## Checklist — FP Food
+## Checklist - FP Food
 
-- [ ] Configuração da loja
+- [ ] Frontend separado quando iniciar o modulo
+- [ ] Configuracao da loja
 - [ ] Categorias
 - [ ] Produtos
-- [ ] Cardápio
-- [ ] Vitrine pública
-- [ ] Criação de pedido
+- [ ] Cardapio
+- [ ] Vitrine publica
+- [ ] Criacao de pedido
 - [ ] Painel de pedidos
 - [ ] Status do pedido
 - [ ] Pagamento manual, se previsto
 - [ ] Eventos para Robots
-- [ ] Integração com Tracking
+- [ ] Integracao com Tracking
 
 ---
 
-## Checklist — FP Tracking
+## Checklist - FP Tracking
 
-- [ ] Estrutura do módulo
+- [ ] Frontend separado quando iniciar o modulo
+- [ ] Estrutura do modulo
 - [ ] Entregadores
-- [ ] Veículos, se previsto
+- [ ] Veiculos, se previsto
 - [ ] Entregas
 - [ ] Status da entrega
-- [ ] Vínculo com pedido de origem
-- [ ] Criação de entrega a partir do Food
-- [ ] Tela básica de entregas
+- [ ] Vinculo com pedido de origem
+- [ ] Criacao de entrega a partir do Food
+- [ ] Tela basica de entregas
 - [ ] Tela/PWA inicial do entregador, se previsto
-- [ ] Link público de rastreamento
+- [ ] Link publico de rastreamento
 - [ ] Eventos para Robots
 - [ ] Retorno de status para Food
 
 ---
 
+## Proximo marco recomendado
+
+Antes de abrir implementacao pesada em Robots, Food e Tracking, fechar o hardening da fundacao:
+
+1. autenticar sessao real no frontend;
+2. propagar usuario autenticado para a API interna;
+3. gravar auditoria com `actor_user_id` real;
+4. aplicar guards/policies reais nas rotas sensiveis;
+5. validar smoke test completo de empresas, usuarios, permissoes, modulos e auditoria.
+
+---
+
 ## Como atualizar
 
-Atualize este arquivo sempre que um módulo mudar de nível.
+Atualize este arquivo sempre que um modulo mudar de nivel.
 
 Formato recomendado:
 
 ```text
-Módulo:
-Nível anterior:
-Novo nível:
+Modulo:
+Nivel anterior:
+Novo nivel:
 Data:
 Motivo:
 Arquivos/migrations principais:
-Pendências:
+Pendencias:
 ```

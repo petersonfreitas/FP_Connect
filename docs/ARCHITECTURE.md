@@ -1,8 +1,8 @@
-# ARCHITECTURE.md — Arquitetura FP WebTech
+# ARCHITECTURE.md - Arquitetura FP WebTech
 
 ## 1. Objetivo
 
-Este documento define a arquitetura técnica base do ecossistema SaaS da FP WebTech.
+Este documento define a arquitetura tecnica base do ecossistema SaaS da FP WebTech.
 
 Ele deve orientar o desenvolvimento sem substituir:
 
@@ -12,7 +12,7 @@ Ele deve orientar o desenvolvimento sem substituir:
 - `MODULE_STATUS.md`;
 - backlogs funcionais.
 
-Use este arquivo como contrato técnico enxuto para manter consistência entre módulos.
+Use este arquivo como contrato tecnico enxuto para manter consistencia entre modulos.
 
 ---
 
@@ -20,49 +20,47 @@ Use este arquivo como contrato técnico enxuto para manter consistência entre m
 
 O ecossistema usa:
 
-- Monorepo;
+- monorepo;
 - Next.js no frontend;
 - NestJS no backend;
-- Supabase/PostgreSQL como banco;
-- Supabase Storage para arquivos;
+- Supabase/PostgreSQL como banco unico;
+- Supabase Storage para arquivos quando necessario;
 - Vercel para frontend;
 - Visual Studio Code com Codex.
 
-Siga sempre o padrão real já existente no repositório.
+Siga sempre o padrao real ja existente no repositorio.
 
 ---
 
-## 3. Módulos do ecossistema
+## 3. Modulos do ecossistema
 
-Módulos prioritários nesta fase:
+Modulos prioritarios nesta fase:
 
 1. FP Connect Admin Console;
 2. FP Robots;
 3. FP Food;
 4. FP Tracking.
 
-Módulos futuros:
+Modulos futuros:
 
 1. FP Billing;
 2. FP Tickets;
 3. FP Sales;
 4. FP Marketing.
 
-Módulo de plataforma previsto:
+Modulo de plataforma previsto:
 
 1. FP Monitor.
 
-O FP Monitor deve observar disponibilidade, latência, falhas, saúde de APIs, integrações e incidentes operacionais. Ele fica deferido para o final do projeto, salvo se uma necessidade operacional justificar antecipação.
-
-Os módulos devem ser independentes em responsabilidade, mas integráveis por contratos claros, eventos e APIs internas.
+O FP Monitor deve observar disponibilidade, latencia, falhas, saude de APIs, integracoes e incidentes operacionais. Ele fica deferido para o final do projeto, salvo necessidade operacional antecipada.
 
 ---
 
-## 4. Organização geral esperada
+## 4. Organizacao do monorepo
 
-A estrutura real do monorepo deve prevalecer.
+A estrutura real do monorepo prevalece.
 
-Na fundação, manter separação semelhante a:
+Estrutura base:
 
 ```text
 apps/
@@ -75,221 +73,81 @@ packages/
   types/
 ```
 
-Frontend:
+`apps/web` e o shell inicial do ecossistema e hospeda o Admin Console.
 
-```text
-apps/web/
-```
+`apps/api` e a API Nest inicial. Os modulos devem ser separados internamente por dominio, contratos, controllers, services, DTOs, policies e migrations.
 
-`apps/web` é o shell inicial do ecossistema, responsável pelo portal/admin principal.
-
-Módulos com jornada pública ou operacional própria podem nascer em frontends separados quando entrarem em desenvolvimento, sem mudar a regra de banco único. Exemplos previstos:
+Modulos com jornada publica ou operacional propria podem nascer como frontends separados quando entrarem em desenvolvimento. Exemplos previstos:
 
 ```text
 apps/food-web/
 apps/tracking-web/
 ```
 
-Mesmo com frontend separado, o módulo deve usar a mesma autenticação do Supabase Auth, o mesmo controle central de empresas/permissões/módulos contratados e as APIs/backend definidos para o ecossistema.
+Mesmo com frontend separado, cada modulo deve usar:
 
-Backend:
+- o mesmo banco Supabase/PostgreSQL;
+- o mesmo Supabase Auth;
+- o controle central de empresas, permissoes e modulos contratados no schema `core`;
+- APIs/backend definidos para o ecossistema.
 
-```text
-apps/api/
-```
-
-`apps/api` é a aplicação backend inicial. Os módulos devem ser separados internamente por domínio, por exemplo:
-
-```text
-modules/
-  admin-console/
-  robots/
-  food/
-  tracking/
-  marketing/
-  sales/
-  tickets/
-  billing/
-  monitoring/
-```
-
-APIs por módulo podem ser extraídas no futuro se houver necessidade real de escala, isolamento operacional ou deploy independente. Até lá, a separação deve ser feita por módulos internos, contratos, rotas, services, DTOs, policies e migrations.
-
-Código compartilhado:
-
-```text
-packages/
-```
-
-Não reestruture o monorepo sem autorização explícita.
+APIs por modulo podem ser extraidas no futuro se houver necessidade real de escala, isolamento operacional ou deploy independente. Ate la, a separacao fica dentro da aplicacao Nest modular.
 
 ---
 
-## 5. Separação de responsabilidades
+## 5. Separacao de responsabilidades
 
 ### Next.js
 
-Responsável por:
+Responsavel por:
 
 - interface administrativa;
-- telas públicas;
-- portal de módulos;
-- formulários;
-- experiência do usuário;
-- chamadas para APIs;
-- proteção visual por permissão e módulo contratado.
+- telas publicas quando existirem;
+- portal de modulos;
+- formularios;
+- experiencia do usuario;
+- chamadas server-side para APIs internas;
+- protecao visual por permissao e modulo contratado.
 
-O frontend não deve ser a única camada de validação de regra crítica.
+O frontend nao deve ser a unica camada de validacao de regra critica.
 
 ### NestJS
 
-Responsável por:
+Responsavel por:
 
-- APIs (internas e externas);
-- regras de aplicação;
-- validações críticas;
-- permissões;
-- integração entre módulos;
-- orquestração de eventos;
+- APIs internas e, futuramente, APIs publicas/externas;
+- regras de aplicacao;
+- validacoes criticas;
+- permissoes;
+- integracao entre modulos;
+- orquestracao de eventos;
 - acesso controlado ao banco;
-- auditoria quando aplicável.
+- auditoria quando aplicavel.
 
-Na fase atual, a prioridade é construir APIs internas para os frontends e para a comunicação controlada entre módulos do ecossistema.
+Na fase atual, a prioridade e construir APIs internas para os frontends e para comunicacao controlada entre modulos.
 
-APIs públicas/externas para clientes, parceiros ou sistemas terceiros são uma capacidade planejada, mas não fazem parte da fundação inicial sem backlog específico ou autorização explícita.
+APIs publicas/externas para clientes, parceiros ou sistemas terceiros sao capacidade planejada, mas nao fazem parte da fundacao inicial sem backlog especifico ou autorizacao explicita.
 
 ### Supabase/PostgreSQL
 
-Responsável por:
+Responsavel por:
 
-- persistência;
+- persistencia;
 - constraints;
-- índices;
+- indices;
 - migrations;
 - storage quando houver arquivos;
 - RLS.
 
-O ecossistema deve usar um único banco Supabase/PostgreSQL.
+O ecossistema deve usar um unico banco Supabase/PostgreSQL.
 
 ---
 
-## 6. Padrão de módulo
+## 6. Banco, schemas e migrations
 
-Cada módulo deve manter responsabilidade própria.
+Toda alteracao de schema deve ser feita por migration versionada.
 
-Exemplo de organização possível no backend:
-
-```text
-modules/
-  admin-console/
-  robots/
-  food/
-  tracking/
-  shared/
-```
-
-Dentro de cada módulo, usar apenas o necessário:
-
-```text
-controllers/
-services/
-dto/
-repositories/
-guards/
-events/
-tests/
-```
-
-Controllers devem ser simples.
-
-Services concentram regra de aplicação.
-
-DTOs validam entrada.
-
-Guards/policies validam acesso.
-
-Repositories/data-access isolam banco quando esse padrão existir no projeto.
-
----
-
-## 7. Multiempresa
-
-O sistema é SaaS multiempresa.
-
-Toda entidade de negócio deve ter `company_id`, salvo entidade claramente global.
-
-Entidades normalmente globais:
-
-- catálogo de módulos/sistemas;
-- permissões globais;
-- planos-base globais;
-- configurações globais do super admin.
-
-Entidades normalmente por empresa:
-
-- usuários vinculados à empresa;
-- clientes;
-- contatos;
-- pedidos;
-- produtos;
-- entregas;
-- tickets;
-- cobranças;
-- pagamentos;
-- eventos;
-- logs operacionais.
-
-Nenhuma empresa pode acessar dados de outra empresa.
-
-Consultas, APIs e regras devem sempre respeitar o escopo da empresa.
-
----
-
-## 8. Permissões e módulos contratados
-
-Toda ação sensível deve validar:
-
-1. usuário autenticado;
-2. empresa ativa;
-3. vínculo do usuário com a empresa;
-4. permissão do usuário;
-5. módulo contratado/liberado, quando aplicável;
-6. escopo por `company_id`.
-
-Menus podem ser ocultados no frontend, mas segurança real deve estar no backend, no banco ou em ambos.
-
----
-
-## 9. Soft delete
-
-Toda exclusão de registro de negócio deve usar soft delete.
-
-Padrão recomendado:
-
-```text
-deleted_at
-deleted_by
-delete_reason
-```
-
-`deleted_by` e `delete_reason` devem ser usados quando fizer sentido para auditoria.
-
-Consultas padrão devem ignorar registros com `deleted_at` preenchido.
-
-Hard delete só deve ser usado para:
-
-- dados temporários;
-- dados descartáveis;
-- seeds de desenvolvimento;
-- casos autorizados explicitamente.
-
----
-
-## 10. Banco e migrations
-
-Toda alteração de schema deve ser feita por migration versionada.
-
-O banco é único para todo o ecossistema. A separação de módulos deve ser feita por schemas PostgreSQL, não por bancos separados.
+A separacao de modulos deve ser feita por schemas PostgreSQL, nao por bancos separados.
 
 Schemas previstos:
 
@@ -305,22 +163,22 @@ billing
 monitoring
 ```
 
-`auth` é gerenciado pelo Supabase Auth.
+`auth` e gerenciado pelo Supabase Auth.
 
-`core` é o schema central do Admin Console e deve concentrar a base comum do ecossistema:
+`core` e o schema central do Admin Console e deve concentrar:
 
 ```text
 empresas
-perfis de usuário
-vínculos usuário x empresa
-catálogo de módulos/sistemas
-módulos contratados por empresa
-papéis e permissões
+perfis de usuario
+vinculos usuario x empresa
+catalogo de modulos/sistemas
+modulos contratados por empresa
+papeis e permissoes
 auditoria administrativa
-funções auxiliares de autorização
+funcoes auxiliares de autorizacao
 ```
 
-Cada módulo deve armazenar suas entidades próprias no schema do módulo. Exemplo:
+Cada modulo deve armazenar suas entidades proprias no schema do modulo. Exemplos:
 
 ```text
 food.orders
@@ -331,37 +189,153 @@ billing.charges
 monitoring.api_checks
 ```
 
-Schemas por módulo não substituem segurança. Toda entidade de negócio continua exigindo `company_id`, RLS, escopo por empresa, validação de módulo contratado e validação de permissão.
-
-As policies dos schemas de módulo devem reutilizar, sempre que possível, funções centralizadas em `core`, por exemplo:
-
-```text
-core.user_has_company_access(...)
-core.company_has_module(...)
-core.user_has_permission(...)
-```
+Schemas por modulo nao substituem seguranca. Toda entidade de negocio continua exigindo `company_id`, RLS, escopo por empresa, validacao de modulo contratado e validacao de permissao.
 
 Regras:
 
 - tabelas e colunas em `snake_case`;
-- usar UUID quando esse for o padrão do projeto;
+- usar UUID quando esse for o padrao do projeto;
 - usar `created_at`;
 - usar `updated_at`;
-- usar `deleted_at` em entidades de negócio;
-- incluir `company_id` em entidades de negócio;
-- criar índices para `company_id`, status e relacionamentos frequentes;
-- criar tabelas no schema correto do módulo;
-- evitar duplicar tabelas de usuário, empresa, permissões ou módulos fora do `core`;
+- usar `deleted_at` em entidades de negocio;
+- incluir `company_id` em entidades de negocio;
+- criar indices para `company_id`, status e relacionamentos frequentes;
+- criar tabelas no schema correto do modulo;
+- evitar duplicar usuarios, empresas, permissoes ou modulos fora do `core`;
 - evitar migrations duplicadas;
-- não apagar dados em migration sem autorização.
+- nao apagar dados em migration sem autorizacao.
 
 ---
 
-## 11. Eventos e FP Robots
+## 7. Multiempresa, permissoes e modulos contratados
 
-O FP Robots é o centro de eventos, logs, webhooks, e-mails, reprocessamentos e automações.
+O sistema e SaaS multiempresa.
 
-Eventos devem ser criados somente quando estiverem no backlog da etapa atual ou quando houver autorização explícita.
+Toda entidade de negocio deve ter `company_id`, salvo entidade claramente global.
+
+Toda acao sensivel deve validar:
+
+1. usuario autenticado;
+2. empresa ativa;
+3. vinculo do usuario com a empresa;
+4. permissao do usuario;
+5. modulo contratado/liberado, quando aplicavel;
+6. escopo por `company_id`.
+
+Menus podem ser ocultados no frontend, mas seguranca real deve estar no backend, no banco ou em ambos.
+
+Entidades normalmente globais:
+
+- catalogo de modulos/sistemas;
+- permissoes globais;
+- planos-base globais;
+- configuracoes globais do super admin.
+
+Entidades normalmente por empresa:
+
+- usuarios vinculados a empresa;
+- clientes;
+- contatos;
+- pedidos;
+- produtos;
+- entregas;
+- tickets;
+- cobrancas;
+- pagamentos;
+- eventos;
+- logs operacionais.
+
+Nenhuma empresa pode acessar dados de outra empresa.
+
+---
+
+## 8. Variaveis de ambiente e fronteira navegador/servidor
+
+Variaveis sensiveis devem ficar server-side.
+
+Regra atual:
+
+- `SUPABASE_SERVICE_ROLE_KEY` nunca pode ser exposta ao navegador;
+- `FP_INTERNAL_API_TOKEN` nunca pode ser exposto ao navegador;
+- `SUPABASE_URL` fica server-side no estado atual do projeto;
+- `SUPABASE_ANON_KEY` nao e usada pelo frontend no navegador no estado atual;
+- variaveis sem prefixo `NEXT_PUBLIC_` nao devem ser usadas por codigo client-side.
+
+O frontend web atual consome a API interna pelo server-side do Next usando `apps/web/src/lib/internal-api.ts`, que usa `server-only`.
+
+Se futuramente houver cliente Supabase direto no navegador, a exposicao deve ser explicita e limitada a:
+
+```text
+NEXT_PUBLIC_SUPABASE_URL
+NEXT_PUBLIC_SUPABASE_ANON_KEY
+```
+
+Nesse caso, a seguranca deve depender de RLS, policies, permissoes e escopo por empresa. A service role continua proibida no frontend.
+
+---
+
+## 9. APIs internas, publicas e integracoes
+
+### APIs internas
+
+APIs internas sao usadas pelos frontends do ecossistema e por modulos internos.
+
+Exemplos:
+
+```text
+/api/admin-console/...
+/api/robots/...
+/api/food/...
+/api/tracking/...
+```
+
+Regras:
+
+- exigem usuario autenticado, empresa ativa, vinculo, permissao, modulo contratado e escopo por `company_id`;
+- nao devem confiar em `company_id` enviado livremente pelo frontend;
+- devem aplicar regras criticas no backend, banco ou ambos;
+- devem usar contratos compartilhados quando houver acoplamento relevante entre modulos.
+
+### APIs publicas/externas
+
+APIs publicas/externas sao endpoints expostos para clientes, parceiros ou sistemas terceiros integrarem com o ecossistema.
+
+Elas devem ser preparadas arquiteturalmente, mas nao implementadas na fundacao inicial sem backlog especifico ou autorizacao explicita.
+
+Quando forem criadas, devem usar namespace e versionamento proprios:
+
+```text
+/public-api/v1/...
+/integrations/v1/...
+```
+
+Regras obrigatorias:
+
+- versionamento explicito;
+- autenticacao propria por chave, token, assinatura ou credencial de integracao;
+- resolucao da empresa pela credencial/dominio/integracao, nunca por `company_id` livre;
+- validacao de modulo contratado e permissoes da integracao;
+- rate limit quando aplicavel;
+- idempotencia para criacao de registros, eventos, pedidos, entregas ou cobrancas;
+- logs e auditoria;
+- respostas de erro claras, sem vazamento de dados sensiveis;
+- contrato documentado antes da implementacao.
+
+### Webhooks e eventos externos
+
+Webhooks de entrada devem validar origem, assinatura ou token antes de processar dados.
+
+Quando possivel, a entrada externa deve registrar um evento bruto ou outbox antes de executar regra de negocio sensivel.
+
+Webhooks de saida, automacoes, e-mails, retries e reprocessamentos pertencem ao FP Robots, salvo excecao autorizada.
+
+---
+
+## 10. FP Robots e eventos
+
+O FP Robots e o centro de eventos, logs, webhooks, e-mails, reprocessamentos e automacoes.
+
+Eventos devem ser criados somente quando estiverem no backlog da etapa atual ou quando houver autorizacao explicita.
 
 Formato conceitual recomendado:
 
@@ -378,224 +352,167 @@ Formato conceitual recomendado:
 }
 ```
 
-Quando possível, usar padrão outbox/event log:
+Quando possivel, usar padrao outbox/event log:
 
 ```text
-ação principal
-→ grava evento
-→ Robots processa
-→ logs registram sucesso ou falha
+acao principal
+-> grava evento
+-> Robots processa
+-> logs registram sucesso ou falha
 ```
 
 ---
 
-## 12. Comunicação entre módulos
+## 11. FP Monitor
 
-Módulos não devem acessar regras internas uns dos outros diretamente sem contrato claro.
-
-Formas aceitáveis de integração:
-
-- service interno bem definido;
-- API interna;
-- evento;
-- outbox/event log;
-- contrato compartilhado em types, quando existir.
-
-Ao transitar entre módulos por dependência:
-
-- construir base mínima coerente;
-- implementar apenas até a função necessária;
-- retornar ao fluxo original.
-
-Não criar função isolada em outro módulo sem base de domínio.
-
----
-
-## 13. APIs internas, APIs públicas e integrações externas
-
-O backend deve diferenciar claramente APIs internas, APIs públicas/externas e webhooks.
-
-### APIs internas
-
-APIs internas são usadas pelos frontends do ecossistema e por módulos internos.
-
-Exemplos conceituais:
-
-```text
-/api/admin-console/...
-/api/robots/...
-/api/food/...
-/api/tracking/...
-```
-
-Regras:
-
-- exigem usuário autenticado, empresa ativa, vínculo, permissão, módulo contratado e escopo por `company_id`;
-- não devem confiar em `company_id` enviado livremente pelo frontend;
-- devem aplicar regras críticas no backend, banco ou ambos;
-- devem usar contratos compartilhados quando houver acoplamento relevante entre módulos.
-
-### APIs públicas/externas
-
-APIs públicas/externas são endpoints expostos para clientes, parceiros ou sistemas terceiros integrarem com o ecossistema.
-
-Elas devem ser preparadas arquiteturalmente, mas não devem ser implementadas na fundação inicial sem backlog específico ou autorização explícita.
-
-Quando forem criadas, devem usar namespace e versionamento próprios, por exemplo:
-
-```text
-/public-api/v1/...
-/integrations/v1/...
-```
-
-Regras obrigatórias para API pública/externa:
-
-- versionamento explícito;
-- autenticação própria por chave, token, assinatura ou credencial de integração;
-- resolução da empresa pela credencial/domínio/integração, nunca por `company_id` livre;
-- validação de módulo contratado e permissões da integração;
-- rate limit quando aplicável;
-- idempotência para criação de registros, eventos, pedidos, entregas ou cobranças;
-- logs e auditoria;
-- respostas de erro claras, sem vazamento de dados sensíveis;
-- contrato documentado antes da implementação.
-
-### Webhooks e eventos externos
-
-Webhooks de entrada devem validar origem, assinatura ou token antes de processar dados.
-
-Quando possível, a entrada externa deve registrar um evento bruto ou outbox antes de executar regra de negócio sensível.
-
-Webhooks de saída, automações, e-mails, retries e reprocessamentos pertencem ao FP Robots, salvo exceção autorizada.
-
-Nenhum endpoint público, webhook ou integração externa deve ser criado apenas por conveniência local de um módulo.
-
----
-
-## 14. Observabilidade e FP Monitor
-
-O FP Monitor é um módulo de plataforma previsto para observabilidade operacional do ecossistema.
+O FP Monitor e um modulo de plataforma previsto para observabilidade operacional do ecossistema.
 
 Responsabilidades previstas:
 
 - monitorar disponibilidade das APIs internas;
-- acompanhar latência, status e falhas por módulo;
-- registrar checks, estados de saúde e incidentes operacionais;
-- exibir saúde de serviços no Admin Console;
-- futuramente monitorar integrações externas e APIs públicas.
+- acompanhar latencia, status e falhas por modulo;
+- registrar checks, estados de saude e incidentes operacionais;
+- exibir saude de servicos no Admin Console;
+- futuramente monitorar integracoes externas e APIs publicas.
 
-Separação de responsabilidades:
+FP Robots executa eventos, automacoes, webhooks, retries e reprocessamentos.
 
-- FP Robots executa eventos, automações, webhooks, retries e reprocessamentos.
-- FP Monitor observa saúde, disponibilidade, incidentes, latência e degradação.
+FP Monitor observa saude, disponibilidade, incidentes, latencia e degradacao.
 
-O FP Monitor deve usar o schema `monitoring` quando for implementado, mantendo o banco único Supabase/PostgreSQL. A primeira versão deve evitar armazenar logs brutos de alto volume no Supabase; priorize resumos, checks, incidentes e estados. Logs pesados, tracing e métricas de alta cardinalidade podem ser integrados futuramente com ferramenta especializada.
+O FP Monitor deve usar o schema `monitoring` quando for implementado. A primeira versao deve evitar logs brutos de alto volume no Supabase; priorize resumos, checks, incidentes e estados.
 
 ---
 
-## 15. Frontend
+## 12. Frontend
 
-Interface deve usar português do Brasil.
+Interface deve usar portugues do Brasil.
 
-Código interno pode usar inglês técnico.
+Codigo interno pode usar ingles tecnico.
 
-Telas devem prever, quando aplicável:
+Telas devem prever, quando aplicavel:
 
 - loading;
 - vazio;
 - erro;
 - sucesso;
-- confirmação de ação destrutiva;
-- bloqueio por permissão;
-- bloqueio por módulo contratado.
+- confirmacao de acao destrutiva;
+- bloqueio por permissao;
+- bloqueio por modulo contratado.
 
-Formulários devem respeitar o mesmo contrato do banco:
+Formularios devem respeitar o mesmo contrato do banco:
 
-- campos textuais com limite explícito por constraint;
-- validação equivalente no backend;
+- campos textuais com limite explicito por constraint;
+- validacao equivalente no backend;
 - `maxLength` no frontend;
-- validação de documentos oficiais quando aplicável, como CPF e CNPJ.
+- validacao de documentos oficiais quando aplicavel, como CPF e CNPJ;
+- normalizacao de telefone/celular quando aplicavel.
 
-No Admin Console, a navegação principal deve usar grupos recolhíveis. Os grupos iniciais são:
+No Admin Console, a navegacao principal deve usar grupos recolhiveis:
 
-- `Cadastro`: cadastros mestres e configurações estruturais, como empresas, usuários, planos, módulos, papéis e permissões;
-- `Movimentação`: dados operacionais, fluxos de trabalho e registros já cadastrados que podem evoluir por CRUD ou mudança de status.
+- `Cadastro`: cadastros mestres e configuracoes estruturais, como empresas, usuarios, planos, modulos, papeis e permissoes;
+- `Movimentacao`: dados operacionais, fluxos de trabalho e registros ja cadastrados que podem evoluir por CRUD ou mudanca de status;
+- `Auditoria`: trilhas e analises por escopo, como empresas, usuarios, modulos e sistema.
 
-Não criar telas fora do backlog atual sem autorização.
+Nao criar telas fora do backlog atual sem autorizacao.
 
 ---
 
-## 16. Arquivos e anexos
+## 13. Soft delete
+
+Toda exclusao de registro de negocio deve usar soft delete.
+
+Padrao recomendado:
+
+```text
+deleted_at
+deleted_by
+delete_reason
+```
+
+Consultas padrao devem ignorar registros com `deleted_at` preenchido.
+
+Hard delete so deve ser usado para:
+
+- dados temporarios;
+- dados descartaveis;
+- seeds de desenvolvimento;
+- casos autorizados explicitamente.
+
+---
+
+## 14. Arquivos e anexos
 
 Arquivos devem usar storage adequado.
 
-Todo arquivo sensível deve considerar:
+Todo arquivo sensivel deve considerar:
 
 - `company_id`;
 - recurso dono;
-- permissão de acesso;
+- permissao de acesso;
 - tipo de arquivo;
-- tamanho máximo;
-- auditoria quando aplicável.
+- tamanho maximo;
+- auditoria quando aplicavel.
 
-Evite URLs públicas para arquivos sensíveis.
+Evite URLs publicas para arquivos sensiveis.
 
 ---
 
-## 17. Convenções
+## 15. Convencoes
 
-Preferir inglês técnico para:
+Preferir ingles tecnico para:
 
 - nomes de tabelas;
 - colunas;
-- variáveis;
-- funções;
+- variaveis;
+- funcoes;
 - classes;
 - DTOs;
 - eventos;
 - rotas de API.
 
-Preferir português do Brasil para:
+Preferir portugues do Brasil para:
 
 - labels;
-- títulos;
-- botões;
+- titulos;
+- botoes;
 - mensagens;
-- validações exibidas ao usuário.
+- validacoes exibidas ao usuario.
 
 ---
 
-## 18. Evitar
+## 16. Evitar
 
 Evite:
 
-- regra crítica apenas no frontend;
+- regra critica apenas no frontend;
 - acesso entre empresas;
-- hard delete em dados de negócio;
+- hard delete em dados de negocio;
 - entidades sem `company_id`;
 - migrations sem necessidade;
-- eventos sem backlog ou autorização;
-- endpoint público sem backlog/autorização;
-- misturar API interna com API pública;
-- webhook sem validação de origem, assinatura ou token;
-- integração externa sem autorização;
-- bibliotecas sem justificativa;
-- reestruturação global sem autorização;
-- duplicação de regra entre módulos;
-- função isolada sem base de domínio.
+- eventos sem backlog ou autorizacao;
+- endpoint publico sem backlog/autorizacao;
+- misturar API interna com API publica;
+- webhook sem validacao de origem, assinatura ou token;
+- integracao externa sem autorizacao;
+- variavel sensivel no navegador;
+- service role no frontend;
+- biblioteca sem justificativa;
+- reestruturacao global sem autorizacao;
+- duplicacao de regra entre modulos;
+- funcao isolada sem base de dominio.
 
 ---
 
-## 19. Diretriz final
+## 17. Diretriz final
 
 A arquitetura deve favorecer:
 
 - modularidade;
-- segurança;
+- seguranca;
 - multiempresa;
 - soft delete;
-- permissões;
+- permissoes;
 - eventos controlados;
 - baixo acoplamento;
-- implementação incremental;
-- integração progressiva por fluxo real.
+- implementacao incremental;
+- integracao progressiva por fluxo real.

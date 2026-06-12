@@ -1,17 +1,17 @@
-# ROADMAP.md — FP WebTech Ecosystem
+# ROADMAP.md - FP WebTech Ecosystem
 
 ## 1. Objetivo
 
-Este roadmap orienta a construção inicial do ecossistema SaaS da FP WebTech com foco em produtividade, segurança e integração progressiva entre módulos.
+Este roadmap orienta a construcao inicial do ecossistema SaaS da FP WebTech com foco em produtividade, seguranca e integracao progressiva entre modulos.
 
-A regra central é:
+A regra central e:
 
 ```text
 Backlogs orientam a prioridade.
-Fluxos reais orientam a implementação.
-Dependências autorizam transição.
-Transição exige base mínima coerente.
-Implementação deve ir só até o ponto necessário.
+Fluxos reais orientam a implementacao.
+Dependencias autorizam transicao.
+Transicao exige base minima coerente.
+Implementacao deve ir so ate o ponto necessario.
 Depois retorna ao fluxo original.
 ```
 
@@ -19,69 +19,96 @@ Depois retorna ao fluxo original.
 
 ## 2. Foco atual
 
-Nesta fase, priorizar os módulos:
+Prioridade atual:
 
-1. **FP Connect Admin Console**
-2. **FP Robots**
-3. **FP Food**
-4. **FP Tracking**
+1. fechar a fundacao do **FP Connect Admin Console**;
+2. preparar o shell e contratos iniciais do **FP Robots**;
+3. iniciar **FP Food** como primeiro produto operacional;
+4. iniciar **FP Tracking** como complemento operacional do Food.
 
-Os demais módulos entram depois, integrando com a base criada.
+Food e Tracking podem nascer com frontends separados, mas sempre usando o mesmo banco Supabase/PostgreSQL, o mesmo Supabase Auth e o controle central do schema `core`.
 
 ---
 
-## 3. Macrofluxo inicial desejado
+## 3. Estagio atual
+
+O Admin Console esta em **Nivel 2 - Base funcional**.
+
+Ja foram implementados:
+
+- API Nest interna com Supabase server-side;
+- consumo server-side pelo Next;
+- painel principal com dados reais do `core`;
+- empresas: cadastro, listagem, detalhe e edicao;
+- usuarios: cadastro, listagem e edicao;
+- vinculo usuario x empresa;
+- papeis/permissoes por usuario, empresa e modulo;
+- catalogo de planos e modulos;
+- modulos contratados por empresa;
+- auditoria administrativa com categoria propria;
+- menu administrativo em `Cadastro`, `Movimentacao` e `Auditoria`;
+- validacoes de formulario alinhadas ao banco em pontos ja implementados;
+- regra documentada para API interna, API publica futura e variaveis server-side.
+
+Pendencias de fundacao antes dos modulos operacionais:
+
+- autenticacao real da sessao no frontend;
+- propagacao do usuario autenticado para a API interna;
+- `actor_user_id` real na auditoria;
+- guards/policies completos por usuario, empresa, permissao e modulo;
+- bloqueio efetivo por modulo contratado nas rotas sensiveis;
+- soft delete/inativacao exposto na UI quando autorizado;
+- smoke test manual dos fluxos principais.
+
+---
+
+## 4. Macrofluxo desejado
 
 ```text
 Admin Console
-→ libera empresa, usuários, permissões e módulos contratados
-→ Food permite loja/cardápio/pedido
-→ Tracking permite entrega/rastreamento
-→ Robots registra eventos e prepara automações
+-> libera empresa, usuarios, permissoes e modulos contratados
+-> Food permite loja/cardapio/pedido
+-> Tracking permite entrega/rastreamento
+-> Robots registra eventos e prepara automacoes
 ```
 
 Primeiro fluxo operacional integrado:
 
 ```text
 Empresa ativa
-→ módulo Food contratado
-→ loja configurada
-→ cliente faz pedido
-→ pedido é aceito
-→ entrega é criada no Tracking
-→ status da entrega evolui
-→ eventos são registrados no Robots
-→ cliente acompanha rastreamento público
+-> modulo Food contratado
+-> loja configurada
+-> cliente faz pedido
+-> pedido e aceito
+-> entrega e criada no Tracking
+-> status da entrega evolui
+-> eventos sao registrados no Robots
+-> cliente acompanha rastreamento publico
 ```
 
 ---
 
-## 4. Etapas recomendadas
+## 5. Proximos blocos recomendados
 
-### Etapa 1 — Base comum/Admin Console mínimo
+### Bloco A - Hardening final do Admin Console
 
-Objetivo: criar a base que todos os módulos usarão.
+Objetivo: transformar a base funcional em fundacao segura para escalar.
 
-Itens principais:
+Itens:
 
-- empresas;
-- usuários;
-- vínculo usuário/empresa;
-- permissões;
-- sistemas/módulos disponíveis;
-- módulos contratados por empresa;
-- bloqueio por empresa/módulo;
-- layout administrativo base;
-- soft delete;
-- auditoria básica.
+- login/sessao real no frontend;
+- leitura do usuario autenticado;
+- envio seguro do contexto para a API interna;
+- auditoria com `actor_user_id` real;
+- guards/policies nas rotas sensiveis;
+- revisao de bloqueios por empresa, permissao e modulo contratado;
+- smoke test de empresas, usuarios, permissoes, modulos e auditoria.
 
----
+### Bloco B - Shell dos modulos prioritarios
 
-### Etapa 2 — Shell dos módulos prioritários
+Objetivo: criar estrutura visual e de navegacao para os modulos.
 
-Objetivo: criar a estrutura visual e de navegação dos módulos prioritários.
-
-Módulos:
+Modulos:
 
 - Admin Console;
 - Robots;
@@ -92,158 +119,125 @@ Cada shell deve ter:
 
 - rota;
 - menu;
-- página inicial;
-- proteção por login;
-- proteção por empresa;
-- proteção por módulo contratado;
+- pagina inicial;
+- protecao por login;
+- protecao por empresa;
+- protecao por modulo contratado;
 - estado vazio;
 - estrutura inicial de pastas/componentes.
 
----
-
-### Etapa 3 — Robots mínimo
+### Bloco C - Robots minimo
 
 Objetivo: preparar o registro de eventos do ecossistema.
 
-Itens principais:
+Itens:
 
-- estrutura do módulo Robots;
-- tabela/event log ou outbox;
+- schema/tabelas do modulo Robots;
+- event log ou outbox;
 - evento com `company_id`;
-- módulo de origem;
-- tipo de recurso;
-- recurso de origem;
+- modulo de origem;
+- tipo e id do recurso de origem;
 - payload;
 - status;
-- erro/log básico;
-- listagem simples;
-- detalhe simples;
-- reprocessamento básico, se previsto no backlog.
+- erro/log basico;
+- listagem e detalhe simples.
 
----
-
-### Etapa 4 — Food até pedido funcional
+### Bloco D - Food ate pedido funcional
 
 Objetivo: criar o primeiro produto operacional.
 
-Itens principais:
+Itens:
 
-- configuração básica da loja;
+- frontend Food separado quando iniciar;
+- configuracao basica da loja;
 - categorias;
 - produtos;
-- cardápio;
-- vitrine pública;
-- criação de pedido;
+- cardapio;
+- vitrine publica;
+- criacao de pedido;
 - painel de pedidos;
 - status do pedido;
-- pagamento manual, se previsto no backlog;
-- eventos necessários para Robots.
+- eventos necessarios para Robots.
 
----
+### Bloco E - Tracking ate entrega funcional
 
-### Etapa 5 — Tracking até entrega funcional
+Objetivo: criar a base minima para atender o fluxo de entrega do Food.
 
-Objetivo: criar a base mínima coerente para atender o fluxo de entrega do Food.
+Itens:
 
-Itens principais:
-
-- estrutura do módulo Tracking;
+- frontend Tracking separado quando iniciar;
 - entregadores;
-- veículos, se previsto no backlog;
+- veiculos, se previsto;
 - entregas;
 - status de entrega;
-- vínculo com pedido de origem;
-- criação de entrega a partir de pedido;
-- tela básica de entregas;
-- tela/PWA inicial do entregador, se previsto no backlog;
-- link público de rastreamento;
-- eventos necessários para Robots.
+- vinculo com pedido de origem;
+- criacao de entrega a partir de pedido;
+- tela basica de entregas;
+- tela/PWA inicial do entregador, se previsto;
+- link publico de rastreamento;
+- eventos necessarios para Robots.
 
----
-
-### Etapa 6 — Integração Food → Tracking → Robots
+### Bloco F - Integracao Food -> Tracking -> Robots
 
 Objetivo: validar o primeiro fluxo integrado do ecossistema.
 
-Fluxo:
-
 ```text
 Pedido criado no Food
-→ evento registrado no Robots
-→ pedido aceito no Food
-→ entrega criada no Tracking
-→ evento registrado no Robots
-→ entregador altera status
-→ Tracking atualiza entrega
-→ Food consulta/enxerga status da entrega
-→ cliente acompanha link público
+-> evento registrado no Robots
+-> pedido aceito no Food
+-> entrega criada no Tracking
+-> evento registrado no Robots
+-> entregador altera status
+-> Tracking atualiza entrega
+-> Food consulta/enxerga status da entrega
+-> cliente acompanha link publico
 ```
 
 ---
 
-### Etapa 7 — Consolidação
-
-Objetivo: estabilizar a base antes de trazer novos módulos.
-
-Validar:
-
-- multiempresa;
-- permissões;
-- módulos contratados;
-- soft delete;
-- migrations;
-- eventos;
-- auditoria;
-- telas básicas;
-- APIs principais;
-- erros e estados vazios;
-- build/lint/testes disponíveis.
-
----
-
-## 5. Módulos futuros
+## 6. Modulos futuros
 
 Depois da base Admin Console + Robots + Food + Tracking, integrar progressivamente:
 
 1. **FP Billing**
    - planos;
-   - módulos contratados;
-   - cobranças;
+   - modulos contratados;
+   - cobrancas;
    - pagamentos;
-   - inadimplência;
-   - suspensão/reativação.
+   - inadimplencia;
+   - suspensao/reativacao.
 
 2. **FP Tickets**
    - suporte;
-   - implantação/onboarding;
+   - implantacao/onboarding;
    - chamados;
-   - vínculo com empresa, cliente e módulo.
+   - vinculo com empresa, cliente e modulo.
 
 3. **FP Sales**
    - clientes;
    - oportunidades;
    - propostas;
-   - visão 360º.
+   - visao 360.
 
 4. **FP Marketing**
    - campanhas;
    - leads;
-   - qualificação;
-   - conversão para Sales.
+   - qualificacao;
+   - conversao para Sales.
 
-5. **FP Monitor** — módulo de plataforma/deferido
+5. **FP Monitor**
    - disponibilidade de APIs internas;
-   - latência e falhas por módulo;
-   - checks de saúde e incidentes;
-   - observabilidade de integrações externas quando existirem;
+   - latencia e falhas por modulo;
+   - checks de saude e incidentes;
+   - observabilidade de integracoes externas quando existirem;
    - visual inicial dentro do Admin Console.
 
-O FP Monitor fica planejado para o final do projeto. Pode ser antecipado apenas se a operação exigir visibilidade de saúde das APIs antes da conclusão dos módulos principais.
+O FP Monitor fica planejado para o final do projeto. Pode ser antecipado apenas se a operacao exigir visibilidade de saude das APIs antes da conclusao dos modulos principais.
 
 ---
 
-## 6. Funcionalidades sensíveis
+## 7. Funcionalidades sensiveis
 
-Gateway de pagamento, nota fiscal, integrações externas, BI avançado e recursos complexos não são proibidos.
+Gateway de pagamento, nota fiscal, integracoes externas, BI avancado e recursos complexos nao sao proibidos.
 
-Devem ser implementados no momento adequado, quando estiverem no backlog da etapa atual ou quando houver autorização explícita.
+Devem ser implementados no momento adequado, quando estiverem no backlog da etapa atual ou quando houver autorizacao explicita.
