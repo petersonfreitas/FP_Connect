@@ -4,6 +4,8 @@ import type {
   AdminAuditScope,
   AdminAuditLogContract,
   AdminBasicPlanContract,
+  BulkUpdateAdminCompanyApplicationsContract,
+  BulkUpdateAdminCompanyApplicationsInput,
   AdminCompanyUserAccessContract,
   AdminCompanyApplicationContract,
   AdminCompanyUserContract,
@@ -101,6 +103,19 @@ export async function updateAdminCompanyApplication(
 ): Promise<InternalApiResult<AdminCompanyApplicationContract>> {
   return fetchInternal<AdminCompanyApplicationContract>(
     `admin-console/companies/${companyId}/applications`,
+    {
+      body: JSON.stringify(input),
+      method: "POST"
+    }
+  );
+}
+
+export async function bulkUpdateAdminCompanyApplications(
+  companyId: string,
+  input: BulkUpdateAdminCompanyApplicationsInput
+): Promise<InternalApiResult<BulkUpdateAdminCompanyApplicationsContract>> {
+  return fetchInternal<BulkUpdateAdminCompanyApplicationsContract>(
+    `admin-console/companies/${companyId}/applications/bulk`,
     {
       body: JSON.stringify(input),
       method: "POST"

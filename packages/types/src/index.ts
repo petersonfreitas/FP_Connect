@@ -221,6 +221,16 @@ export type UpdateAdminCompanyApplicationInput = {
   implementationNotes?: string | null;
 };
 
+export type BulkUpdateAdminCompanyApplicationsInput = {
+  applicationIds: string[];
+  status: CompanyApplicationStatus;
+  implementationNotes?: string | null;
+};
+
+export type BulkUpdateAdminCompanyApplicationsContract = {
+  updated: AdminCompanyApplicationContract[];
+};
+
 export type GrantAdminUserRoleInput = {
   roleId: string;
 };

@@ -23,6 +23,7 @@ Ja existe base funcional para:
 - papeis/permissoes por usuario, empresa e modulo;
 - catalogo de planos e modulos;
 - modulos contratados por empresa;
+- tabela de modulos contratados com selecao e acao em lote por empresa;
 - auditoria administrativa por escopo;
 - menu administrativo agrupado em `Cadastro`, `Movimentacao` e `Auditoria`;
 - login/logout server-side com Supabase Auth e cookies HttpOnly;

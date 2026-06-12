@@ -46,6 +46,7 @@ Ja foram implementados:
 - papeis/permissoes por usuario, empresa e modulo;
 - catalogo de planos e modulos;
 - modulos contratados por empresa;
+- acao em lote para modulos contratados por empresa;
 - auditoria administrativa com categoria propria;
 - menu administrativo em `Cadastro`, `Movimentacao` e `Auditoria`;
 - login/logout server-side com Supabase Auth e cookies HttpOnly;

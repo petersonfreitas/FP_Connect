@@ -42,6 +42,7 @@ Este arquivo controla o avanco dos modulos do ecossistema.
 - [x] Catalogo de modulos
 - [x] Catalogo de planos
 - [x] Modulos contratados por empresa
+- [x] Acao em lote para modulos contratados por empresa
 - [x] Layout administrativo base
 - [x] Menu agrupado em Cadastro, Movimentacao e Auditoria
 - [x] Auditoria basica

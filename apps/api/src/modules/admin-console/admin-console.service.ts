@@ -12,6 +12,8 @@ import type {
   AdminApplicationContract,
   AdminBasicPlanCatalogContract,
   AdminBasicPlanContract,
+  BulkUpdateAdminCompanyApplicationsContract,
+  BulkUpdateAdminCompanyApplicationsInput,
   AdminCatalogContract,
   AdminCompanyApplicationContract,
   AdminCompanyUserAccessContract,
@@ -849,6 +851,38 @@ export class AdminConsoleService {
     return mapCompanyApplication(application, companyApplication);
   }
 
+  async bulkUpdateCompanyApplications(
+    companyId: string,
+    input: BulkUpdateAdminCompanyApplicationsInput,
+    context: InternalApiContext = emptyInternalApiContext
+  ): Promise<BulkUpdateAdminCompanyApplicationsContract> {
+    const applicationIds = normalizeUuidList(input.applicationIds, "applicationIds");
+
+    if (applicationIds.length === 0) {
+      throw new BadRequestException("Selecione ao menos um modulo");
+    }
+
+    const status = normalizeCompanyApplicationStatus(input.status);
+    const implementationNotes = normalizeOptional(input.implementationNotes, 1000);
+    const updated: AdminCompanyApplicationContract[] = [];
+
+    for (const applicationId of applicationIds) {
+      updated.push(
+        await this.updateCompanyApplication(
+          companyId,
+          {
+            applicationId,
+            status,
+            implementationNotes
+          },
+          context
+        )
+      );
+    }
+
+    return { updated };
+  }
+
   async grantUserRole(
     companyId: string,
     userId: string,
@@ -1545,6 +1579,14 @@ function normalizeUuid(value: unknown, field: string): string {
   }
 
   return id;
+}
+
+function normalizeUuidList(value: unknown, field: string): string[] {
+  if (!Array.isArray(value)) {
+    throw new BadRequestException(`${field} must be an array`);
+  }
+
+  return unique(value.map((item) => normalizeUuid(item, field)));
 }
 
 function normalizeCompanyApplicationStatus(

@@ -3,6 +3,7 @@ import { InternalApiGuard } from "../../auth/internal-api.guard";
 import { readInternalApiContext } from "../../auth/internal-api-context";
 import type {
   AdminAuditScope,
+  BulkUpdateAdminCompanyApplicationsInput,
   CreateAdminCompanyInput,
   CreateAdminUserInput,
   GrantAdminUserRoleInput,
@@ -97,6 +98,19 @@ export class AdminConsoleController {
     @Headers() headers: Record<string, string | string[] | undefined>
   ) {
     return this.adminConsole.updateCompanyApplication(id, input, readInternalApiContext(headers));
+  }
+
+  @Post("companies/:id/applications/bulk")
+  bulkUpdateCompanyApplications(
+    @Param("id") id: string,
+    @Body() input: BulkUpdateAdminCompanyApplicationsInput,
+    @Headers() headers: Record<string, string | string[] | undefined>
+  ) {
+    return this.adminConsole.bulkUpdateCompanyApplications(
+      id,
+      input,
+      readInternalApiContext(headers)
+    );
   }
 
   @Get("users")

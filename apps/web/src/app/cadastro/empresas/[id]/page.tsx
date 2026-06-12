@@ -2,11 +2,12 @@ import Link from "next/link";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { AppShell } from "@/components/app-shell";
+import { CompanyModulesTable } from "@/components/company-modules-table";
 import {
+  bulkUpdateAdminCompanyApplications,
   getAdminCompany,
   listAdminCompanyApplications,
-  listAdminCompanyUsers,
-  updateAdminCompanyApplication
+  listAdminCompanyUsers
 } from "@/lib/internal-api";
 
 export const dynamic = "force-dynamic";
@@ -30,27 +31,22 @@ const personTypeLabels = {
   legal_entity: "Pessoa Juridica"
 };
 
-const moduleStatusLabels = {
-  active: "Ativo",
-  cancelled: "Cancelado",
-  implementation: "Em implantacao",
-  suspended: "Suspenso"
-};
-
 export default async function CompanyDetailPage({ params, searchParams }: CompanyDetailPageProps) {
   const { id } = await params;
   const query = searchParams ? await searchParams : {};
   const moduleError = getQueryValue(query.moduleError);
   const moduleSaved = getQueryValue(query.moduleSaved);
 
-  async function updateModuleAction(formData: FormData) {
+  async function bulkUpdateModulesAction(formData: FormData) {
     "use server";
 
-    const applicationId = readFormValue(formData, "applicationId");
+    const applicationIds = formData
+      .getAll("applicationIds")
+      .filter((value): value is string => typeof value === "string");
     const status = readFormValue(formData, "status");
     const implementationNotes = readOptionalFormValue(formData, "implementationNotes");
-    const result = await updateAdminCompanyApplication(id, {
-      applicationId,
+    const result = await bulkUpdateAdminCompanyApplications(id, {
+      applicationIds,
       status:
         status === "active" ||
         status === "suspended" ||
@@ -67,7 +63,7 @@ export default async function CompanyDetailPage({ params, searchParams }: Compan
       redirect(`/cadastro/empresas/${id}?moduleError=${encodeURIComponent(result.error)}`);
     }
 
-    redirect(`/cadastro/empresas/${id}?moduleSaved=1`);
+    redirect(`/cadastro/empresas/${id}?moduleSaved=${result.data?.updated.length ?? 0}`);
   }
 
   const [companyResult, usersResult, applicationsResult] = await Promise.all([
@@ -190,51 +186,12 @@ export default async function CompanyDetailPage({ params, searchParams }: Compan
 
         {moduleSaved ? (
           <div className="form-alert neutral module-feedback" role="status">
-            Modulo atualizado com sucesso.
+            {moduleSaved} modulo(s) atualizado(s) com sucesso.
           </div>
         ) : null}
 
         {applications.length > 0 ? (
-          <div className="company-modules-list">
-            {applications.map((application) => (
-              <form
-                action={updateModuleAction}
-                className="company-module-row"
-                key={application.id}
-              >
-                <input name="applicationId" type="hidden" value={application.id} />
-                <div>
-                  <strong>{application.name}</strong>
-                  <small>{application.description ?? application.key}</small>
-                </div>
-                <label>
-                  Status
-                  <select
-                    name="status"
-                    defaultValue={application.companyStatus ?? "implementation"}
-                  >
-                    {Object.entries(moduleStatusLabels).map(([value, label]) => (
-                      <option key={value} value={value}>
-                        {label}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-                <label>
-                  Observacoes
-                  <input
-                    maxLength={1000}
-                    name="implementationNotes"
-                    placeholder="Opcional"
-                    defaultValue={application.implementationNotes ?? ""}
-                  />
-                </label>
-                <button className="primary-action" type="submit">
-                  Salvar
-                </button>
-              </form>
-            ))}
-          </div>
+          <CompanyModulesTable action={bulkUpdateModulesAction} applications={applications} />
         ) : (
           <div className="empty-state">Nenhum modulo disponivel para contratacao.</div>
         )}
