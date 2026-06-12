@@ -43,6 +43,7 @@ Este arquivo registra decisoes arquiteturais e operacionais para evitar retrabal
 | DEC-035 | O Admin Console deve autenticar pelo Supabase Auth no server-side do Next, armazenar sessao em cookie HttpOnly e enviar contexto interno de usuario para a API Nest. | Aprovada |
 | DEC-036 | O primeiro super-admin deve nascer de um usuario criado manualmente no Supabase Auth e ser promovido no `core.profiles` por seed SQL idempotente. | Aprovada |
 | DEC-037 | Resets operacionais devem preservar catalogos nativos do sistema, como modulos, planos, roles, permissions e vinculos role-permission. | Aprovada |
+| DEC-038 | Otimizacoes de consulta devem preservar seguranca acima de performance, mantendo autorizacao no backend/banco, escopo por empresa, soft delete, `select` explicito, paginacao em listagens novas e indices alinhados a queries reais. | Aprovada |
 
 ---
 

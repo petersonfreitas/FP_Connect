@@ -30,6 +30,7 @@ Ja existe base funcional para:
 - login/logout server-side com Supabase Auth e cookies HttpOnly;
 - recuperacao de senha por e-mail via Supabase Auth;
 - refresh de sessao por refresh token HttpOnly no proxy do Next;
+- contrato de performance/seguranca para consultas Supabase;
 - `actor_user_id` real enviado pelo Next para a API interna em mutacoes auditadas;
 - API Nest interna consumida pelo Next server-side.
 
@@ -140,6 +141,8 @@ O banco e unico e separado por schemas de modulo, com `core` centralizando empre
 
 Para a API Nest consultar `core` via `@supabase/supabase-js`, o schema `core` precisa estar em Supabase Dashboard > Project Settings > Data API > Exposed schemas. No ambiente local, `supabase/config.toml` ja declara `core` em `[api].schemas`.
 
+Consultas devem seguir `docs/PERFORMANCE_SECURITY.md`: seguranca acima de performance, `select` explicito, escopo por empresa, soft delete, paginacao para listagens novas e indices alinhados a queries reais.
+
 ### Scripts SQL operacionais
 
 Scripts manuais ficam em `supabase/sql`.
@@ -158,6 +161,7 @@ Fluxo recomendado para primeiro acesso:
 
 - `docs/ARCHITECTURE.md`: contrato tecnico do ecossistema.
 - `docs/DECISIONS.md`: decisoes arquiteturais aprovadas.
+- `docs/PERFORMANCE_SECURITY.md`: padrao de consultas Supabase com seguranca.
 - `docs/ROADMAP.md`: plano macro e proximos passos.
 - `docs/MODULE_STATUS.md`: maturidade atual dos modulos.
 - `docs/backlog/*.md`: fonte funcional de escopo por modulo.

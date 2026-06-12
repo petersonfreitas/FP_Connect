@@ -59,12 +59,15 @@ Ja foram implementados:
 - auditoria com `actor_user_id` real em mutacoes do Admin Console;
 - validacoes de formulario alinhadas ao banco em pontos ja implementados;
 - regra documentada para API interna, API publica futura e variaveis server-side.
+- contrato de performance/seguranca para consultas Supabase;
+- indices complementares do `core` para listagens, auditoria e relacoes atuais.
 
 Pendencias de fundacao antes dos modulos operacionais:
 
 - guards/policies completos por usuario, empresa, permissao e modulo;
 - bloqueio efetivo por modulo contratado nas rotas sensiveis;
 - soft delete/inativacao exposto na UI quando autorizado;
+- paginacao nas listagens principais;
 - smoke test manual dos fluxos principais.
 
 ---
@@ -106,6 +109,7 @@ Itens:
 - guards/policies nas rotas sensiveis;
 - resolucao de empresa/contexto ativo;
 - revisao de bloqueios por empresa, permissao e modulo contratado;
+- paginacao nas listagens principais;
 - smoke test de empresas, usuarios, permissoes, modulos e auditoria.
 
 ### Bloco B - Shell dos modulos prioritarios

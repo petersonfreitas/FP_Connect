@@ -207,7 +207,28 @@ Regras:
 
 ---
 
-## 7. Multiempresa, permissoes e modulos contratados
+## 7. Performance e seguranca em consultas
+
+Performance nunca deve reduzir seguranca.
+
+Consultas devem seguir o contrato detalhado em `docs/PERFORMANCE_SECURITY.md`.
+
+Regras obrigatorias:
+
+- validar autenticacao, empresa, vinculo, permissao, modulo contratado e escopo antes de dados sensiveis;
+- nao confiar em `company_id` enviado livremente pelo frontend;
+- usar `select` explicito;
+- filtrar `deleted_at is null` em entidades com soft delete;
+- usar indices alinhados a filtros e ordenacoes reais;
+- criar listagens novas com paginacao e limite maximo no backend;
+- evitar N+1, buscando dados relacionados em lote quando possivel;
+- cachear apenas dados globais ou nao sensiveis com justificativa clara.
+
+No estado atual, a API Nest usa `SUPABASE_SERVICE_ROLE_KEY` server-side. Portanto, guards/policies no backend sao obrigatorios antes de qualquer otimizacao em dados sensiveis; RLS permanece como defesa em profundidade e contrato para futuros clientes Supabase diretos.
+
+---
+
+## 8. Multiempresa, permissoes e modulos contratados
 
 O sistema e SaaS multiempresa.
 
@@ -249,7 +270,7 @@ Nenhuma empresa pode acessar dados de outra empresa.
 
 ---
 
-## 8. Variaveis de ambiente e fronteira navegador/servidor
+## 9. Variaveis de ambiente e fronteira navegador/servidor
 
 Variaveis sensiveis devem ficar server-side.
 
@@ -278,7 +299,7 @@ Nesse caso, a seguranca deve depender de RLS, policies, permissoes e escopo por 
 
 ---
 
-## 9. APIs internas, publicas e integracoes
+## 10. APIs internas, publicas e integracoes
 
 ### APIs internas
 
@@ -335,7 +356,7 @@ Webhooks de saida, automacoes, e-mails, retries e reprocessamentos pertencem ao 
 
 ---
 
-## 10. FP Robots e eventos
+## 11. FP Robots e eventos
 
 O FP Robots e o centro de eventos, logs, webhooks, e-mails, reprocessamentos e automacoes.
 
@@ -367,7 +388,7 @@ acao principal
 
 ---
 
-## 11. FP Monitor
+## 12. FP Monitor
 
 O FP Monitor e um modulo de plataforma previsto para observabilidade operacional do ecossistema.
 
@@ -387,7 +408,7 @@ O FP Monitor deve usar o schema `monitoring` quando for implementado. A primeira
 
 ---
 
-## 12. Frontend
+## 13. Frontend
 
 Interface deve usar portugues do Brasil.
 
@@ -422,7 +443,7 @@ Nao criar telas fora do backlog atual sem autorizacao.
 
 ---
 
-## 13. Soft delete
+## 14. Soft delete
 
 Toda exclusao de registro de negocio deve usar soft delete.
 
@@ -445,7 +466,7 @@ Hard delete so deve ser usado para:
 
 ---
 
-## 14. Arquivos e anexos
+## 15. Arquivos e anexos
 
 Arquivos devem usar storage adequado.
 
@@ -462,7 +483,7 @@ Evite URLs publicas para arquivos sensiveis.
 
 ---
 
-## 15. Convencoes
+## 16. Convencoes
 
 Preferir ingles tecnico para:
 
@@ -485,7 +506,7 @@ Preferir portugues do Brasil para:
 
 ---
 
-## 16. Evitar
+## 17. Evitar
 
 Evite:
 
@@ -508,7 +529,7 @@ Evite:
 
 ---
 
-## 17. Diretriz final
+## 18. Diretriz final
 
 A arquitetura deve favorecer:
 
