@@ -4,6 +4,7 @@ export type UserStatus = "invited" | "active" | "inactive";
 export type ApplicationStatus = "active" | "inactive" | "hidden";
 export type CompanyApplicationStatus = "implementation" | "active" | "suspended" | "cancelled";
 export type BasicPlanStatus = "active" | "inactive";
+export type AdminAuditScope = "all" | "companies" | "users" | "modules" | "system";
 
 export type AdminApplicationContract = {
   id: string;

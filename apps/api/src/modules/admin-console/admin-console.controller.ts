@@ -1,6 +1,7 @@
-import { Body, Controller, Get, Param, Post, UseGuards } from "@nestjs/common";
+import { Body, Controller, Get, Param, Post, Query, UseGuards } from "@nestjs/common";
 import { InternalApiGuard } from "../../auth/internal-api.guard";
 import type {
+  AdminAuditScope,
   CreateAdminCompanyInput,
   CreateAdminUserInput,
   GrantAdminUserRoleInput,
@@ -30,8 +31,8 @@ export class AdminConsoleController {
   }
 
   @Get("audit-logs")
-  listAuditLogs() {
-    return this.adminConsole.listAuditLogs();
+  listAuditLogs(@Query("scope") scope?: AdminAuditScope) {
+    return this.adminConsole.listAuditLogs(scope);
   }
 
   @Get("companies")

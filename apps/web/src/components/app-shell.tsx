@@ -15,8 +15,15 @@ const cadastroItems = [
 ];
 
 const movimentacaoItems = [
-  { href: "/", label: "Modulos contratados" },
-  { href: "/movimentacao/auditoria", label: "Auditoria" }
+  { href: "/", label: "Modulos contratados" }
+];
+
+const auditoriaItems = [
+  { href: "/auditoria", label: "Visao geral" },
+  { href: "/auditoria/empresas", label: "Empresas" },
+  { href: "/auditoria/usuarios", label: "Usuarios" },
+  { href: "/auditoria/modulos", label: "Modulos e permissoes" },
+  { href: "/auditoria/sistema", label: "Sistema" }
 ];
 
 export function AppShell({ activePath = "/", children }: AppShellProps) {
@@ -50,6 +57,21 @@ export function AppShell({ activePath = "/", children }: AppShellProps) {
             <summary>Movimentacao</summary>
             <div className="nav-group-items">
               {movimentacaoItems.map((item) => (
+                <Link
+                  className={activePath === item.href ? "nav-item active" : "nav-item"}
+                  href={item.href}
+                  key={item.label}
+                >
+                  {item.label}
+                </Link>
+              ))}
+            </div>
+          </details>
+
+          <details className="nav-group" open>
+            <summary>Auditoria</summary>
+            <div className="nav-group-items">
+              {auditoriaItems.map((item) => (
                 <Link
                   className={activePath === item.href ? "nav-item active" : "nav-item"}
                   href={item.href}

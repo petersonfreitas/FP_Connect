@@ -8,6 +8,7 @@ import {
 import { randomBytes } from "node:crypto";
 import type {
   AdminAuditLogContract,
+  AdminAuditScope,
   AdminApplicationContract,
   AdminBasicPlanContract,
   AdminCompanyApplicationContract,
@@ -239,12 +240,20 @@ export class AdminConsoleService {
     return ((data ?? []) as BasicPlanRow[]).map(mapBasicPlan);
   }
 
-  async listAuditLogs(): Promise<AdminAuditLogContract[]> {
-    const { data, error } = await this.supabase.core
+  async listAuditLogs(scope: AdminAuditScope = "all"): Promise<AdminAuditLogContract[]> {
+    const normalizedScope = normalizeAuditScope(scope);
+    const actions = getAuditScopeActions(normalizedScope);
+    let query = this.supabase.core
       .from("audit_logs")
       .select(auditLogSelect)
       .order("created_at", { ascending: false })
       .limit(100);
+
+    if (actions) {
+      query = query.in("action", actions);
+    }
+
+    const { data, error } = await query;
 
     if (error) {
       throwSupabaseError(error);
@@ -1160,6 +1169,47 @@ function normalizeCompanyApplicationStatus(
   }
 
   throw new BadRequestException("status must be implementation, active, suspended or cancelled");
+}
+
+function normalizeAuditScope(value: unknown): AdminAuditScope {
+  if (
+    value === "companies" ||
+    value === "users" ||
+    value === "modules" ||
+    value === "system"
+  ) {
+    return value;
+  }
+
+  return "all";
+}
+
+function getAuditScopeActions(scope: AdminAuditScope): string[] | null {
+  if (scope === "companies") {
+    return ["core.company.created"];
+  }
+
+  if (scope === "users") {
+    return [
+      "core.user.invited",
+      "core.user_application_role.granted",
+      "core.user_application_role.revoked"
+    ];
+  }
+
+  if (scope === "modules") {
+    return [
+      "core.company_application.updated",
+      "core.user_application_role.granted",
+      "core.user_application_role.revoked"
+    ];
+  }
+
+  if (scope === "system") {
+    return ["core.system.event"];
+  }
+
+  return null;
 }
 
 function isGrantableCompanyApplication(application: AdminCompanyApplicationContract): boolean {
