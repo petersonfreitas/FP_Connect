@@ -9,12 +9,14 @@ import { randomBytes } from "node:crypto";
 import type {
   AdminApplicationContract,
   AdminBasicPlanContract,
+  AdminCompanyApplicationContract,
   AdminCompanyUserContract,
   AdminCompanyContract,
   AdminConsoleOverviewContract,
   AdminUserContract,
   CreateAdminCompanyInput,
-  CreateAdminUserInput
+  CreateAdminUserInput,
+  UpdateAdminCompanyApplicationInput
 } from "./admin-console.contracts";
 import { SupabaseService } from "../../supabase/supabase.service";
 
@@ -72,9 +74,23 @@ type CompanyUserRow = {
   is_primary_contact: boolean;
 };
 
+type CompanyApplicationRow = {
+  id: string;
+  company_id: string;
+  application_id: string;
+  status: NonNullable<AdminCompanyApplicationContract["companyStatus"]>;
+  implementation_notes: string | null;
+  activated_at: string | null;
+  suspended_at: string | null;
+  cancelled_at: string | null;
+};
+
 const companySelect =
   "id,person_type,legal_name,trade_name,document,primary_email,primary_phone,primary_responsible_name,primary_responsible_email,status,basic_plan_id,implementation_notes,created_at";
 const userSelect = "id,full_name,email,status,created_at";
+const applicationSelect = "id,key,name,description,entry_path,status,sort_order";
+const companyApplicationSelect =
+  "id,company_id,application_id,status,implementation_notes,activated_at,suspended_at,cancelled_at";
 
 @Injectable()
 export class AdminConsoleService {
@@ -97,7 +113,7 @@ export class AdminConsoleService {
   async listApplications(): Promise<AdminApplicationContract[]> {
     const { data, error } = await this.supabase.core
       .from("applications")
-      .select("id,key,name,description,entry_path,status,sort_order")
+      .select(applicationSelect)
       .is("deleted_at", null)
       .order("sort_order", { ascending: true });
 
@@ -106,6 +122,45 @@ export class AdminConsoleService {
     }
 
     return ((data ?? []) as ApplicationRow[]).map(mapApplication);
+  }
+
+  async listCompanyApplications(companyId: string): Promise<AdminCompanyApplicationContract[]> {
+    await this.ensureCompanyExists(companyId);
+
+    const [applicationsResult, companyApplicationsResult] = await Promise.all([
+      this.supabase.core
+        .from("applications")
+        .select(applicationSelect)
+        .is("deleted_at", null)
+        .neq("status", "hidden")
+        .order("sort_order", { ascending: true }),
+      this.supabase.core
+        .from("company_applications")
+        .select(companyApplicationSelect)
+        .eq("company_id", companyId)
+        .is("deleted_at", null)
+    ]);
+
+    if (applicationsResult.error) {
+      throwSupabaseError(applicationsResult.error);
+    }
+
+    if (companyApplicationsResult.error) {
+      throwSupabaseError(companyApplicationsResult.error);
+    }
+
+    const companyApplicationsByApplicationId = new Map(
+      ((companyApplicationsResult.data ?? []) as CompanyApplicationRow[]).map((row) => [
+        row.application_id,
+        row
+      ])
+    );
+
+    return ((applicationsResult.data ?? []) as ApplicationRow[]).map((application) => {
+      const companyApplication = companyApplicationsByApplicationId.get(application.id);
+
+      return mapCompanyApplication(application, companyApplication);
+    });
   }
 
   async listBasicPlans(): Promise<AdminBasicPlanContract[]> {
@@ -305,8 +360,109 @@ export class AdminConsoleService {
     }
   }
 
+  async updateCompanyApplication(
+    companyId: string,
+    input: UpdateAdminCompanyApplicationInput
+  ): Promise<AdminCompanyApplicationContract> {
+    await this.ensureCompanyExists(companyId);
+
+    const applicationId = normalizeUuid(input.applicationId, "applicationId");
+    const status = normalizeCompanyApplicationStatus(input.status);
+    const implementationNotes = normalizeOptional(input.implementationNotes, 1000);
+    const application = await this.getApplication(applicationId);
+    const current = await this.getCurrentCompanyApplication(companyId, applicationId);
+    const timestamp = new Date().toISOString();
+
+    const statusTimestamps = {
+      activated_at: status === "active" ? (current?.activated_at ?? timestamp) : current?.activated_at,
+      suspended_at: status === "suspended" ? timestamp : current?.suspended_at,
+      cancelled_at: status === "cancelled" ? timestamp : current?.cancelled_at
+    };
+
+    const payload = {
+      status,
+      implementation_notes: implementationNotes,
+      ...statusTimestamps
+    };
+
+    const { data, error } = current
+      ? await this.supabase.core
+          .from("company_applications")
+          .update(payload)
+          .eq("id", current.id)
+          .select(companyApplicationSelect)
+          .single()
+      : await this.supabase.core
+          .from("company_applications")
+          .insert({
+            company_id: companyId,
+            application_id: applicationId,
+            ...payload
+          })
+          .select(companyApplicationSelect)
+          .single();
+
+    if (error) {
+      throwSupabaseError(error);
+    }
+
+    const companyApplication = data as CompanyApplicationRow;
+
+    await this.createAuditLog(
+      companyId,
+      "core.company_application.updated",
+      "company_applications",
+      companyApplication.id,
+      {
+        applicationId,
+        applicationKey: application.key,
+        status
+      }
+    );
+
+    return mapCompanyApplication(application, companyApplication);
+  }
+
   private async ensureCompanyExists(companyId: string): Promise<void> {
     await this.getCompany(companyId);
+  }
+
+  private async getApplication(applicationId: string): Promise<ApplicationRow> {
+    const { data, error } = await this.supabase.core
+      .from("applications")
+      .select(applicationSelect)
+      .eq("id", applicationId)
+      .is("deleted_at", null)
+      .maybeSingle();
+
+    if (error) {
+      throwSupabaseError(error);
+    }
+
+    if (!data) {
+      throw new NotFoundException("Application not found");
+    }
+
+    return data as ApplicationRow;
+  }
+
+  private async getCurrentCompanyApplication(
+    companyId: string,
+    applicationId: string
+  ): Promise<CompanyApplicationRow | null> {
+    const { data, error } = await this.supabase.core
+      .from("company_applications")
+      .select(companyApplicationSelect)
+      .eq("company_id", companyId)
+      .eq("application_id", applicationId)
+      .is("deleted_at", null)
+      .maybeSingle();
+
+    if (error) {
+      throwSupabaseError(error);
+    }
+
+    return (data as CompanyApplicationRow | null) ?? null;
   }
 
   private async hydrateCompanyUsers(
@@ -378,6 +534,26 @@ function mapApplication(row: ApplicationRow): AdminApplicationContract {
     entryPath: row.entry_path,
     status: row.status,
     sortOrder: row.sort_order
+  };
+}
+
+function mapCompanyApplication(
+  application: ApplicationRow,
+  companyApplication?: CompanyApplicationRow | null
+): AdminCompanyApplicationContract {
+  return {
+    id: application.id,
+    key: application.key,
+    name: application.name,
+    description: application.description,
+    entryPath: application.entry_path,
+    applicationStatus: application.status,
+    companyApplicationId: companyApplication?.id ?? null,
+    companyStatus: companyApplication?.status ?? null,
+    implementationNotes: companyApplication?.implementation_notes ?? null,
+    activatedAt: companyApplication?.activated_at ?? null,
+    suspendedAt: companyApplication?.suspended_at ?? null,
+    cancelledAt: companyApplication?.cancelled_at ?? null
   };
 }
 
@@ -457,17 +633,36 @@ function normalizeCreateCompanyInput(input: CreateAdminCompanyInput): CreateAdmi
 }
 
 function normalizeCreateUserInput(input: CreateAdminUserInput): Required<CreateAdminUserInput> {
-  const companyId = normalizeRequired(input.companyId, "companyId", 36);
-  if (!isUuid(companyId)) {
-    throw new BadRequestException("Invalid company id");
-  }
-
   return {
-    companyId,
+    companyId: normalizeUuid(input.companyId, "companyId"),
     fullName: normalizeRequired(input.fullName, "fullName", 140),
     email: normalizeEmail(input.email),
     isPrimaryContact: Boolean(input.isPrimaryContact)
   };
+}
+
+function normalizeUuid(value: unknown, field: string): string {
+  const id = normalizeRequired(value, field, 36);
+  if (!isUuid(id)) {
+    throw new BadRequestException(`Invalid ${field}`);
+  }
+
+  return id;
+}
+
+function normalizeCompanyApplicationStatus(
+  value: unknown
+): UpdateAdminCompanyApplicationInput["status"] {
+  if (
+    value === "implementation" ||
+    value === "active" ||
+    value === "suspended" ||
+    value === "cancelled"
+  ) {
+    return value;
+  }
+
+  throw new BadRequestException("status must be implementation, active, suspended or cancelled");
 }
 
 function normalizeEmail(value: unknown): string {

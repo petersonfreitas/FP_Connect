@@ -2,12 +2,14 @@ import "server-only";
 
 import type {
   AdminBasicPlanContract,
+  AdminCompanyApplicationContract,
   AdminCompanyUserContract,
   AdminCompanyContract,
   AdminConsoleOverviewContract,
   AdminUserContract,
   CreateAdminCompanyInput,
-  CreateAdminUserInput
+  CreateAdminUserInput,
+  UpdateAdminCompanyApplicationInput
 } from "@fp/types";
 import { loadServerEnv } from "./server-env";
 
@@ -45,6 +47,14 @@ export async function listAdminCompanyUsers(
   return fetchInternal<AdminCompanyUserContract[]>(`admin-console/companies/${companyId}/users`);
 }
 
+export async function listAdminCompanyApplications(
+  companyId: string
+): Promise<InternalApiResult<AdminCompanyApplicationContract[]>> {
+  return fetchInternal<AdminCompanyApplicationContract[]>(
+    `admin-console/companies/${companyId}/applications`
+  );
+}
+
 export async function createAdminCompany(
   input: CreateAdminCompanyInput
 ): Promise<InternalApiResult<AdminCompanyContract>> {
@@ -52,6 +62,19 @@ export async function createAdminCompany(
     body: JSON.stringify(input),
     method: "POST"
   });
+}
+
+export async function updateAdminCompanyApplication(
+  companyId: string,
+  input: UpdateAdminCompanyApplicationInput
+): Promise<InternalApiResult<AdminCompanyApplicationContract>> {
+  return fetchInternal<AdminCompanyApplicationContract>(
+    `admin-console/companies/${companyId}/applications`,
+    {
+      body: JSON.stringify(input),
+      method: "POST"
+    }
+  );
 }
 
 export async function listAdminBasicPlans(): Promise<

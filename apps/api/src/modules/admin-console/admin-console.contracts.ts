@@ -2,6 +2,7 @@ export type CompanyStatus = "implementation" | "active" | "suspended" | "cancell
 export type CompanyPersonType = "individual" | "legal_entity";
 export type UserStatus = "invited" | "active" | "inactive";
 export type ApplicationStatus = "active" | "inactive" | "hidden";
+export type CompanyApplicationStatus = "implementation" | "active" | "suspended" | "cancelled";
 export type BasicPlanStatus = "active" | "inactive";
 
 export type AdminApplicationContract = {
@@ -44,6 +45,21 @@ export type AdminConsoleOverviewContract = {
   companies: AdminCompanyContract[];
 };
 
+export type AdminCompanyApplicationContract = {
+  id: string;
+  key: string;
+  name: string;
+  description: string | null;
+  entryPath: string | null;
+  applicationStatus: ApplicationStatus;
+  companyApplicationId: string | null;
+  companyStatus: CompanyApplicationStatus | null;
+  implementationNotes: string | null;
+  activatedAt: string | null;
+  suspendedAt: string | null;
+  cancelledAt: string | null;
+};
+
 export type CreateAdminCompanyInput = {
   personType: CompanyPersonType;
   legalName: string;
@@ -77,4 +93,10 @@ export type CreateAdminUserInput = {
   email: string;
   companyId: string;
   isPrimaryContact?: boolean;
+};
+
+export type UpdateAdminCompanyApplicationInput = {
+  applicationId: string;
+  status: CompanyApplicationStatus;
+  implementationNotes?: string | null;
 };

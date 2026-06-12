@@ -491,6 +491,10 @@ button:disabled {
   margin: 0 0 16px;
 }
 
+.module-feedback {
+  margin-bottom: 16px;
+}
+
 .detail-grid {
   display: grid;
   gap: 16px;
@@ -519,6 +523,59 @@ button:disabled {
 
 .detail-full {
   grid-column: 1 / -1;
+}
+
+.company-modules-list {
+  display: grid;
+}
+
+.company-module-row {
+  align-items: end;
+  border-bottom: 1px solid var(--line);
+  display: grid;
+  gap: 16px;
+  grid-template-columns: minmax(220px, 1.2fr) 170px minmax(220px, 1fr) auto;
+  padding: 14px 0;
+}
+
+.company-module-row:last-child {
+  border-bottom: 0;
+}
+
+.company-module-row > div,
+.company-module-row label {
+  min-width: 0;
+}
+
+.company-module-row strong {
+  display: block;
+}
+
+.company-module-row small {
+  color: var(--muted);
+  display: block;
+  margin-top: 4px;
+}
+
+.company-module-row label {
+  color: var(--muted);
+  display: grid;
+  font-size: 12px;
+  font-weight: 900;
+  gap: 8px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.company-module-row input,
+.company-module-row select {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  color: var(--foreground);
+  font: inherit;
+  min-height: 42px;
+  padding: 9px 10px;
+  text-transform: none;
 }
 
 .module-grid {
@@ -616,6 +673,7 @@ button:disabled {
   }
 
   .data-row,
+  .company-module-row,
   .form-grid,
   .detail-grid {
     grid-template-columns: 1fr;
