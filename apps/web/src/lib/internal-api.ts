@@ -208,17 +208,19 @@ async function fetchInternal<T>(
     headers: {
       "Content-Type": "application/json",
       "X-FP-Internal-Token": token,
-      ...(actor ? { "X-FP-Actor-User-Id": actor.id } : {}),
+      "X-FP-Actor-User-Id": actor.id,
       ...init.headers
     }
-  }).catch((error: unknown) => {
-    const message = error instanceof Error ? error.message : "erro desconhecido";
-    return {
-      ok: false,
-      status: 503,
-      statusText: message
-    } as Response;
+  }).catch((): null => {
+    return null;
   });
+
+  if (!response) {
+    return {
+      data: null,
+      error: "API interna respondeu 503 fetch failed"
+    };
+  }
 
   if (!response.ok) {
     const detail = await readErrorDetail(response);
