@@ -3,6 +3,13 @@ import { NextResponse } from "next/server";
 import { isValidCnpj, normalizeBrazilPhone, onlyDigits } from "@/lib/br-documents";
 
 const DEFAULT_CNPJ_LOOKUP_BASE_URL = "https://brasilapi.com.br/api/cnpj/v1";
+const DEFAULT_CNPJ_LOOKUP_USER_AGENT =
+  "FP-Connect/0.1 (+https://github.com/petersonfreitas/FP_Connect)";
+const CNPJ_LOOKUP_TIMEOUT_MS = 8000;
+const MAX_CNPJ_LOOKUP_ATTEMPTS = 3;
+const RETRYABLE_STATUS_CODES = new Set([429, 500, 502, 503, 504]);
+
+export const runtime = "nodejs";
 
 type CnpjRouteProps = {
   params: Promise<{
@@ -33,14 +40,19 @@ export async function GET(_request: Request, { params }: CnpjRouteProps) {
     return NextResponse.json({ message: "CNPJ invalido" }, { status: 400 });
   }
 
-  const response = await fetch(`${getCnpjLookupBaseUrl()}/${digits}`, {
-    cache: "no-store"
-  });
+  const { response, error } = await fetchBrasilApiCnpj(digits);
 
-  if (!response.ok) {
+  if (error) {
     return NextResponse.json(
-      { message: `Consulta de CNPJ respondeu ${response.status}` },
-      { status: response.status }
+      { message: "Nao foi possivel consultar o provedor de CNPJ." },
+      { status: 503 }
+    );
+  }
+
+  if (!response?.ok) {
+    return NextResponse.json(
+      { message: `Consulta de CNPJ respondeu ${response?.status ?? 503}` },
+      { status: response?.status ?? 503 }
     );
   }
 
@@ -62,6 +74,59 @@ function getCnpjLookupBaseUrl(): string {
     /\/$/,
     ""
   );
+}
+
+async function fetchBrasilApiCnpj(
+  digits: string
+): Promise<{ response: Response | null; error: Error | null }> {
+  const url = `${getCnpjLookupBaseUrl()}/${digits}`;
+
+  for (let attempt = 1; attempt <= MAX_CNPJ_LOOKUP_ATTEMPTS; attempt += 1) {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), CNPJ_LOOKUP_TIMEOUT_MS);
+
+    try {
+      const response = await fetch(url, {
+        cache: "no-store",
+        headers: {
+          Accept: "application/json",
+          "User-Agent": getCnpjLookupUserAgent()
+        },
+        signal: controller.signal
+      });
+
+      if (!shouldRetry(response.status) || attempt === MAX_CNPJ_LOOKUP_ATTEMPTS) {
+        return { response, error: null };
+      }
+    } catch (error) {
+      if (attempt === MAX_CNPJ_LOOKUP_ATTEMPTS) {
+        return {
+          response: null,
+          error: error instanceof Error ? error : new Error("CNPJ lookup failed")
+        };
+      }
+    } finally {
+      clearTimeout(timeout);
+    }
+
+    await delay(300 * attempt);
+  }
+
+  return { response: null, error: new Error("CNPJ lookup failed") };
+}
+
+function getCnpjLookupUserAgent(): string {
+  return process.env.FP_CNPJ_LOOKUP_USER_AGENT?.trim() || DEFAULT_CNPJ_LOOKUP_USER_AGENT;
+}
+
+function shouldRetry(status: number): boolean {
+  return RETRYABLE_STATUS_CODES.has(status);
+}
+
+async function delay(milliseconds: number): Promise<void> {
+  await new Promise((resolve) => {
+    setTimeout(resolve, milliseconds);
+  });
 }
 
 function formatAddress(body: BrasilApiCnpjResponse): string | null {

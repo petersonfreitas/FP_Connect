@@ -68,6 +68,7 @@ No estado atual do projeto:
 - `FP_INTERNAL_API_TOKEN` fica somente no server-side do Next e no backend.
 - `FP_API_INTERNAL_URL` e usada pelo Next server-side para chamar a API interna.
 - `FP_WEB_URL` define a URL base usada em links server-side, como recuperacao de senha.
+- `FP_CNPJ_LOOKUP_USER_AGENT` identifica a chamada server-side para provedores de CNPJ, como BrasilAPI.
 
 O cliente interno do frontend esta em `apps/web/src/lib/internal-api.ts` e usa `server-only`, impedindo importacao por componentes client.
 
@@ -116,7 +117,7 @@ Em desenvolvimento local, o padrao esperado para o frontend chamar a API e:
 FP_API_INTERNAL_URL=http://localhost:3001/api
 ```
 
-O cadastro de empresas possui rota server-side no Next para consulta de CNPJ. A integracao externa pode ficar indisponivel por chave, limite ou bloqueio do provedor, e deve ser tratada como melhoria futura.
+O cadastro de empresas possui rota server-side no Next para consulta de CNPJ. Essa rota envia `User-Agent`, `Accept: application/json`, timeout e retry curto para falhas transitorias do provedor. A integracao externa ainda pode ficar indisponivel por limite, bloqueio ou instabilidade do provedor.
 
 ## Supabase
 
