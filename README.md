@@ -37,6 +37,7 @@ Ja existe base funcional para:
 Ainda precisam ser amadurecidos antes de entrar pesado nos modulos operacionais:
 
 - guards/policies completos alem do token interno;
+- envio efetivo de convite/ativacao de usuarios por e-mail;
 - fluxos de inativacao/soft delete na UI;
 - smoke tests manuais dos fluxos principais;
 - shell dos modulos Robots, Food e Tracking.

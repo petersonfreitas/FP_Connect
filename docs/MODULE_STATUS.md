@@ -59,6 +59,8 @@ Este arquivo controla o avanco dos modulos do ecossistema.
 - [x] Guard inicial do Admin Console com usuario ativo e bypass super-admin
 - [x] Policies granulares iniciais por permissao em rotas com contexto de empresa
 - [ ] Completar guards/policies em rotas globais, empresas, permissao e modulo
+- [ ] Envio efetivo de convite/ativacao de usuarios por e-mail
+- [ ] Reenvio de convite para usuarios pendentes
 - [ ] Bloqueio efetivo por empresa/modulo em todas as rotas sensiveis
 - [ ] Soft delete/inativacao exposto na UI quando autorizado
 - [ ] Smoke test manual dos fluxos principais
