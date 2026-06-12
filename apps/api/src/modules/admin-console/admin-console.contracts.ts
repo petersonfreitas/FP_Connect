@@ -70,6 +70,22 @@ export type AdminCompanyApplicationContract = {
   cancelledAt: string | null;
 };
 
+export type AdminContractedModuleContract = {
+  id: string;
+  companyId: string;
+  companyName: string;
+  applicationId: string;
+  applicationKey: string;
+  applicationName: string;
+  applicationEntryPath: string | null;
+  status: CompanyApplicationStatus;
+  implementationNotes: string | null;
+  activatedAt: string | null;
+  suspendedAt: string | null;
+  cancelledAt: string | null;
+  createdAt: string;
+};
+
 export type AdminPermissionContract = {
   id: string;
   applicationId: string;

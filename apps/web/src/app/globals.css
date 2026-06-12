@@ -839,6 +839,46 @@ button:disabled {
   border-bottom: 0;
 }
 
+.contracted-module-list {
+  display: grid;
+}
+
+.contracted-module-row {
+  align-items: start;
+  border-bottom: 1px solid var(--line);
+  display: grid;
+  gap: 16px;
+  grid-template-columns: minmax(220px, 1.1fr) minmax(220px, 1fr) 170px minmax(220px, 1fr) auto;
+  padding: 16px 0;
+}
+
+.contracted-module-row:last-child {
+  border-bottom: 0;
+}
+
+.contracted-module-row p {
+  color: var(--muted);
+  line-height: 1.5;
+  margin: 0;
+}
+
+.contracted-module-row small {
+  color: var(--muted);
+  display: block;
+  margin-top: 4px;
+  overflow-wrap: anywhere;
+}
+
+.contracted-module-row span {
+  color: var(--success);
+  font-weight: 900;
+}
+
+.contracted-module-row a {
+  color: var(--accent);
+  font-weight: 900;
+}
+
 @media (max-width: 980px) {
   .app-shell {
     grid-template-columns: 1fr;
@@ -885,6 +925,7 @@ button:disabled {
   .access-role-row,
   .audit-row,
   .company-module-row,
+  .contracted-module-row,
   .form-grid,
   .module-catalog-row,
   .module-status-row,

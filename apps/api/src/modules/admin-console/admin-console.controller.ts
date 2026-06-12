@@ -35,6 +35,11 @@ export class AdminConsoleController {
     return this.adminConsole.getCatalog();
   }
 
+  @Get("contracted-modules")
+  listContractedModules() {
+    return this.adminConsole.listContractedModules();
+  }
+
   @Get("audit-logs")
   listAuditLogs(@Query("scope") scope?: AdminAuditScope) {
     return this.adminConsole.listAuditLogs(scope);

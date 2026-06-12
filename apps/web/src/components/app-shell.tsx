@@ -15,7 +15,7 @@ const cadastroItems = [
 ];
 
 const movimentacaoItems = [
-  { href: "/", label: "Modulos contratados" }
+  { href: "/movimentacao/modulos-contratados", label: "Modulos contratados" }
 ];
 
 const auditoriaItems = [

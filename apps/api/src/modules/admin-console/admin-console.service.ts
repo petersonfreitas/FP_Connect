@@ -18,6 +18,7 @@ import type {
   AdminCompanyUserContract,
   AdminCompanyContract,
   AdminConsoleOverviewContract,
+  AdminContractedModuleContract,
   AdminPermissionContract,
   AdminRoleContract,
   AdminUserContract,
@@ -99,6 +100,7 @@ type CompanyApplicationRow = {
   activated_at: string | null;
   suspended_at: string | null;
   cancelled_at: string | null;
+  created_at?: string;
 };
 
 type PermissionRow = {
@@ -149,12 +151,20 @@ type AuditCompanyRow = {
   trade_name: string | null;
 };
 
+type ContractedModuleCompanyRow = {
+  id: string;
+  legal_name: string;
+  trade_name: string | null;
+};
+
 const companySelect =
   "id,person_type,legal_name,trade_name,document,primary_email,primary_phone,primary_responsible_name,primary_responsible_email,status,basic_plan_id,implementation_notes,created_at";
 const userSelect = "id,full_name,email,status,created_at";
 const applicationSelect = "id,key,name,description,entry_path,status,sort_order";
 const companyApplicationSelect =
   "id,company_id,application_id,status,implementation_notes,activated_at,suspended_at,cancelled_at";
+const contractedModuleSelect =
+  "id,company_id,application_id,status,implementation_notes,activated_at,suspended_at,cancelled_at,created_at";
 const permissionSelect = "id,application_id,key,name,description";
 const roleSelect = "id,application_id,key,name,description";
 const rolePermissionSelect = "role_id,permission_id";
@@ -293,6 +303,37 @@ export class AdminConsoleService {
       applications,
       basicPlans
     };
+  }
+
+  async listContractedModules(): Promise<AdminContractedModuleContract[]> {
+    const { data, error } = await this.supabase.core
+      .from("company_applications")
+      .select(contractedModuleSelect)
+      .is("deleted_at", null)
+      .order("created_at", { ascending: false });
+
+    if (error) {
+      throwSupabaseError(error);
+    }
+
+    const rows = (data ?? []) as Required<CompanyApplicationRow>[];
+    const companyIds = unique(rows.map((row) => row.company_id));
+    const applicationIds = unique(rows.map((row) => row.application_id));
+    const [companiesById, applicationsById] = await Promise.all([
+      this.listContractedModuleCompaniesById(companyIds),
+      this.listApplicationsById(applicationIds)
+    ]);
+
+    return rows.flatMap((row) => {
+      const company = companiesById.get(row.company_id);
+      const application = applicationsById.get(row.application_id);
+
+      if (!company || !application) {
+        return [];
+      }
+
+      return [mapContractedModule(row, company, application)];
+    });
   }
 
   async listAuditLogs(scope: AdminAuditScope = "all"): Promise<AdminAuditLogContract[]> {
@@ -784,6 +825,27 @@ export class AdminConsoleService {
     return new Map(((data ?? []) as AuditCompanyRow[]).map((company) => [company.id, company]));
   }
 
+  private async listContractedModuleCompaniesById(
+    companyIds: string[]
+  ): Promise<Map<string, ContractedModuleCompanyRow>> {
+    if (companyIds.length === 0) {
+      return new Map();
+    }
+
+    const { data, error } = await this.supabase.core
+      .from("companies")
+      .select("id,legal_name,trade_name")
+      .in("id", companyIds);
+
+    if (error) {
+      throwSupabaseError(error);
+    }
+
+    return new Map(
+      ((data ?? []) as ContractedModuleCompanyRow[]).map((company) => [company.id, company])
+    );
+  }
+
   private async getApplication(applicationId: string): Promise<ApplicationRow> {
     const { data, error } = await this.supabase.core
       .from("applications")
@@ -801,6 +863,24 @@ export class AdminConsoleService {
     }
 
     return data as ApplicationRow;
+  }
+
+  private async listApplicationsById(applicationIds: string[]): Promise<Map<string, ApplicationRow>> {
+    if (applicationIds.length === 0) {
+      return new Map();
+    }
+
+    const { data, error } = await this.supabase.core
+      .from("applications")
+      .select(applicationSelect)
+      .in("id", applicationIds)
+      .is("deleted_at", null);
+
+    if (error) {
+      throwSupabaseError(error);
+    }
+
+    return new Map(((data ?? []) as ApplicationRow[]).map((application) => [application.id, application]));
   }
 
   private async getCurrentCompanyApplication(
@@ -1054,6 +1134,28 @@ function mapCompanyApplication(
     activatedAt: companyApplication?.activated_at ?? null,
     suspendedAt: companyApplication?.suspended_at ?? null,
     cancelledAt: companyApplication?.cancelled_at ?? null
+  };
+}
+
+function mapContractedModule(
+  row: Required<CompanyApplicationRow>,
+  company: ContractedModuleCompanyRow,
+  application: ApplicationRow
+): AdminContractedModuleContract {
+  return {
+    id: row.id,
+    companyId: row.company_id,
+    companyName: company.trade_name ?? company.legal_name,
+    applicationId: row.application_id,
+    applicationKey: application.key,
+    applicationName: application.name,
+    applicationEntryPath: application.entry_path,
+    status: row.status,
+    implementationNotes: row.implementation_notes,
+    activatedAt: row.activated_at,
+    suspendedAt: row.suspended_at,
+    cancelledAt: row.cancelled_at,
+    createdAt: row.created_at
   };
 }
 
