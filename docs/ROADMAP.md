@@ -40,6 +40,7 @@ Ja foram implementados:
 - consumo server-side pelo Next;
 - painel principal com dados reais do `core`;
 - empresas: cadastro, listagem, detalhe e edicao;
+- empresas: contato, celular, documentos e endereco estruturado normalizados;
 - usuarios: cadastro, listagem e edicao;
 - vinculo usuario x empresa;
 - papeis/permissoes por usuario, empresa e modulo;

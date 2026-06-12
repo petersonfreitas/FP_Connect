@@ -32,6 +32,15 @@ export function CompanyForm({
   const [tradeName, setTradeName] = useState(company?.tradeName ?? "");
   const [primaryEmail, setPrimaryEmail] = useState(company?.primaryEmail ?? "");
   const [primaryPhone, setPrimaryPhone] = useState(company?.primaryPhone ?? "");
+  const [primaryMobilePhone, setPrimaryMobilePhone] = useState(company?.primaryMobilePhone ?? "");
+  const [addressPostalCode, setAddressPostalCode] = useState(company?.addressPostalCode ?? "");
+  const [addressStreetType, setAddressStreetType] = useState(company?.addressStreetType ?? "");
+  const [addressStreet, setAddressStreet] = useState(company?.addressStreet ?? "");
+  const [addressNumber, setAddressNumber] = useState(company?.addressNumber ?? "");
+  const [addressComplement, setAddressComplement] = useState(company?.addressComplement ?? "");
+  const [addressDistrict, setAddressDistrict] = useState(company?.addressDistrict ?? "");
+  const [addressCity, setAddressCity] = useState(company?.addressCity ?? "");
+  const [addressState, setAddressState] = useState(company?.addressState ?? "");
   const [implementationNotes, setImplementationNotes] = useState(
     company?.implementationNotes ?? ""
   );
@@ -40,13 +49,15 @@ export function CompanyForm({
   const [isLookupLoading, setIsLookupLoading] = useState(false);
 
   const documentLabel = personType === "individual" ? "CPF" : "CNPJ";
-  const documentMaxLength = personType === "individual" ? 11 : 14;
+  const documentMaxLength = personType === "individual" ? 14 : 18;
 
   function handleSubmit(event: FormEvent<HTMLFormElement>) {
     const digits = onlyDigits(document);
     const isValidDocument =
       personType === "individual" ? isValidCpf(digits) : isValidCnpj(digits);
     const normalizedPhone = normalizeBrazilPhone(primaryPhone);
+    const normalizedMobilePhone = normalizeBrazilPhone(primaryMobilePhone);
+    const postalCode = onlyDigits(addressPostalCode);
 
     if (!isValidDocument) {
       event.preventDefault();
@@ -60,11 +71,40 @@ export function CompanyForm({
       return;
     }
 
+    if (normalizedMobilePhone.value && (!normalizedMobilePhone.isValid || !normalizedMobilePhone.isMobile)) {
+      event.preventDefault();
+      setValidationError("Celular invalido. Informe DDD + numero de celular.");
+      return;
+    }
+
+    if (postalCode && postalCode.length !== 8) {
+      event.preventDefault();
+      setValidationError("CEP invalido.");
+      return;
+    }
+
+    const documentInput = event.currentTarget.elements.namedItem("document");
+    if (documentInput instanceof HTMLInputElement) {
+      documentInput.value = digits;
+    }
+
     const phoneInput = event.currentTarget.elements.namedItem("primaryPhone");
     if (phoneInput instanceof HTMLInputElement) {
       phoneInput.value = normalizedPhone.value;
     }
     setPrimaryPhone(normalizedPhone.value);
+
+    const mobilePhoneInput = event.currentTarget.elements.namedItem("primaryMobilePhone");
+    if (mobilePhoneInput instanceof HTMLInputElement) {
+      mobilePhoneInput.value = normalizedMobilePhone.value;
+    }
+    setPrimaryMobilePhone(normalizedMobilePhone.value);
+
+    const postalCodeInput = event.currentTarget.elements.namedItem("addressPostalCode");
+    if (postalCodeInput instanceof HTMLInputElement) {
+      postalCodeInput.value = postalCode;
+    }
+    setAddressPostalCode(postalCode);
 
     setValidationError(null);
   }
@@ -97,10 +137,14 @@ export function CompanyForm({
     setTradeName((body.tradeName ?? "").slice(0, 140));
     setPrimaryEmail((body.primaryEmail ?? "").slice(0, 254));
     setPrimaryPhone(normalizeBrazilPhone(body.primaryPhone ?? "").value.slice(0, 20));
-
-    if (body.address && !implementationNotes) {
-      setImplementationNotes(`Endereco consultado: ${body.address}`.slice(0, 1000));
-    }
+    setAddressPostalCode(body.addressPostalCode ?? "");
+    setAddressStreetType(body.addressStreetType ?? "");
+    setAddressStreet((body.addressStreet ?? "").slice(0, 160));
+    setAddressNumber((body.addressNumber ?? "").slice(0, 20));
+    setAddressComplement((body.addressComplement ?? "").slice(0, 120));
+    setAddressDistrict((body.addressDistrict ?? "").slice(0, 120));
+    setAddressCity((body.addressCity ?? "").slice(0, 120));
+    setAddressState(body.addressState ?? "");
 
     setLookupStatus("Dados cadastrais preenchidos a partir do CNPJ.");
   }
@@ -144,9 +188,12 @@ export function CompanyForm({
             inputMode="numeric"
             maxLength={documentMaxLength}
             name="document"
-            onChange={(event) => setDocument(onlyDigits(event.target.value).slice(0, documentMaxLength))}
+            onChange={(event) => {
+              const maxDigits = personType === "individual" ? 11 : 14;
+              setDocument(formatDocument(onlyDigits(event.target.value).slice(0, maxDigits), personType));
+            }}
             required
-            value={document}
+            value={formatDocument(document, personType)}
           />
           {personType === "legal_entity" ? (
             <button
@@ -208,18 +255,36 @@ export function CompanyForm({
       <label>
         Telefone principal
         <input
-          maxLength={20}
+          maxLength={15}
           name="primaryPhone"
           onBlur={() => {
             const normalizedPhone = normalizeBrazilPhone(primaryPhone);
 
             if (normalizedPhone.isValid) {
-              setPrimaryPhone(normalizedPhone.value);
+              setPrimaryPhone(formatBrazilPhone(normalizedPhone.value));
             }
           }}
-          onChange={(event) => setPrimaryPhone(event.target.value)}
-          placeholder="+55DD9XXXXXXXX"
-          value={primaryPhone}
+          onChange={(event) => setPrimaryPhone(formatBrazilPhone(event.target.value))}
+          placeholder="(11) 3333-4444"
+          value={formatBrazilPhone(primaryPhone)}
+        />
+      </label>
+
+      <label>
+        Celular / WhatsApp
+        <input
+          maxLength={16}
+          name="primaryMobilePhone"
+          onBlur={() => {
+            const normalizedPhone = normalizeBrazilPhone(primaryMobilePhone);
+
+            if (normalizedPhone.isValid && normalizedPhone.isMobile) {
+              setPrimaryMobilePhone(formatBrazilPhone(normalizedPhone.value));
+            }
+          }}
+          onChange={(event) => setPrimaryMobilePhone(formatBrazilPhone(event.target.value))}
+          placeholder="(11) 93333-4444"
+          value={formatBrazilPhone(primaryMobilePhone)}
         />
       </label>
 
@@ -241,6 +306,100 @@ export function CompanyForm({
           name="primaryResponsibleEmail"
           type="email"
         />
+      </label>
+
+      <label>
+        CEP
+        <input
+          inputMode="numeric"
+          maxLength={9}
+          name="addressPostalCode"
+          onChange={(event) => setAddressPostalCode(formatPostalCode(event.target.value))}
+          placeholder="00000-000"
+          value={formatPostalCode(addressPostalCode)}
+        />
+      </label>
+
+      <label>
+        Tipo de logradouro
+        <select
+          name="addressStreetType"
+          onChange={(event) => setAddressStreetType(event.target.value)}
+          value={addressStreetType}
+        >
+          <option value="">Selecione</option>
+          {streetTypes.map((type) => (
+            <option key={type} value={type}>
+              {type}
+            </option>
+          ))}
+        </select>
+      </label>
+
+      <label>
+        Logradouro
+        <input
+          maxLength={160}
+          name="addressStreet"
+          onChange={(event) => setAddressStreet(event.target.value)}
+          value={addressStreet}
+        />
+      </label>
+
+      <label>
+        Numero
+        <input
+          maxLength={20}
+          name="addressNumber"
+          onChange={(event) => setAddressNumber(event.target.value)}
+          value={addressNumber}
+        />
+      </label>
+
+      <label>
+        Complemento
+        <input
+          maxLength={120}
+          name="addressComplement"
+          onChange={(event) => setAddressComplement(event.target.value)}
+          value={addressComplement}
+        />
+      </label>
+
+      <label>
+        Bairro
+        <input
+          maxLength={120}
+          name="addressDistrict"
+          onChange={(event) => setAddressDistrict(event.target.value)}
+          value={addressDistrict}
+        />
+      </label>
+
+      <label>
+        Cidade
+        <input
+          maxLength={120}
+          name="addressCity"
+          onChange={(event) => setAddressCity(event.target.value)}
+          value={addressCity}
+        />
+      </label>
+
+      <label>
+        Estado
+        <select
+          name="addressState"
+          onChange={(event) => setAddressState(event.target.value)}
+          value={addressState}
+        >
+          <option value="">Selecione</option>
+          {brazilianStates.map((state) => (
+            <option key={state.uf} value={state.uf}>
+              {state.uf} - {state.name}
+            </option>
+          ))}
+        </select>
       </label>
 
       <label className="form-full">
@@ -277,3 +436,90 @@ function readLookupError(value: CnpjLookupContract | { message?: string } | null
 
   return "Nao foi possivel consultar o CNPJ.";
 }
+
+function formatDocument(value: string, personType: CompanyPersonType): string {
+  const digits = onlyDigits(value);
+
+  if (personType === "individual") {
+    return digits
+      .replace(/^(\d{3})(\d)/, "$1.$2")
+      .replace(/^(\d{3})\.(\d{3})(\d)/, "$1.$2.$3")
+      .replace(/^(\d{3})\.(\d{3})\.(\d{3})(\d)/, "$1.$2.$3-$4");
+  }
+
+  return digits
+    .replace(/^(\d{2})(\d)/, "$1.$2")
+    .replace(/^(\d{2})\.(\d{3})(\d)/, "$1.$2.$3")
+    .replace(/^(\d{2})\.(\d{3})\.(\d{3})(\d)/, "$1.$2.$3/$4")
+    .replace(/^(\d{2})\.(\d{3})\.(\d{3})\/(\d{4})(\d)/, "$1.$2.$3/$4-$5");
+}
+
+function formatPostalCode(value: string): string {
+  const digits = onlyDigits(value).slice(0, 8);
+  return digits.replace(/^(\d{5})(\d)/, "$1-$2");
+}
+
+function formatBrazilPhone(value: string): string {
+  const digits = onlyDigits(value);
+  const nationalNumber =
+    digits.startsWith("55") && (digits.length === 12 || digits.length === 13)
+      ? digits.slice(2)
+      : digits;
+  const limited = nationalNumber.slice(0, 11);
+
+  if (limited.length <= 2) {
+    return limited;
+  }
+
+  if (limited.length <= 10) {
+    return limited
+      .replace(/^(\d{2})(\d)/, "($1) $2")
+      .replace(/^(\(\d{2}\) \d{4})(\d)/, "$1-$2");
+  }
+
+  return limited
+    .replace(/^(\d{2})(\d)/, "($1) $2")
+    .replace(/^(\(\d{2}\) \d{5})(\d)/, "$1-$2");
+}
+
+const streetTypes = [
+  "Rua",
+  "Avenida",
+  "Rodovia",
+  "Travessa",
+  "Alameda",
+  "Estrada",
+  "Praca",
+  "Largo",
+  "Outro"
+];
+
+const brazilianStates = [
+  { uf: "AC", name: "Acre" },
+  { uf: "AL", name: "Alagoas" },
+  { uf: "AP", name: "Amapa" },
+  { uf: "AM", name: "Amazonas" },
+  { uf: "BA", name: "Bahia" },
+  { uf: "CE", name: "Ceara" },
+  { uf: "DF", name: "Distrito Federal" },
+  { uf: "ES", name: "Espirito Santo" },
+  { uf: "GO", name: "Goias" },
+  { uf: "MA", name: "Maranhao" },
+  { uf: "MT", name: "Mato Grosso" },
+  { uf: "MS", name: "Mato Grosso do Sul" },
+  { uf: "MG", name: "Minas Gerais" },
+  { uf: "PA", name: "Para" },
+  { uf: "PB", name: "Paraiba" },
+  { uf: "PR", name: "Parana" },
+  { uf: "PE", name: "Pernambuco" },
+  { uf: "PI", name: "Piaui" },
+  { uf: "RJ", name: "Rio de Janeiro" },
+  { uf: "RN", name: "Rio Grande do Norte" },
+  { uf: "RS", name: "Rio Grande do Sul" },
+  { uf: "RO", name: "Rondonia" },
+  { uf: "RR", name: "Roraima" },
+  { uf: "SC", name: "Santa Catarina" },
+  { uf: "SP", name: "Sao Paulo" },
+  { uf: "SE", name: "Sergipe" },
+  { uf: "TO", name: "Tocantins" }
+];

@@ -73,8 +73,17 @@ type CompanyRow = {
   document: string | null;
   primary_email: string | null;
   primary_phone: string | null;
+  primary_mobile_phone: string | null;
   primary_responsible_name: string;
   primary_responsible_email: string | null;
+  address_postal_code: string | null;
+  address_street_type: string | null;
+  address_street: string | null;
+  address_number: string | null;
+  address_complement: string | null;
+  address_district: string | null;
+  address_city: string | null;
+  address_state: string | null;
   status: AdminCompanyContract["status"];
   basic_plan_id: string | null;
   implementation_notes: string | null;
@@ -164,7 +173,7 @@ type ContractedModuleCompanyRow = {
 };
 
 const companySelect =
-  "id,person_type,legal_name,trade_name,document,primary_email,primary_phone,primary_responsible_name,primary_responsible_email,status,basic_plan_id,implementation_notes,created_at";
+  "id,person_type,legal_name,trade_name,document,primary_email,primary_phone,primary_mobile_phone,primary_responsible_name,primary_responsible_email,address_postal_code,address_street_type,address_street,address_number,address_complement,address_district,address_city,address_state,status,basic_plan_id,implementation_notes,created_at";
 const userSelect = "id,full_name,email,status,created_at";
 const applicationSelect = "id,key,name,description,entry_path,status,sort_order";
 const companyApplicationSelect =
@@ -531,8 +540,17 @@ export class AdminConsoleService {
         document: company.document,
         primary_email: company.primaryEmail,
         primary_phone: company.primaryPhone,
+        primary_mobile_phone: company.primaryMobilePhone,
         primary_responsible_name: company.primaryResponsibleName,
         primary_responsible_email: company.primaryResponsibleEmail,
+        address_postal_code: company.addressPostalCode,
+        address_street_type: company.addressStreetType,
+        address_street: company.addressStreet,
+        address_number: company.addressNumber,
+        address_complement: company.addressComplement,
+        address_district: company.addressDistrict,
+        address_city: company.addressCity,
+        address_state: company.addressState,
         basic_plan_id: company.basicPlanId,
         implementation_notes: company.implementationNotes
       })
@@ -577,8 +595,17 @@ export class AdminConsoleService {
         document: company.document,
         primary_email: company.primaryEmail,
         primary_phone: company.primaryPhone,
+        primary_mobile_phone: company.primaryMobilePhone,
         primary_responsible_name: company.primaryResponsibleName,
         primary_responsible_email: company.primaryResponsibleEmail,
+        address_postal_code: company.addressPostalCode,
+        address_street_type: company.addressStreetType,
+        address_street: company.addressStreet,
+        address_number: company.addressNumber,
+        address_complement: company.addressComplement,
+        address_district: company.addressDistrict,
+        address_city: company.addressCity,
+        address_state: company.addressState,
         basic_plan_id: company.basicPlanId,
         implementation_notes: company.implementationNotes
       })
@@ -1412,8 +1439,17 @@ function mapCompany(row: CompanyRow): AdminCompanyContract {
     document: row.document,
     primaryEmail: row.primary_email,
     primaryPhone: row.primary_phone,
+    primaryMobilePhone: row.primary_mobile_phone,
     primaryResponsibleName: row.primary_responsible_name,
     primaryResponsibleEmail: row.primary_responsible_email,
+    addressPostalCode: row.address_postal_code,
+    addressStreetType: row.address_street_type,
+    addressStreet: row.address_street,
+    addressNumber: row.address_number,
+    addressComplement: row.address_complement,
+    addressDistrict: row.address_district,
+    addressCity: row.address_city,
+    addressState: row.address_state,
     status: row.status,
     basicPlanId: row.basic_plan_id,
     implementationNotes: row.implementation_notes,
@@ -1462,7 +1498,16 @@ function normalizeCreateCompanyInput(input: CreateAdminCompanyInput): CreateAdmi
     document,
     primaryEmail: normalizeOptional(input.primaryEmail, 254),
     primaryPhone: normalizePhone(input.primaryPhone),
+    primaryMobilePhone: normalizeMobilePhone(input.primaryMobilePhone),
     primaryResponsibleEmail: normalizeOptional(input.primaryResponsibleEmail, 254),
+    addressPostalCode: normalizePostalCode(input.addressPostalCode),
+    addressStreetType: normalizeOptional(input.addressStreetType, 40),
+    addressStreet: normalizeOptional(input.addressStreet, 160),
+    addressNumber: normalizeOptional(input.addressNumber, 20),
+    addressComplement: normalizeOptional(input.addressComplement, 120),
+    addressDistrict: normalizeOptional(input.addressDistrict, 120),
+    addressCity: normalizeOptional(input.addressCity, 120),
+    addressState: normalizeState(input.addressState),
     basicPlanId: normalizeOptional(input.basicPlanId),
     implementationNotes: normalizeOptional(input.implementationNotes, 1000)
   };
@@ -1681,6 +1726,87 @@ function normalizePhone(value: unknown): string | null {
 
   return `+55${nationalNumber}`;
 }
+
+function normalizeMobilePhone(value: unknown): string | null {
+  const rawValue = normalizeOptional(value, 20);
+
+  if (!rawValue) {
+    return null;
+  }
+
+  const digits = onlyDigits(rawValue);
+  const nationalNumber =
+    digits.startsWith("55") && digits.length === 13 ? digits.slice(2) : digits;
+  const isMobile = nationalNumber.length === 11 && nationalNumber[2] === "9";
+
+  if (!isMobile) {
+    throw new BadRequestException(
+      "Celular invalido. Informe DDD + numero de celular ou +55 + DDD + numero."
+    );
+  }
+
+  return `+55${nationalNumber}`;
+}
+
+function normalizePostalCode(value: unknown): string | null {
+  const rawValue = normalizeOptional(value, 12);
+
+  if (!rawValue) {
+    return null;
+  }
+
+  const digits = onlyDigits(rawValue);
+  if (digits.length !== 8) {
+    throw new BadRequestException("CEP invalido");
+  }
+
+  return digits;
+}
+
+function normalizeState(value: unknown): string | null {
+  const rawValue = normalizeOptional(value, 2);
+
+  if (!rawValue) {
+    return null;
+  }
+
+  const state = rawValue.toUpperCase();
+  if (!brazilianStates.has(state)) {
+    throw new BadRequestException("Estado invalido");
+  }
+
+  return state;
+}
+
+const brazilianStates = new Set([
+  "AC",
+  "AL",
+  "AP",
+  "AM",
+  "BA",
+  "CE",
+  "DF",
+  "ES",
+  "GO",
+  "MA",
+  "MT",
+  "MS",
+  "MG",
+  "PA",
+  "PB",
+  "PR",
+  "PE",
+  "PI",
+  "RJ",
+  "RN",
+  "RS",
+  "RO",
+  "RR",
+  "SC",
+  "SP",
+  "SE",
+  "TO"
+]);
 
 function isUuid(value: string): boolean {
   return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(

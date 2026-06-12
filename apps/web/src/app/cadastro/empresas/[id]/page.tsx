@@ -121,7 +121,7 @@ export default async function CompanyDetailPage({ params, searchParams }: Compan
             </div>
             <div>
               <dt>Documento</dt>
-              <dd>{company.document ?? "Nao informado"}</dd>
+              <dd>{formatDocument(company.document, company.personType)}</dd>
             </div>
             <div>
               <dt>E-mail principal</dt>
@@ -129,7 +129,11 @@ export default async function CompanyDetailPage({ params, searchParams }: Compan
             </div>
             <div>
               <dt>Telefone principal</dt>
-              <dd>{company.primaryPhone ?? "Nao informado"}</dd>
+              <dd>{formatBrazilPhone(company.primaryPhone)}</dd>
+            </div>
+            <div>
+              <dt>Celular / WhatsApp</dt>
+              <dd>{formatBrazilPhone(company.primaryMobilePhone)}</dd>
             </div>
             <div>
               <dt>Responsavel principal</dt>
@@ -138,6 +142,18 @@ export default async function CompanyDetailPage({ params, searchParams }: Compan
             <div>
               <dt>E-mail do responsavel</dt>
               <dd>{company.primaryResponsibleEmail ?? "Nao informado"}</dd>
+            </div>
+            <div>
+              <dt>CEP</dt>
+              <dd>{formatPostalCode(company.addressPostalCode)}</dd>
+            </div>
+            <div>
+              <dt>Estado</dt>
+              <dd>{company.addressState ?? "Nao informado"}</dd>
+            </div>
+            <div className="detail-full">
+              <dt>Endereco</dt>
+              <dd>{formatAddress(company)}</dd>
             </div>
             <div className="detail-full">
               <dt>Observacoes de implantacao</dt>
@@ -291,4 +307,70 @@ function readFormValue(formData: FormData, key: string): string {
 function readOptionalFormValue(formData: FormData, key: string): string | null {
   const value = readFormValue(formData, key).trim();
   return value || null;
+}
+
+type CompanyAddress = {
+  addressCity: string | null;
+  addressComplement: string | null;
+  addressDistrict: string | null;
+  addressNumber: string | null;
+  addressState: string | null;
+  addressStreet: string | null;
+  addressStreetType: string | null;
+};
+
+function formatDocument(value: string | null, personType: "individual" | "legal_entity"): string {
+  if (!value) {
+    return "Nao informado";
+  }
+
+  if (personType === "individual") {
+    return value.replace(/^(\d{3})(\d{3})(\d{3})(\d{2})$/, "$1.$2.$3-$4");
+  }
+
+  return value.replace(/^(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})$/, "$1.$2.$3/$4-$5");
+}
+
+function formatBrazilPhone(value: string | null): string {
+  if (!value) {
+    return "Nao informado";
+  }
+
+  const digits = value.replace(/\D/g, "");
+  const nationalNumber =
+    digits.startsWith("55") && (digits.length === 12 || digits.length === 13)
+      ? digits.slice(2)
+      : digits;
+
+  if (nationalNumber.length === 10) {
+    return nationalNumber.replace(/^(\d{2})(\d{4})(\d{4})$/, "($1) $2-$3");
+  }
+
+  if (nationalNumber.length === 11) {
+    return nationalNumber.replace(/^(\d{2})(\d{5})(\d{4})$/, "($1) $2-$3");
+  }
+
+  return value;
+}
+
+function formatPostalCode(value: string | null): string {
+  if (!value) {
+    return "Nao informado";
+  }
+
+  return value.replace(/^(\d{5})(\d{3})$/, "$1-$2");
+}
+
+function formatAddress(company: CompanyAddress): string {
+  const street = [company.addressStreetType, company.addressStreet].filter(Boolean).join(" ");
+  const streetLine = [street, company.addressNumber].filter(Boolean).join(", ");
+  const cityLine = [company.addressCity, company.addressState].filter(Boolean).join(" - ");
+  const parts = [
+    streetLine,
+    company.addressComplement,
+    company.addressDistrict,
+    cityLine
+  ].filter(Boolean);
+
+  return parts.length > 0 ? parts.join(" | ") : "Nao informado";
 }

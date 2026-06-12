@@ -57,13 +57,21 @@ export async function GET(_request: Request, { params }: CnpjRouteProps) {
   }
 
   const body = (await response.json()) as BrasilApiCnpjResponse;
+  const parsedStreet = parseStreet(body.logradouro);
   const result: CnpjLookupContract = {
     cnpj: onlyDigits(body.cnpj ?? digits),
     legalName: body.razao_social ?? "",
     tradeName: body.nome_fantasia || null,
     primaryEmail: body.email || null,
     primaryPhone: normalizeBrazilPhone(body.ddd_telefone_1 ?? "").value || null,
-    address: formatAddress(body)
+    addressPostalCode: onlyDigits(body.cep ?? "") || null,
+    addressStreetType: parsedStreet.type,
+    addressStreet: parsedStreet.street,
+    addressNumber: body.numero || null,
+    addressComplement: body.complemento || null,
+    addressDistrict: body.bairro || null,
+    addressCity: body.municipio || null,
+    addressState: body.uf || null
   };
 
   return NextResponse.json(result);
@@ -129,10 +137,29 @@ async function delay(milliseconds: number): Promise<void> {
   });
 }
 
-function formatAddress(body: BrasilApiCnpjResponse): string | null {
-  const street = [body.logradouro, body.numero].filter(Boolean).join(", ");
-  const city = [body.municipio, body.uf].filter(Boolean).join(" - ");
-  const parts = [street, body.complemento, body.bairro, city, body.cep].filter(Boolean);
+function parseStreet(value: string | undefined): { street: string | null; type: string | null } {
+  const street = value?.trim();
 
-  return parts.length > 0 ? parts.join(" | ") : null;
+  if (!street) {
+    return {
+      street: null,
+      type: null
+    };
+  }
+
+  const knownTypes = ["Rua", "Avenida", "Rodovia", "Travessa", "Alameda", "Estrada", "Praca", "Largo"];
+  const streetLower = street.toLowerCase();
+  const type = knownTypes.find((item) => streetLower.startsWith(`${item.toLowerCase()} `));
+
+  if (!type) {
+    return {
+      street,
+      type: null
+    };
+  }
+
+  return {
+    street: street.slice(type.length).trim() || street,
+    type
+  };
 }

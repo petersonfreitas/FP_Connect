@@ -34,6 +34,7 @@ Este arquivo controla o avanco dos modulos do ecossistema.
 
 - [x] Empresas
 - [x] Edicao de empresas
+- [x] Endereco estruturado, celular e mascaras amigaveis no cadastro de empresas
 - [x] Usuarios
 - [x] Edicao de usuarios
 - [x] Vinculo usuario/empresa

@@ -17,6 +17,7 @@ Ja existe base funcional para:
 
 - painel principal com dados reais do schema `core`;
 - cadastro, listagem, detalhe e edicao de empresas;
+- cadastro de empresas com CPF/CNPJ, telefone, celular, CEP e endereco estruturado normalizados;
 - cadastro, listagem e edicao de usuarios;
 - vinculo usuario x empresa;
 - papeis/permissoes por usuario, empresa e modulo;

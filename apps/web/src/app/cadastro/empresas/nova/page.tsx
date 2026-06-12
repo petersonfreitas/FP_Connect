@@ -26,8 +26,17 @@ export default async function NewCompanyPage({ searchParams }: NewCompanyPagePro
       document: readOptionalFormValue(formData, "document"),
       primaryEmail: readOptionalFormValue(formData, "primaryEmail"),
       primaryPhone: readOptionalFormValue(formData, "primaryPhone"),
+      primaryMobilePhone: readOptionalFormValue(formData, "primaryMobilePhone"),
       primaryResponsibleName: readFormValue(formData, "primaryResponsibleName"),
       primaryResponsibleEmail: readOptionalFormValue(formData, "primaryResponsibleEmail"),
+      addressPostalCode: readOptionalFormValue(formData, "addressPostalCode"),
+      addressStreetType: readOptionalFormValue(formData, "addressStreetType"),
+      addressStreet: readOptionalFormValue(formData, "addressStreet"),
+      addressNumber: readOptionalFormValue(formData, "addressNumber"),
+      addressComplement: readOptionalFormValue(formData, "addressComplement"),
+      addressDistrict: readOptionalFormValue(formData, "addressDistrict"),
+      addressCity: readOptionalFormValue(formData, "addressCity"),
+      addressState: readOptionalFormValue(formData, "addressState"),
       basicPlanId: readOptionalFormValue(formData, "basicPlanId"),
       implementationNotes: readOptionalFormValue(formData, "implementationNotes")
     });

@@ -410,6 +410,7 @@ Formularios devem respeitar o mesmo contrato do banco:
 - `maxLength` no frontend;
 - validacao de documentos oficiais quando aplicavel, como CPF e CNPJ;
 - normalizacao de telefone/celular quando aplicavel.
+- mascaras visuais podem ser usadas no frontend para CPF, CNPJ, telefone, celular e CEP, mas o banco deve manter valores normalizados.
 
 No Admin Console, a navegacao principal deve usar grupos recolhiveis:
 

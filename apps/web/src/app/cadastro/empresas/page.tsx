@@ -63,7 +63,7 @@ export default async function CompaniesPage() {
                   <small>{company.legalName}</small>
                 </span>
                 <span>
-                  {company.document}
+                  {formatDocument(company.document, company.personType)}
                   <small>{personTypeLabels[company.personType]}</small>
                 </span>
                 <span>{statusLabels[company.status]}</span>
@@ -80,4 +80,16 @@ export default async function CompaniesPage() {
       </section>
     </AppShell>
   );
+}
+
+function formatDocument(value: string | null, personType: "individual" | "legal_entity"): string {
+  if (!value) {
+    return "Nao informado";
+  }
+
+  if (personType === "individual") {
+    return value.replace(/^(\d{3})(\d{3})(\d{3})(\d{2})$/, "$1.$2.$3-$4");
+  }
+
+  return value.replace(/^(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})$/, "$1.$2.$3/$4-$5");
 }
