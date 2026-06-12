@@ -28,6 +28,7 @@ import type {
   GrantAdminUserRoleInput,
   RevokeAdminUserRoleContract,
   RevokeAdminUserRoleInput,
+  UpdateAdminCompanyInput,
   UpdateAdminCompanyApplicationInput
 } from "./admin-console.contracts";
 import { SupabaseService } from "../../supabase/supabase.service";
@@ -520,6 +521,52 @@ export class AdminConsoleService {
     });
 
     return createdCompany;
+  }
+
+  async updateCompany(
+    companyId: string,
+    input: UpdateAdminCompanyInput
+  ): Promise<AdminCompanyContract> {
+    const normalizedCompanyId = normalizeUuid(companyId, "companyId");
+    await this.ensureCompanyExists(normalizedCompanyId);
+    const company = normalizeCreateCompanyInput(input);
+
+    const { data, error } = await this.supabase.core
+      .from("companies")
+      .update({
+        person_type: company.personType,
+        legal_name: company.legalName,
+        trade_name: company.tradeName,
+        document: company.document,
+        primary_email: company.primaryEmail,
+        primary_phone: company.primaryPhone,
+        primary_responsible_name: company.primaryResponsibleName,
+        primary_responsible_email: company.primaryResponsibleEmail,
+        basic_plan_id: company.basicPlanId,
+        implementation_notes: company.implementationNotes
+      })
+      .eq("id", normalizedCompanyId)
+      .is("deleted_at", null)
+      .select(companySelect)
+      .single();
+
+    if (error) {
+      throwSupabaseError(error);
+    }
+
+    const updatedCompany = mapCompany(data as CompanyRow);
+    await this.createAuditLog(
+      updatedCompany.id,
+      "core.company.updated",
+      "companies",
+      updatedCompany.id,
+      {
+        legalName: updatedCompany.legalName,
+        status: updatedCompany.status
+      }
+    );
+
+    return updatedCompany;
   }
 
   async createUser(input: CreateAdminUserInput): Promise<AdminCompanyUserContract> {

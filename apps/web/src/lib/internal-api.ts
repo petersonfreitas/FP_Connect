@@ -18,6 +18,7 @@ import type {
   GrantAdminUserRoleInput,
   RevokeAdminUserRoleContract,
   RevokeAdminUserRoleInput,
+  UpdateAdminCompanyInput,
   UpdateAdminCompanyApplicationInput
 } from "@fp/types";
 import { loadServerEnv } from "./server-env";
@@ -79,6 +80,16 @@ export async function createAdminCompany(
   return fetchInternal<AdminCompanyContract>("admin-console/companies", {
     body: JSON.stringify(input),
     method: "POST"
+  });
+}
+
+export async function updateAdminCompany(
+  id: string,
+  input: UpdateAdminCompanyInput
+): Promise<InternalApiResult<AdminCompanyContract>> {
+  return fetchInternal<AdminCompanyContract>(`admin-console/companies/${id}`, {
+    body: JSON.stringify(input),
+    method: "PATCH"
   });
 }
 

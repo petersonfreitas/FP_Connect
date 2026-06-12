@@ -1,22 +1,40 @@
 "use client";
 
-import type { AdminBasicPlanContract, CnpjLookupContract, CompanyPersonType } from "@fp/types";
+import type {
+  AdminBasicPlanContract,
+  AdminCompanyContract,
+  CnpjLookupContract,
+  CompanyPersonType
+} from "@fp/types";
 import { useState, type FormEvent } from "react";
 import { isValidCnpj, isValidCpf, normalizeBrazilPhone, onlyDigits } from "@/lib/br-documents";
 
 type CompanyFormProps = {
   action: (formData: FormData) => void | Promise<void>;
   basicPlans: AdminBasicPlanContract[];
+  cancelHref?: string;
+  company?: AdminCompanyContract;
+  submitLabel?: string;
 };
 
-export function CompanyForm({ action, basicPlans }: CompanyFormProps) {
-  const [personType, setPersonType] = useState<CompanyPersonType>("legal_entity");
-  const [document, setDocument] = useState("");
-  const [legalName, setLegalName] = useState("");
-  const [tradeName, setTradeName] = useState("");
-  const [primaryEmail, setPrimaryEmail] = useState("");
-  const [primaryPhone, setPrimaryPhone] = useState("");
-  const [implementationNotes, setImplementationNotes] = useState("");
+export function CompanyForm({
+  action,
+  basicPlans,
+  cancelHref = "/cadastro/empresas",
+  company,
+  submitLabel = "Salvar empresa"
+}: CompanyFormProps) {
+  const [personType, setPersonType] = useState<CompanyPersonType>(
+    company?.personType ?? "legal_entity"
+  );
+  const [document, setDocument] = useState(company?.document ?? "");
+  const [legalName, setLegalName] = useState(company?.legalName ?? "");
+  const [tradeName, setTradeName] = useState(company?.tradeName ?? "");
+  const [primaryEmail, setPrimaryEmail] = useState(company?.primaryEmail ?? "");
+  const [primaryPhone, setPrimaryPhone] = useState(company?.primaryPhone ?? "");
+  const [implementationNotes, setImplementationNotes] = useState(
+    company?.implementationNotes ?? ""
+  );
   const [validationError, setValidationError] = useState<string | null>(null);
   const [lookupStatus, setLookupStatus] = useState<string | null>(null);
   const [isLookupLoading, setIsLookupLoading] = useState(false);
@@ -166,7 +184,7 @@ export function CompanyForm({ action, basicPlans }: CompanyFormProps) {
 
       <label>
         Plano base
-        <select name="basicPlanId" defaultValue="">
+        <select name="basicPlanId" defaultValue={company?.basicPlanId ?? ""}>
           <option value="">Sem plano definido</option>
           {basicPlans.map((plan) => (
             <option key={plan.id} value={plan.id}>
@@ -207,12 +225,22 @@ export function CompanyForm({ action, basicPlans }: CompanyFormProps) {
 
       <label>
         Responsavel principal
-        <input maxLength={140} name="primaryResponsibleName" required />
+        <input
+          defaultValue={company?.primaryResponsibleName ?? ""}
+          maxLength={140}
+          name="primaryResponsibleName"
+          required
+        />
       </label>
 
       <label>
         E-mail do responsavel
-        <input maxLength={254} name="primaryResponsibleEmail" type="email" />
+        <input
+          defaultValue={company?.primaryResponsibleEmail ?? ""}
+          maxLength={254}
+          name="primaryResponsibleEmail"
+          type="email"
+        />
       </label>
 
       <label className="form-full">
@@ -227,11 +255,11 @@ export function CompanyForm({ action, basicPlans }: CompanyFormProps) {
       </label>
 
       <div className="form-actions">
-        <a className="secondary-action" href="/cadastro/empresas">
+        <a className="secondary-action" href={cancelHref}>
           Cancelar
         </a>
         <button className="primary-action" type="submit">
-          Salvar empresa
+          {submitLabel}
         </button>
       </div>
     </form>

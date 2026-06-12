@@ -105,6 +105,9 @@ export default async function CompanyDetailPage({ params, searchParams }: Compan
               <h1>{company.legalName}</h1>
               <p>Status atual: {statusLabels[company.status]}</p>
             </div>
+            <Link className="secondary-action" href={`/cadastro/empresas/${company.id}/editar`}>
+              Editar
+            </Link>
           </div>
 
           <dl className="detail-grid">

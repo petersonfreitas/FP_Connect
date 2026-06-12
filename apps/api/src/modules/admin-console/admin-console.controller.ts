@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Param, Post, Query, UseGuards } from "@nestjs/common";
+import { Body, Controller, Get, Param, Patch, Post, Query, UseGuards } from "@nestjs/common";
 import { InternalApiGuard } from "../../auth/internal-api.guard";
 import type {
   AdminAuditScope,
@@ -6,6 +6,7 @@ import type {
   CreateAdminUserInput,
   GrantAdminUserRoleInput,
   RevokeAdminUserRoleInput,
+  UpdateAdminCompanyInput,
   UpdateAdminCompanyApplicationInput
 } from "./admin-console.contracts";
 import { AdminConsoleService } from "./admin-console.service";
@@ -73,6 +74,11 @@ export class AdminConsoleController {
   @Post("companies")
   createCompany(@Body() input: CreateAdminCompanyInput) {
     return this.adminConsole.createCompany(input);
+  }
+
+  @Patch("companies/:id")
+  updateCompany(@Param("id") id: string, @Body() input: UpdateAdminCompanyInput) {
+    return this.adminConsole.updateCompany(id, input);
   }
 
   @Post("companies/:id/applications")

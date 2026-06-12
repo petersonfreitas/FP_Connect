@@ -1,25 +1,37 @@
 import { redirect } from "next/navigation";
 import { AppShell } from "@/components/app-shell";
 import { CompanyForm } from "@/components/company-form";
-import { createAdminCompany, listAdminBasicPlans } from "@/lib/internal-api";
+import {
+  getAdminCompany,
+  listAdminBasicPlans,
+  updateAdminCompany
+} from "@/lib/internal-api";
 
 export const dynamic = "force-dynamic";
 
-type NewCompanyPageProps = {
+type EditCompanyPageProps = {
+  params: Promise<{
+    id: string;
+  }>;
   searchParams?: Promise<{
     erro?: string;
   }>;
 };
 
-export default async function NewCompanyPage({ searchParams }: NewCompanyPageProps) {
-  const params = await searchParams;
-  const basicPlansResult = await listAdminBasicPlans();
+export default async function EditCompanyPage({ params, searchParams }: EditCompanyPageProps) {
+  const { id } = await params;
+  const query = await searchParams;
+  const [companyResult, basicPlansResult] = await Promise.all([
+    getAdminCompany(id),
+    listAdminBasicPlans()
+  ]);
+  const company = companyResult.data;
   const basicPlans = basicPlansResult.data ?? [];
 
-  async function createCompanyAction(formData: FormData) {
+  async function updateCompanyAction(formData: FormData) {
     "use server";
 
-    const result = await createAdminCompany({
+    const result = await updateAdminCompany(id, {
       personType: readFormValue(formData, "personType") === "individual" ? "individual" : "legal_entity",
       legalName: readFormValue(formData, "legalName"),
       tradeName: readOptionalFormValue(formData, "tradeName"),
@@ -34,8 +46,8 @@ export default async function NewCompanyPage({ searchParams }: NewCompanyPagePro
 
     if (result.error || !result.data) {
       redirect(
-        `/cadastro/empresas/nova?erro=${encodeURIComponent(
-          result.error ?? "API interna nao retornou a empresa criada."
+        `/cadastro/empresas/${id}/editar?erro=${encodeURIComponent(
+          result.error ?? "API interna nao retornou a empresa atualizada."
         )}`
       );
     }
@@ -48,9 +60,16 @@ export default async function NewCompanyPage({ searchParams }: NewCompanyPagePro
       <header className="topbar">
         <div>
           <div className="eyebrow">Cadastro</div>
-          <strong>Nova empresa</strong>
+          <strong>Editar empresa</strong>
         </div>
       </header>
+
+      {companyResult.error ? (
+        <section className="data-alert" role="status">
+          <strong>Nao foi possivel carregar a empresa.</strong>
+          <span>{companyResult.error}</span>
+        </section>
+      ) : null}
 
       {basicPlansResult.error ? (
         <section className="data-alert" role="status">
@@ -59,28 +78,31 @@ export default async function NewCompanyPage({ searchParams }: NewCompanyPagePro
         </section>
       ) : null}
 
-      {params?.erro ? (
+      {query?.erro ? (
         <section className="data-alert" role="status">
-          <strong>Nao foi possivel cadastrar a empresa.</strong>
-          <span>{params.erro}</span>
+          <strong>Nao foi possivel atualizar a empresa.</strong>
+          <span>{query.erro}</span>
         </section>
       ) : null}
 
-      <section className="content-panel">
-        <div className="panel-heading">
-          <div>
-            <h1>Cadastrar empresa</h1>
-            <p>Crie a empresa no core para depois liberar usuarios e modulos contratados.</p>
+      {company ? (
+        <section className="content-panel">
+          <div className="panel-heading">
+            <div>
+              <h1>{company.legalName}</h1>
+              <p>Atualize os dados cadastrais principais desta empresa.</p>
+            </div>
           </div>
-        </div>
 
-        <CompanyForm
-          action={createCompanyAction}
-          basicPlans={basicPlans}
-          cancelHref="/cadastro/empresas"
-          submitLabel="Salvar empresa"
-        />
-      </section>
+          <CompanyForm
+            action={updateCompanyAction}
+            basicPlans={basicPlans}
+            cancelHref={`/cadastro/empresas/${company.id}`}
+            company={company}
+            submitLabel="Salvar alteracoes"
+          />
+        </section>
+      ) : null}
     </AppShell>
   );
 }

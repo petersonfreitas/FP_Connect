@@ -151,6 +151,8 @@ export type CreateAdminCompanyInput = {
   implementationNotes?: string | null;
 };
 
+export type UpdateAdminCompanyInput = CreateAdminCompanyInput;
+
 export type CnpjLookupContract = {
   cnpj: string;
   legalName: string;

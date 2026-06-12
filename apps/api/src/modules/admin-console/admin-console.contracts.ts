@@ -151,6 +151,8 @@ export type CreateAdminCompanyInput = {
   implementationNotes?: string | null;
 };
 
+export type UpdateAdminCompanyInput = CreateAdminCompanyInput;
+
 export type AdminUserContract = {
   id: string;
   fullName: string;
