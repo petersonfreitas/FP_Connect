@@ -11,13 +11,15 @@ import {
 export async function signInAction(formData: FormData): Promise<void> {
   const email = String(formData.get("email") ?? "");
   const password = String(formData.get("password") ?? "");
+  const next = normalizeRedirectPath(String(formData.get("next") ?? ""));
   const result = await signInWithPassword(email, password);
 
   if (!result.ok) {
-    redirect(`/login?error=${encodeURIComponent(result.error)}`);
+    const nextParam = next ? `&next=${encodeURIComponent(next)}` : "";
+    redirect(`/login?error=${encodeURIComponent(result.error)}${nextParam}`);
   }
 
-  redirect("/");
+  redirect(next || "/");
 }
 
 export async function signOutAction(): Promise<void> {
@@ -53,4 +55,18 @@ export async function updatePasswordWithRecoveryAction(formData: FormData): Prom
   }
 
   redirect("/");
+}
+
+function normalizeRedirectPath(value: string): string {
+  const path = value.trim();
+
+  if (!path.startsWith("/") || path.startsWith("//")) {
+    return "";
+  }
+
+  if (path.startsWith("/login")) {
+    return "";
+  }
+
+  return path;
 }

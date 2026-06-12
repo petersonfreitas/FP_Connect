@@ -29,12 +29,12 @@ Ja existe base funcional para:
 - menu administrativo agrupado em `Cadastro`, `Movimentacao` e `Auditoria`;
 - login/logout server-side com Supabase Auth e cookies HttpOnly;
 - recuperacao de senha por e-mail via Supabase Auth;
+- refresh de sessao por refresh token HttpOnly no proxy do Next;
 - `actor_user_id` real enviado pelo Next para a API interna em mutacoes auditadas;
 - API Nest interna consumida pelo Next server-side.
 
 Ainda precisam ser amadurecidos antes de entrar pesado nos modulos operacionais:
 
-- refresh de sessao e tratamento refinado de expiracao;
 - guards/policies completos alem do token interno;
 - fluxos de inativacao/soft delete na UI;
 - smoke tests manuais dos fluxos principais;
@@ -75,7 +75,7 @@ No estado atual do projeto:
 
 O cliente interno do frontend esta em `apps/web/src/lib/internal-api.ts` e usa `server-only`, impedindo importacao por componentes client.
 
-O login do Admin Console usa Supabase Auth pelo server-side do Next. A sessao fica em cookies HttpOnly e o navegador nao recebe a service role nem o token interno.
+O login do Admin Console usa Supabase Auth pelo server-side do Next. A sessao fica em cookies HttpOnly e o navegador nao recebe a service role nem o token interno. Quando o access token expira, o proxy do Next renova a sessao com o refresh token HttpOnly antes de liberar a rota protegida.
 
 Para recuperacao de senha, cadastre a URL abaixo em Supabase Dashboard > Authentication > URL Configuration > Redirect URLs:
 

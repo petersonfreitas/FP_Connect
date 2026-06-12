@@ -52,6 +52,7 @@ Ja foram implementados:
 - menu administrativo em `Cadastro`, `Movimentacao` e `Auditoria`;
 - login/logout server-side com Supabase Auth e cookies HttpOnly;
 - recuperacao de senha por e-mail;
+- refresh de sessao por refresh token HttpOnly no proxy do Next;
 - seed inicial de super-admin a partir de Auth manual;
 - reset SQL de dados operacionais preservando catalogos nativos;
 - propagacao do usuario autenticado para a API interna;
@@ -61,7 +62,6 @@ Ja foram implementados:
 
 Pendencias de fundacao antes dos modulos operacionais:
 
-- refresh de sessao e tratamento refinado de expiracao;
 - guards/policies completos por usuario, empresa, permissao e modulo;
 - bloqueio efetivo por modulo contratado nas rotas sensiveis;
 - soft delete/inativacao exposto na UI quando autorizado;
@@ -103,7 +103,6 @@ Objetivo: transformar a base funcional em fundacao segura para escalar.
 
 Itens:
 
-- refresh de sessao;
 - guards/policies nas rotas sensiveis;
 - resolucao de empresa/contexto ativo;
 - revisao de bloqueios por empresa, permissao e modulo contratado;

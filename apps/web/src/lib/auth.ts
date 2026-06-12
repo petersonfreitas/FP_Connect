@@ -70,23 +70,11 @@ export async function signInWithPassword(
     };
   }
 
-  const cookieStore = await cookies();
-  const secure = process.env.NODE_ENV === "production";
-
-  cookieStore.set(ACCESS_TOKEN_COOKIE, body.access_token, {
-    httpOnly: true,
-    maxAge: body.expires_in ?? DEFAULT_ACCESS_TOKEN_MAX_AGE,
-    path: "/",
-    sameSite: "lax",
-    secure
-  });
-  cookieStore.set(REFRESH_TOKEN_COOKIE, body.refresh_token, {
-    httpOnly: true,
-    maxAge: REFRESH_TOKEN_MAX_AGE,
-    path: "/",
-    sameSite: "lax",
-    secure
-  });
+  await setSessionCookies(
+    body.access_token,
+    body.refresh_token,
+    body.expires_in ?? DEFAULT_ACCESS_TOKEN_MAX_AGE
+  );
 
   return { ok: true };
 }
@@ -172,9 +160,7 @@ export async function updatePasswordWithRecoveryToken(
 }
 
 export async function signOut(): Promise<void> {
-  const cookieStore = await cookies();
-  cookieStore.delete(ACCESS_TOKEN_COOKIE);
-  cookieStore.delete(REFRESH_TOKEN_COOKIE);
+  await clearSessionCookies();
 }
 
 export async function getCurrentUser(): Promise<AuthUser | null> {
@@ -219,7 +205,7 @@ export async function requireCurrentUser(): Promise<AuthUser> {
 }
 
 export async function hasAuthCookie(): Promise<boolean> {
-  return Boolean(await getAccessToken());
+  return Boolean((await getAccessToken()) || (await getRefreshToken()));
 }
 
 async function getAccessToken(): Promise<string | undefined> {
@@ -227,13 +213,22 @@ async function getAccessToken(): Promise<string | undefined> {
   return cookieStore.get(ACCESS_TOKEN_COOKIE)?.value;
 }
 
-async function setSessionCookies(accessToken: string, refreshToken: string | null): Promise<void> {
+async function getRefreshToken(): Promise<string | undefined> {
+  const cookieStore = await cookies();
+  return cookieStore.get(REFRESH_TOKEN_COOKIE)?.value;
+}
+
+async function setSessionCookies(
+  accessToken: string,
+  refreshToken: string | null,
+  expiresIn: number = DEFAULT_ACCESS_TOKEN_MAX_AGE
+): Promise<void> {
   const cookieStore = await cookies();
   const secure = process.env.NODE_ENV === "production";
 
   cookieStore.set(ACCESS_TOKEN_COOKIE, accessToken, {
     httpOnly: true,
-    maxAge: DEFAULT_ACCESS_TOKEN_MAX_AGE,
+    maxAge: expiresIn,
     path: "/",
     sameSite: "lax",
     secure
@@ -248,6 +243,12 @@ async function setSessionCookies(accessToken: string, refreshToken: string | nul
       secure
     });
   }
+}
+
+async function clearSessionCookies(): Promise<void> {
+  const cookieStore = await cookies();
+  cookieStore.delete(ACCESS_TOKEN_COOKIE);
+  cookieStore.delete(REFRESH_TOKEN_COOKIE);
 }
 
 function getSupabaseAuthHeaders(): HeadersInit {

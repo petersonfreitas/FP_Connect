@@ -7,6 +7,7 @@ import { getCurrentUser } from "@/lib/auth";
 type LoginPageProps = {
   searchParams?: Promise<{
     error?: string;
+    next?: string;
   }>;
 };
 
@@ -21,6 +22,7 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
 
   const params = await searchParams;
   const error = params?.error;
+  const next = normalizeRedirectPath(params?.next ?? "");
 
   return (
     <main className="login-screen">
@@ -39,6 +41,7 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
         ) : null}
 
         <form action={signInAction} className="auth-form">
+          <input name="next" type="hidden" value={next} />
           <label>
             E-mail
             <input autoComplete="email" maxLength={254} name="email" required type="email" />
@@ -64,4 +67,18 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
       </section>
     </main>
   );
+}
+
+function normalizeRedirectPath(value: string): string {
+  const path = value.trim();
+
+  if (!path.startsWith("/") || path.startsWith("//")) {
+    return "";
+  }
+
+  if (path.startsWith("/login")) {
+    return "";
+  }
+
+  return path;
 }

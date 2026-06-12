@@ -50,10 +50,10 @@ Este arquivo controla o avanco dos modulos do ecossistema.
 - [x] API interna Nest consumida pelo Next server-side
 - [x] Login/logout server-side com Supabase Auth
 - [x] Recuperacao de senha por e-mail
+- [x] Refresh de sessao com refresh token HttpOnly no proxy do Next
 - [x] Seed SQL inicial de super-admin
 - [x] Reset SQL de dados operacionais preservando catalogos nativos
 - [x] `actor_user_id` real nas mutacoes auditadas
-- [ ] Refresh de sessao e tratamento refinado de expiracao
 - [ ] Guards/policies completos por usuario, empresa, permissao e modulo
 - [ ] Bloqueio efetivo por empresa/modulo em todas as rotas sensiveis
 - [ ] Soft delete/inativacao exposto na UI quando autorizado
@@ -117,8 +117,7 @@ Antes de abrir implementacao pesada em Robots, Food e Tracking, fechar o hardeni
 
 1. aplicar guards/policies reais nas rotas sensiveis;
 2. resolver empresa/contexto ativo para autorizacao;
-3. adicionar refresh de sessao;
-4. validar smoke test completo de empresas, usuarios, permissoes, modulos e auditoria.
+3. validar smoke test completo de empresas, usuarios, permissoes, modulos e auditoria.
 
 ---
 
