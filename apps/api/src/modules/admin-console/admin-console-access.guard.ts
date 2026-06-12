@@ -5,10 +5,17 @@ import {
   Injectable,
   UnauthorizedException
 } from "@nestjs/common";
+import { Reflector } from "@nestjs/core";
 import { SupabaseService } from "../../supabase/supabase.service";
+import {
+  ADMIN_CONSOLE_POLICY_KEY,
+  type AdminConsolePolicy
+} from "./admin-console-policy.decorator";
 
 type RequestWithHeaders = {
+  body?: Record<string, unknown>;
   headers: Record<string, string | string[] | undefined>;
+  params?: Record<string, string | undefined>;
 };
 
 type AdminProfileRow = {
@@ -22,7 +29,10 @@ const uuidPattern =
 
 @Injectable()
 export class AdminConsoleAccessGuard implements CanActivate {
-  constructor(private readonly supabase: SupabaseService) {}
+  constructor(
+    private readonly reflector: Reflector,
+    private readonly supabase: SupabaseService
+  ) {}
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
     const request = context.switchToHttp().getRequest<RequestWithHeaders>();
@@ -45,8 +55,43 @@ export class AdminConsoleAccessGuard implements CanActivate {
 
     const profile = data as AdminProfileRow | null;
 
-    if (!profile || profile.global_role !== "super_admin" || profile.status !== "active") {
+    if (!profile || profile.status !== "active") {
+      throw new ForbiddenException("Admin Console requires an active user");
+    }
+
+    if (profile.global_role === "super_admin") {
+      return true;
+    }
+
+    const policy = this.reflector.getAllAndOverride<AdminConsolePolicy | undefined>(
+      ADMIN_CONSOLE_POLICY_KEY,
+      [context.getHandler(), context.getClass()]
+    );
+
+    if (!policy?.permissionKey || (!policy.companyParam && !policy.companyBody)) {
       throw new ForbiddenException("Admin Console requires an active super-admin user");
+    }
+
+    const companyId = policy.companyParam
+      ? request.params?.[policy.companyParam]
+      : readStringBodyValue(request.body?.[policy.companyBody ?? ""]);
+
+    if (!companyId || !uuidPattern.test(companyId)) {
+      throw new ForbiddenException("Admin Console company context is required");
+    }
+
+    const { data: hasPermission, error: permissionError } = await this.supabase.core.rpc(
+      "user_has_permission",
+      {
+        target_company_id: companyId,
+        target_application_key: "admin-console",
+        target_permission_key: policy.permissionKey,
+        target_user_id: actorUserId
+      }
+    );
+
+    if (permissionError || hasPermission !== true) {
+      throw new ForbiddenException("Admin Console permission denied");
     }
 
     return true;
@@ -59,4 +104,8 @@ function readSingleHeader(value: string | string[] | undefined): string | undefi
   }
 
   return value;
+}
+
+function readStringBodyValue(value: unknown): string | undefined {
+  return typeof value === "string" ? value : undefined;
 }

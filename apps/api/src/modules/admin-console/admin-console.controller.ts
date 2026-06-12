@@ -15,6 +15,7 @@ import type {
   UpdateAdminCompanyApplicationInput
 } from "./admin-console.contracts";
 import { AdminConsoleAccessGuard } from "./admin-console-access.guard";
+import { AdminConsolePolicy } from "./admin-console-policy.decorator";
 import { AdminConsoleService } from "./admin-console.service";
 
 @Controller("admin-console")
@@ -58,21 +59,25 @@ export class AdminConsoleController {
   }
 
   @Get("companies/:id")
+  @AdminConsolePolicy({ companyParam: "id", permissionKey: "admin.companies.read" })
   getCompany(@Param("id") id: string) {
     return this.adminConsole.getCompany(id);
   }
 
   @Get("companies/:id/users")
+  @AdminConsolePolicy({ companyParam: "id", permissionKey: "admin.users.manage" })
   listCompanyUsers(@Param("id") id: string) {
     return this.adminConsole.listCompanyUsers(id);
   }
 
   @Get("companies/:companyId/users/:userId/access")
+  @AdminConsolePolicy({ companyParam: "companyId", permissionKey: "admin.users.manage" })
   getCompanyUserAccess(@Param("companyId") companyId: string, @Param("userId") userId: string) {
     return this.adminConsole.getCompanyUserAccess(companyId, userId);
   }
 
   @Get("companies/:id/applications")
+  @AdminConsolePolicy({ companyParam: "id", permissionKey: "admin.modules.manage" })
   listCompanyApplications(@Param("id") id: string) {
     return this.adminConsole.listCompanyApplications(id);
   }
@@ -86,6 +91,7 @@ export class AdminConsoleController {
   }
 
   @Patch("companies/:id")
+  @AdminConsolePolicy({ companyParam: "id", permissionKey: "admin.companies.manage" })
   updateCompany(
     @Param("id") id: string,
     @Body() input: UpdateAdminCompanyInput,
@@ -95,6 +101,7 @@ export class AdminConsoleController {
   }
 
   @Post("companies/:id/applications")
+  @AdminConsolePolicy({ companyParam: "id", permissionKey: "admin.modules.manage" })
   updateCompanyApplication(
     @Param("id") id: string,
     @Body() input: UpdateAdminCompanyApplicationInput,
@@ -104,6 +111,7 @@ export class AdminConsoleController {
   }
 
   @Post("companies/:id/applications/bulk")
+  @AdminConsolePolicy({ companyParam: "id", permissionKey: "admin.modules.manage" })
   bulkUpdateCompanyApplications(
     @Param("id") id: string,
     @Body() input: BulkUpdateAdminCompanyApplicationsInput,
@@ -127,6 +135,7 @@ export class AdminConsoleController {
   }
 
   @Post("users")
+  @AdminConsolePolicy({ companyBody: "companyId", permissionKey: "admin.users.manage" })
   createUser(
     @Body() input: CreateAdminUserInput,
     @Headers() headers: Record<string, string | string[] | undefined>
@@ -144,6 +153,7 @@ export class AdminConsoleController {
   }
 
   @Post("companies/:companyId/users/:userId/roles")
+  @AdminConsolePolicy({ companyParam: "companyId", permissionKey: "admin.users.manage" })
   grantUserRole(
     @Param("companyId") companyId: string,
     @Param("userId") userId: string,
@@ -154,6 +164,7 @@ export class AdminConsoleController {
   }
 
   @Post("companies/:companyId/users/:userId/roles/bulk")
+  @AdminConsolePolicy({ companyParam: "companyId", permissionKey: "admin.users.manage" })
   bulkGrantUserRoles(
     @Param("companyId") companyId: string,
     @Param("userId") userId: string,
@@ -169,6 +180,7 @@ export class AdminConsoleController {
   }
 
   @Post("companies/:companyId/users/:userId/roles/revoke")
+  @AdminConsolePolicy({ companyParam: "companyId", permissionKey: "admin.users.manage" })
   revokeUserRole(
     @Param("companyId") companyId: string,
     @Param("userId") userId: string,
@@ -184,6 +196,7 @@ export class AdminConsoleController {
   }
 
   @Post("companies/:companyId/users/:userId/roles/revoke-bulk")
+  @AdminConsolePolicy({ companyParam: "companyId", permissionKey: "admin.users.manage" })
   bulkRevokeUserRoles(
     @Param("companyId") companyId: string,
     @Param("userId") userId: string,

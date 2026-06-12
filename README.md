@@ -118,7 +118,7 @@ Endpoints internos atuais do Admin Console:
 
 Essas rotas usam Supabase server-side com `SUPABASE_SERVICE_ROLE_KEY` e exigem o header `X-FP-Internal-Token` com o valor de `FP_INTERNAL_API_TOKEN`.
 
-As rotas do Admin Console tambem exigem `X-FP-Actor-User-Id` apontando para um usuario ativo com `global_role = 'super_admin'` no `core.profiles`. Esse guard e a primeira camada de autorizacao de aplicacao enquanto as policies granulares por permissao evoluem.
+As rotas do Admin Console tambem exigem `X-FP-Actor-User-Id` apontando para um usuario ativo no `core.profiles`. `super_admin` possui bypass global. Rotas com contexto de empresa podem usar policies granulares por permissao, como `admin.companies.read`, `admin.companies.manage`, `admin.users.manage` e `admin.modules.manage`. Rotas globais continuam restritas a super-admin.
 
 Em desenvolvimento local, o padrao esperado para o frontend chamar a API e:
 
