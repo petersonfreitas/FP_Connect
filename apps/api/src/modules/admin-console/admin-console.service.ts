@@ -29,6 +29,7 @@ import type {
   RevokeAdminUserRoleContract,
   RevokeAdminUserRoleInput,
   UpdateAdminCompanyInput,
+  UpdateAdminUserInput,
   UpdateAdminCompanyApplicationInput
 } from "./admin-console.contracts";
 import { SupabaseService } from "../../supabase/supabase.service";
@@ -391,6 +392,27 @@ export class AdminConsoleService {
     return ((data ?? []) as UserRow[]).map(mapUser);
   }
 
+  async getUser(id: string): Promise<AdminUserContract> {
+    const userId = normalizeUuid(id, "userId");
+
+    const { data, error } = await this.supabase.core
+      .from("profiles")
+      .select(userSelect)
+      .eq("id", userId)
+      .is("deleted_at", null)
+      .maybeSingle();
+
+    if (error) {
+      throwSupabaseError(error);
+    }
+
+    if (!data) {
+      throw new NotFoundException("User not found");
+    }
+
+    return mapUser(data as UserRow);
+  }
+
   async listCompanyUsers(companyId: string): Promise<AdminCompanyUserContract[]> {
     if (!isUuid(companyId)) {
       throw new BadRequestException("Invalid company id");
@@ -647,6 +669,55 @@ export class AdminConsoleService {
 
       throw new InternalServerErrorException("Core user creation failed");
     }
+  }
+
+  async updateUser(id: string, input: UpdateAdminUserInput): Promise<AdminUserContract> {
+    const userId = normalizeUuid(id, "userId");
+    await this.getUser(userId);
+    const userInput = normalizeUpdateUserInput(input);
+
+    const { error: authError } = await this.supabase.admin.auth.admin.updateUserById(userId, {
+      email: userInput.email,
+      user_metadata: {
+        full_name: userInput.fullName
+      }
+    });
+
+    if (authError) {
+      if (authError.message.toLowerCase().includes("already")) {
+        throw new ConflictException("E-mail ja existe no Supabase Auth");
+      }
+
+      throw new InternalServerErrorException({
+        message: "Supabase auth user update failed",
+        detail: authError.message
+      });
+    }
+
+    const { data, error } = await this.supabase.core
+      .from("profiles")
+      .update({
+        full_name: userInput.fullName,
+        email: userInput.email,
+        status: userInput.status
+      })
+      .eq("id", userId)
+      .is("deleted_at", null)
+      .select(userSelect)
+      .single();
+
+    if (error) {
+      throwSupabaseError(error);
+    }
+
+    const updatedUser = mapUser(data as UserRow);
+    await this.createAuditLog(null, "core.user.updated", "profiles", userId, {
+      email: updatedUser.email,
+      fullName: updatedUser.fullName,
+      status: updatedUser.status
+    });
+
+    return updatedUser;
   }
 
   async updateCompanyApplication(
@@ -1125,7 +1196,7 @@ export class AdminConsoleService {
   }
 
   private async createAuditLog(
-    companyId: string,
+    companyId: string | null,
     action: string,
     entityTable: string,
     entityId: string,
@@ -1361,6 +1432,22 @@ function normalizeCreateUserInput(input: CreateAdminUserInput): Required<CreateA
   };
 }
 
+function normalizeUpdateUserInput(input: UpdateAdminUserInput): UpdateAdminUserInput {
+  return {
+    fullName: normalizeRequired(input.fullName, "fullName", 140),
+    email: normalizeEmail(input.email),
+    status: normalizeUserStatus(input.status)
+  };
+}
+
+function normalizeUserStatus(value: unknown): UpdateAdminUserInput["status"] {
+  if (value === "invited" || value === "active" || value === "inactive") {
+    return value;
+  }
+
+  throw new BadRequestException("status must be invited, active or inactive");
+}
+
 function normalizeUuid(value: unknown, field: string): string {
   const id = normalizeRequired(value, field, 36);
   if (!isUuid(id)) {
@@ -1400,12 +1487,13 @@ function normalizeAuditScope(value: unknown): AdminAuditScope {
 
 function getAuditScopeActions(scope: AdminAuditScope): string[] | null {
   if (scope === "companies") {
-    return ["core.company.created"];
+    return ["core.company.created", "core.company.updated"];
   }
 
   if (scope === "users") {
     return [
       "core.user.invited",
+      "core.user.updated",
       "core.user_application_role.granted",
       "core.user_application_role.revoked"
     ];

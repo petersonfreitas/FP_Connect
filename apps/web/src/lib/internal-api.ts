@@ -19,6 +19,7 @@ import type {
   RevokeAdminUserRoleContract,
   RevokeAdminUserRoleInput,
   UpdateAdminCompanyInput,
+  UpdateAdminUserInput,
   UpdateAdminCompanyApplicationInput
 } from "@fp/types";
 import { loadServerEnv } from "./server-env";
@@ -133,12 +134,26 @@ export async function listAdminUsers(): Promise<InternalApiResult<AdminUserContr
   return fetchInternal<AdminUserContract[]>("admin-console/users");
 }
 
+export async function getAdminUser(id: string): Promise<InternalApiResult<AdminUserContract>> {
+  return fetchInternal<AdminUserContract>(`admin-console/users/${id}`);
+}
+
 export async function createAdminUser(
   input: CreateAdminUserInput
 ): Promise<InternalApiResult<AdminCompanyUserContract>> {
   return fetchInternal<AdminCompanyUserContract>("admin-console/users", {
     body: JSON.stringify(input),
     method: "POST"
+  });
+}
+
+export async function updateAdminUser(
+  id: string,
+  input: UpdateAdminUserInput
+): Promise<InternalApiResult<AdminUserContract>> {
+  return fetchInternal<AdminUserContract>(`admin-console/users/${id}`, {
+    body: JSON.stringify(input),
+    method: "PATCH"
   });
 }
 

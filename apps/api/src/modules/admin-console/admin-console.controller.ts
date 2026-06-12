@@ -7,6 +7,7 @@ import type {
   GrantAdminUserRoleInput,
   RevokeAdminUserRoleInput,
   UpdateAdminCompanyInput,
+  UpdateAdminUserInput,
   UpdateAdminCompanyApplicationInput
 } from "./admin-console.contracts";
 import { AdminConsoleService } from "./admin-console.service";
@@ -94,9 +95,19 @@ export class AdminConsoleController {
     return this.adminConsole.listUsers();
   }
 
+  @Get("users/:id")
+  getUser(@Param("id") id: string) {
+    return this.adminConsole.getUser(id);
+  }
+
   @Post("users")
   createUser(@Body() input: CreateAdminUserInput) {
     return this.adminConsole.createUser(input);
+  }
+
+  @Patch("users/:id")
+  updateUser(@Param("id") id: string, @Body() input: UpdateAdminUserInput) {
+    return this.adminConsole.updateUser(id, input);
   }
 
   @Post("companies/:companyId/users/:userId/roles")

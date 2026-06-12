@@ -12,8 +12,10 @@ type AuditLogViewProps = {
 
 const actionLabels: Record<string, string> = {
   "core.company.created": "Empresa criada",
+  "core.company.updated": "Empresa atualizada",
   "core.company_application.updated": "Modulo atualizado",
   "core.user.invited": "Usuario convidado",
+  "core.user.updated": "Usuario atualizado",
   "core.user_application_role.granted": "Papel concedido",
   "core.user_application_role.revoked": "Papel revogado"
 };

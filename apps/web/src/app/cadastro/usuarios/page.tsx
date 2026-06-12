@@ -58,7 +58,7 @@ export default async function UsersPage() {
                 </span>
                 <span>{user.email ?? "Nao informado"}</span>
                 <span>{statusLabels[user.status]}</span>
-                <span />
+                <Link href={`/cadastro/usuarios/${user.id}/editar`}>Editar</Link>
               </div>
             ))}
           </div>
