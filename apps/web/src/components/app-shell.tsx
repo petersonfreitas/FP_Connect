@@ -10,8 +10,8 @@ type AppShellProps = {
 const cadastroItems = [
   { href: "/cadastro/empresas", label: "Empresas" },
   { href: "/cadastro/usuarios", label: "Usuarios" },
-  { href: "/", label: "Planos" },
-  { href: "/", label: "Modulos" }
+  { href: "/cadastro/planos", label: "Planos" },
+  { href: "/cadastro/modulos", label: "Modulos" }
 ];
 
 const movimentacaoItems = [

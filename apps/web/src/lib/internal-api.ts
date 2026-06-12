@@ -9,6 +9,7 @@ import type {
   AdminCompanyUserContract,
   AdminCompanyContract,
   AdminConsoleOverviewContract,
+  AdminCatalogContract,
   AdminUserApplicationRoleContract,
   AdminUserContract,
   CreateAdminCompanyInput,
@@ -97,6 +98,10 @@ export async function listAdminBasicPlans(): Promise<
   InternalApiResult<AdminBasicPlanContract[]>
 > {
   return fetchInternal<AdminBasicPlanContract[]>("admin-console/basic-plans");
+}
+
+export async function getAdminCatalog(): Promise<InternalApiResult<AdminCatalogContract>> {
+  return fetchInternal<AdminCatalogContract>("admin-console/catalog");
 }
 
 export async function listAdminAuditLogs(

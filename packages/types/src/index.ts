@@ -24,6 +24,15 @@ export type AdminBasicPlanContract = {
   status: BasicPlanStatus;
 };
 
+export type AdminBasicPlanCatalogContract = AdminBasicPlanContract & {
+  applications: AdminApplicationContract[];
+};
+
+export type AdminCatalogContract = {
+  applications: AdminApplicationContract[];
+  basicPlans: AdminBasicPlanCatalogContract[];
+};
+
 export type AdminCompanyContract = {
   id: string;
   personType: CompanyPersonType;

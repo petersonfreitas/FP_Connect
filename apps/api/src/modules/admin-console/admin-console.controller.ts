@@ -30,6 +30,11 @@ export class AdminConsoleController {
     return this.adminConsole.listBasicPlans();
   }
 
+  @Get("catalog")
+  getCatalog() {
+    return this.adminConsole.getCatalog();
+  }
+
   @Get("audit-logs")
   listAuditLogs(@Query("scope") scope?: AdminAuditScope) {
     return this.adminConsole.listAuditLogs(scope);

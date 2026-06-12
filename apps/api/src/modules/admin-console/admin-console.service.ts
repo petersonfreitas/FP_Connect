@@ -10,7 +10,9 @@ import type {
   AdminAuditLogContract,
   AdminAuditScope,
   AdminApplicationContract,
+  AdminBasicPlanCatalogContract,
   AdminBasicPlanContract,
+  AdminCatalogContract,
   AdminCompanyApplicationContract,
   AdminCompanyUserAccessContract,
   AdminCompanyUserContract,
@@ -49,6 +51,11 @@ type BasicPlanRow = {
   name: string;
   description: string | null;
   status: AdminBasicPlanContract["status"];
+};
+
+type BasicPlanApplicationRow = {
+  basic_plan_id: string;
+  application_id: string;
 };
 
 type CompanyRow = {
@@ -154,6 +161,7 @@ const rolePermissionSelect = "role_id,permission_id";
 const userApplicationRoleSelect = "id,company_id,user_id,application_id,role_id,created_at";
 const auditLogSelect =
   "id,company_id,actor_user_id,action,entity_schema,entity_table,entity_id,metadata,created_at";
+const basicPlanApplicationSelect = "basic_plan_id,application_id";
 
 @Injectable()
 export class AdminConsoleService {
@@ -238,6 +246,53 @@ export class AdminConsoleService {
     }
 
     return ((data ?? []) as BasicPlanRow[]).map(mapBasicPlan);
+  }
+
+  async getCatalog(): Promise<AdminCatalogContract> {
+    const [applicationsResult, basicPlansResult, planApplicationsResult] = await Promise.all([
+      this.supabase.core
+        .from("applications")
+        .select(applicationSelect)
+        .is("deleted_at", null)
+        .order("sort_order", { ascending: true }),
+      this.supabase.core
+        .from("basic_plans")
+        .select("id,key,name,description,status")
+        .is("deleted_at", null)
+        .order("name", { ascending: true }),
+      this.supabase.core.from("basic_plan_applications").select(basicPlanApplicationSelect)
+    ]);
+
+    if (applicationsResult.error) {
+      throwSupabaseError(applicationsResult.error);
+    }
+
+    if (basicPlansResult.error) {
+      throwSupabaseError(basicPlansResult.error);
+    }
+
+    if (planApplicationsResult.error) {
+      throwSupabaseError(planApplicationsResult.error);
+    }
+
+    const applications = ((applicationsResult.data ?? []) as ApplicationRow[]).map(mapApplication);
+    const applicationsById = new Map(applications.map((application) => [application.id, application]));
+    const planApplications = (planApplicationsResult.data ?? []) as BasicPlanApplicationRow[];
+    const applicationIdsByPlanId = groupApplicationIdsByPlanId(planApplications);
+    const basicPlans = ((basicPlansResult.data ?? []) as BasicPlanRow[]).map((plan) =>
+      mapBasicPlanCatalog(
+        plan,
+        (applicationIdsByPlanId.get(plan.id) ?? []).flatMap((applicationId) => {
+          const application = applicationsById.get(applicationId);
+          return application ? [application] : [];
+        })
+      )
+    );
+
+    return {
+      applications,
+      basicPlans
+    };
   }
 
   async listAuditLogs(scope: AdminAuditScope = "all"): Promise<AdminAuditLogContract[]> {
@@ -1073,6 +1128,16 @@ function mapBasicPlan(row: BasicPlanRow): AdminBasicPlanContract {
   };
 }
 
+function mapBasicPlanCatalog(
+  row: BasicPlanRow,
+  applications: AdminApplicationContract[]
+): AdminBasicPlanCatalogContract {
+  return {
+    ...mapBasicPlan(row),
+    applications
+  };
+}
+
 function mapCompany(row: CompanyRow): AdminCompanyContract {
   return {
     id: row.id,
@@ -1227,6 +1292,20 @@ function isGrantableCompanyApplicationStatus(
 
 function unique(values: string[]): string[] {
   return Array.from(new Set(values));
+}
+
+function groupApplicationIdsByPlanId(
+  rows: BasicPlanApplicationRow[]
+): Map<string, string[]> {
+  const grouped = new Map<string, string[]>();
+
+  for (const row of rows) {
+    const applicationIds = grouped.get(row.basic_plan_id) ?? [];
+    applicationIds.push(row.application_id);
+    grouped.set(row.basic_plan_id, applicationIds);
+  }
+
+  return grouped;
 }
 
 function normalizeEmail(value: unknown): string {
