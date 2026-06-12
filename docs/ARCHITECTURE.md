@@ -290,6 +290,8 @@ O Admin Console autentica pelo Supabase Auth no server-side do Next. A sessao e 
 
 Recuperacao de senha deve usar o fluxo do Supabase Auth com redirect autorizado para `/login/atualizar-senha`. O link pode carregar token de recovery no hash da URL; a pagina de atualizacao deve remover o hash do historico do navegador depois de ler o token.
 
+Convites de usuarios do Admin Console devem ser enviados server-side pelo Nest com `inviteUserByEmail`, usando a `SUPABASE_SERVICE_ROLE_KEY` apenas no backend. O `redirectTo` deve ser derivado de `FP_WEB_URL` e apontar para `/login/atualizar-senha`, reaproveitando a mesma tela para definicao da senha inicial. Ao definir a senha, o servidor deve ativar o perfil e os vinculos pendentes no `core`. Reenvio de convite so deve ser permitido para usuario e vinculo ainda pendentes.
+
 Se futuramente houver cliente Supabase direto no navegador, a exposicao deve ser explicita e limitada a:
 
 ```text

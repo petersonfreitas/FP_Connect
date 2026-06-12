@@ -63,7 +63,7 @@ export default async function NewUserPage({ searchParams }: NewUserPageProps) {
         <div className="panel-heading">
           <div>
             <h1>Cadastrar usuario</h1>
-            <p>Cria o usuario no Supabase Auth, registra perfil no core e vincula a empresa.</p>
+            <p>Envia convite pelo Supabase Auth, registra perfil no core e vincula a empresa.</p>
           </div>
         </div>
 
@@ -100,7 +100,7 @@ export default async function NewUserPage({ searchParams }: NewUserPageProps) {
               Cancelar
             </a>
             <button className="primary-action" type="submit">
-              Salvar usuario
+              Enviar convite
             </button>
           </div>
         </form>

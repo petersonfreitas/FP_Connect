@@ -7,7 +7,8 @@ import {
   bulkUpdateAdminCompanyApplications,
   getAdminCompany,
   listAdminCompanyApplications,
-  listAdminCompanyUsers
+  listAdminCompanyUsers,
+  resendAdminUserInvite
 } from "@/lib/internal-api";
 
 export const dynamic = "force-dynamic";
@@ -34,6 +35,8 @@ const personTypeLabels = {
 export default async function CompanyDetailPage({ params, searchParams }: CompanyDetailPageProps) {
   const { id } = await params;
   const query = searchParams ? await searchParams : {};
+  const inviteError = getQueryValue(query.inviteError);
+  const inviteSent = getQueryValue(query.inviteSent);
   const moduleError = getQueryValue(query.moduleError);
   const moduleSaved = getQueryValue(query.moduleSaved);
 
@@ -64,6 +67,21 @@ export default async function CompanyDetailPage({ params, searchParams }: Compan
     }
 
     redirect(`/cadastro/empresas/${id}?moduleSaved=${result.data?.updated.length ?? 0}`);
+  }
+
+  async function resendInviteAction(formData: FormData) {
+    "use server";
+
+    const userId = readFormValue(formData, "userId");
+    const result = await resendAdminUserInvite(id, userId);
+
+    revalidatePath(`/cadastro/empresas/${id}`);
+
+    if (result.error) {
+      redirect(`/cadastro/empresas/${id}?inviteError=${encodeURIComponent(result.error)}`);
+    }
+
+    redirect(`/cadastro/empresas/${id}?inviteSent=1`);
   }
 
   const [companyResult, usersResult, applicationsResult] = await Promise.all([
@@ -215,16 +233,30 @@ export default async function CompanyDetailPage({ params, searchParams }: Compan
           </div>
         ) : null}
 
+        {inviteError ? (
+          <div className="data-alert inline-alert" role="status">
+            <strong>Nao foi possivel reenviar o convite.</strong>
+            <span>{inviteError}</span>
+          </div>
+        ) : null}
+
+        {inviteSent ? (
+          <div className="form-alert neutral module-feedback" role="status">
+            Convite reenviado com sucesso.
+          </div>
+        ) : null}
+
         {users.length > 0 ? (
           <div className="data-table" role="table" aria-label="Usuarios vinculados">
-            <div className="data-row data-row-head" role="row">
+            <div className="data-row data-row-head company-users-row" role="row">
               <span>Usuario</span>
               <span>E-mail</span>
               <span>Status</span>
               <span>Contato</span>
+              <span>Acoes</span>
             </div>
             {users.map((user) => (
-              <div className="data-row" role="row" key={user.membershipId}>
+              <div className="data-row company-users-row" role="row" key={user.membershipId}>
                 <span>
                   <strong>{user.fullName}</strong>
                   <small>{user.id}</small>
@@ -233,9 +265,17 @@ export default async function CompanyDetailPage({ params, searchParams }: Compan
                 <span>{user.membershipStatus}</span>
                 <span>
                   {user.isPrimaryContact ? "Principal" : "-"}
-                  <small>
-                    <Link href={`/cadastro/empresas/${id}/usuarios/${user.id}`}>Acessos</Link>
-                  </small>
+                </span>
+                <span className="row-actions">
+                  <Link href={`/cadastro/empresas/${id}/usuarios/${user.id}`}>Acessos</Link>
+                  {user.status === "invited" && user.membershipStatus === "invited" ? (
+                    <form action={resendInviteAction}>
+                      <input name="userId" type="hidden" value={user.id} />
+                      <button className="secondary-action compact-action" type="submit">
+                        Reenviar convite
+                      </button>
+                    </form>
+                  ) : null}
                 </span>
               </div>
             ))}

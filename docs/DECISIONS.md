@@ -44,6 +44,7 @@ Este arquivo registra decisoes arquiteturais e operacionais para evitar retrabal
 | DEC-036 | O primeiro super-admin deve nascer de um usuario criado manualmente no Supabase Auth e ser promovido no `core.profiles` por seed SQL idempotente. | Aprovada |
 | DEC-037 | Resets operacionais devem preservar catalogos nativos do sistema, como modulos, planos, roles, permissions e vinculos role-permission. | Aprovada |
 | DEC-038 | Otimizacoes de consulta devem preservar seguranca acima de performance, mantendo autorizacao no backend/banco, escopo por empresa, soft delete, `select` explicito, paginacao em listagens novas e indices alinhados a queries reais. | Aprovada |
+| DEC-039 | Convites de usuarios do Admin Console devem ser enviados server-side pelo Nest com Supabase Auth `inviteUserByEmail`, usando `FP_WEB_URL` para redirecionar a `/login/atualizar-senha`; ao definir senha, o servidor ativa perfil e vinculos pendentes no `core`; reenvio so e permitido para usuarios pendentes. | Aprovada |
 
 ---
 

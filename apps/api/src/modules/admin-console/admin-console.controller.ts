@@ -143,6 +143,16 @@ export class AdminConsoleController {
     return this.adminConsole.createUser(input, readInternalApiContext(headers));
   }
 
+  @Post("companies/:companyId/users/:userId/invite")
+  @AdminConsolePolicy({ companyParam: "companyId", permissionKey: "admin.users.manage" })
+  resendUserInvite(
+    @Param("companyId") companyId: string,
+    @Param("userId") userId: string,
+    @Headers() headers: Record<string, string | string[] | undefined>
+  ) {
+    return this.adminConsole.resendUserInvite(companyId, userId, readInternalApiContext(headers));
+  }
+
   @Patch("users/:id")
   updateUser(
     @Param("id") id: string,

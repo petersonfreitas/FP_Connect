@@ -1,6 +1,7 @@
 import "server-only";
 
 import type {
+  ActivateAdminUserInviteContract,
   AdminAuditScope,
   AdminAuditLogContract,
   AdminBasicPlanContract,
@@ -22,6 +23,7 @@ import type {
   CreateAdminCompanyInput,
   CreateAdminUserInput,
   GrantAdminUserRoleInput,
+  ResendAdminUserInviteContract,
   RevokeAdminUserRoleContract,
   RevokeAdminUserRoleInput,
   UpdateAdminCompanyInput,
@@ -163,6 +165,26 @@ export async function createAdminUser(
 ): Promise<InternalApiResult<AdminCompanyUserContract>> {
   return fetchInternal<AdminCompanyUserContract>("admin-console/users", {
     body: JSON.stringify(input),
+    method: "POST"
+  });
+}
+
+export async function resendAdminUserInvite(
+  companyId: string,
+  userId: string
+): Promise<InternalApiResult<ResendAdminUserInviteContract>> {
+  return fetchInternal<ResendAdminUserInviteContract>(
+    `admin-console/companies/${companyId}/users/${userId}/invite`,
+    {
+      method: "POST"
+    }
+  );
+}
+
+export async function activateCurrentUserInvite(): Promise<
+  InternalApiResult<ActivateAdminUserInviteContract>
+> {
+  return fetchInternal<ActivateAdminUserInviteContract>("admin-console/users/me/activate-invite", {
     method: "POST"
   });
 }

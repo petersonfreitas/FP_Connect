@@ -63,12 +63,12 @@ Ja foram implementados:
 - indices complementares do `core` para listagens, auditoria e relacoes atuais.
 - guard inicial do Admin Console exigindo usuario ativo;
 - policies granulares iniciais por permissao em rotas com contexto de empresa.
+- convite e reenvio de ativacao de usuarios por e-mail via Supabase Auth.
 
 Pendencias de fundacao antes dos modulos operacionais:
 
 - completar guards/policies em rotas globais, empresas, permissao e modulo;
 - bloqueio efetivo por modulo contratado nas rotas sensiveis;
-- envio efetivo e reenvio de convite/ativacao de usuarios por e-mail;
 - soft delete/inativacao exposto na UI quando autorizado;
 - paginacao nas listagens principais;
 - smoke test manual dos fluxos principais.
@@ -112,7 +112,6 @@ Itens:
 - guards/policies nas rotas sensiveis;
 - resolucao de empresa/contexto ativo;
 - revisao de bloqueios por empresa, permissao e modulo contratado;
-- envio e reenvio de convite/ativacao de usuarios por e-mail;
 - paginacao nas listagens principais;
 - smoke test de empresas, usuarios, permissoes, modulos e auditoria.
 

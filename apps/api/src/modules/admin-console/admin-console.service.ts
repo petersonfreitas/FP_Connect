@@ -3,10 +3,11 @@ import {
   ConflictException,
   Injectable,
   InternalServerErrorException,
-  NotFoundException
+  NotFoundException,
+  UnauthorizedException
 } from "@nestjs/common";
-import { randomBytes } from "node:crypto";
 import type {
+  ActivateAdminUserInviteContract,
   AdminAuditLogContract,
   AdminAuditScope,
   AdminApplicationContract,
@@ -32,6 +33,7 @@ import type {
   CreateAdminCompanyInput,
   CreateAdminUserInput,
   GrantAdminUserRoleInput,
+  ResendAdminUserInviteContract,
   RevokeAdminUserRoleContract,
   RevokeAdminUserRoleInput,
   UpdateAdminCompanyInput,
@@ -42,6 +44,7 @@ import {
   emptyInternalApiContext,
   type InternalApiContext
 } from "../../auth/internal-api-context";
+import { AppConfigService } from "../../config/app-config.service";
 import { SupabaseService } from "../../supabase/supabase.service";
 
 type SupabaseFailure = {
@@ -196,7 +199,10 @@ const basicPlanApplicationSelect = "basic_plan_id,application_id";
 
 @Injectable()
 export class AdminConsoleService {
-  constructor(private readonly supabase: SupabaseService) {}
+  constructor(
+    private readonly config: AppConfigService,
+    private readonly supabase: SupabaseService
+  ) {}
 
   async getOverview(): Promise<AdminConsoleOverviewContract> {
     const [applications, basicPlans, companies] = await Promise.all([
@@ -647,14 +653,13 @@ export class AdminConsoleService {
     const userInput = normalizeCreateUserInput(input);
     await this.ensureCompanyExists(userInput.companyId);
 
-    const { data: authData, error: authError } = await this.supabase.admin.auth.admin.createUser({
-      email: userInput.email,
-      email_confirm: false,
-      password: createTemporaryPassword(),
-      user_metadata: {
-        full_name: userInput.fullName
-      }
-    });
+    const { data: authData, error: authError } =
+      await this.supabase.admin.auth.admin.inviteUserByEmail(userInput.email, {
+        redirectTo: this.getPasswordRedirectUrl(),
+        data: {
+          full_name: userInput.fullName
+        }
+      });
 
     if (authError) {
       if (authError.message.toLowerCase().includes("already")) {
@@ -662,7 +667,7 @@ export class AdminConsoleService {
       }
 
       throw new InternalServerErrorException({
-        message: "Supabase auth user creation failed",
+        message: "Supabase auth invitation failed",
         detail: authError.message
       });
     }
@@ -728,6 +733,147 @@ export class AdminConsoleService {
 
       throw new InternalServerErrorException("Core user creation failed");
     }
+  }
+
+  async resendUserInvite(
+    companyId: string,
+    userId: string,
+    context: InternalApiContext = emptyInternalApiContext
+  ): Promise<ResendAdminUserInviteContract> {
+    const normalizedCompanyId = normalizeUuid(companyId, "companyId");
+    const normalizedUserId = normalizeUuid(userId, "userId");
+    const membership = await this.getCompanyMembership(normalizedCompanyId, normalizedUserId);
+    const [companyUser] = await this.hydrateCompanyUsers([membership]);
+
+    if (!companyUser) {
+      throw new NotFoundException("User profile not found");
+    }
+
+    if (companyUser.status !== "invited" || companyUser.membershipStatus !== "invited") {
+      throw new BadRequestException("Convite so pode ser reenviado para usuarios pendentes");
+    }
+
+    if (!companyUser.email) {
+      throw new BadRequestException("Usuario nao possui e-mail cadastrado para convite");
+    }
+
+    const { error: authError } = await this.supabase.admin.auth.admin.inviteUserByEmail(
+      companyUser.email,
+      {
+        redirectTo: this.getPasswordRedirectUrl(),
+        data: {
+          full_name: companyUser.fullName
+        }
+      }
+    );
+
+    if (authError) {
+      throw new InternalServerErrorException({
+        message: "Supabase auth invitation resend failed",
+        detail: authError.message
+      });
+    }
+
+    const { error: membershipError } = await this.supabase.core
+      .from("company_memberships")
+      .update({
+        invited_at: new Date().toISOString()
+      })
+      .eq("id", membership.id)
+      .is("deleted_at", null);
+
+    if (membershipError) {
+      throwSupabaseError(membershipError);
+    }
+
+    await this.createAuditLog(
+      normalizedCompanyId,
+      "core.user.invite_resent",
+      "profiles",
+      normalizedUserId,
+      {
+        email: companyUser.email,
+        fullName: companyUser.fullName
+      },
+      context
+    );
+
+    return {
+      sent: true
+    };
+  }
+
+  async activateCurrentUserInvite(
+    context: InternalApiContext = emptyInternalApiContext
+  ): Promise<ActivateAdminUserInviteContract> {
+    const actorUserId = context.actorUserId;
+
+    if (!actorUserId) {
+      throw new UnauthorizedException("Authenticated actor is required");
+    }
+
+    const userId = normalizeUuid(actorUserId, "userId");
+    const { data: profileData, error: profileError } = await this.supabase.core
+      .from("profiles")
+      .select("id,status")
+      .eq("id", userId)
+      .is("deleted_at", null)
+      .maybeSingle();
+
+    if (profileError) {
+      throwSupabaseError(profileError);
+    }
+
+    const profile = profileData as Pick<UserRow, "id" | "status"> | null;
+
+    if (!profile || profile.status !== "invited") {
+      return {
+        activated: false
+      };
+    }
+
+    const timestamp = new Date().toISOString();
+    const { error: userError } = await this.supabase.core
+      .from("profiles")
+      .update({
+        status: "active"
+      })
+      .eq("id", userId)
+      .eq("status", "invited")
+      .is("deleted_at", null);
+
+    if (userError) {
+      throwSupabaseError(userError);
+    }
+
+    const { error: membershipError } = await this.supabase.core
+      .from("company_memberships")
+      .update({
+        accepted_at: timestamp,
+        status: "active"
+      })
+      .eq("user_id", userId)
+      .eq("status", "invited")
+      .is("deleted_at", null);
+
+    if (membershipError) {
+      throwSupabaseError(membershipError);
+    }
+
+    await this.createAuditLog(
+      null,
+      "core.user.invite_accepted",
+      "profiles",
+      userId,
+      {
+        activatedAt: timestamp
+      },
+      context
+    );
+
+    return {
+      activated: true
+    };
   }
 
   async updateUser(
@@ -1364,6 +1510,10 @@ export class AdminConsoleService {
       throwSupabaseError(error);
     }
   }
+
+  private getPasswordRedirectUrl(): string {
+    return `${this.config.webUrl}/login/atualizar-senha`;
+  }
 }
 
 function throwSupabaseError(error: SupabaseFailure): never {
@@ -1943,8 +2093,4 @@ function calculateCnpjDigit(base: string): number {
   const rest = sum % 11;
 
   return rest < 2 ? 0 : 11 - rest;
-}
-
-function createTemporaryPassword(): string {
-  return `${randomBytes(24).toString("base64url")}Aa1!`;
 }

@@ -7,6 +7,7 @@ import {
   signOut,
   updatePasswordWithRecoveryToken
 } from "./auth";
+import { activateCurrentUserInvite } from "./internal-api";
 
 export async function signInAction(formData: FormData): Promise<void> {
   const email = String(formData.get("email") ?? "");
@@ -52,6 +53,12 @@ export async function updatePasswordWithRecoveryAction(formData: FormData): Prom
 
   if (!result.ok) {
     redirect(`/login/atualizar-senha?error=${encodeURIComponent(result.error)}`);
+  }
+
+  const activationResult = await activateCurrentUserInvite();
+
+  if (activationResult.error) {
+    redirect(`/login/atualizar-senha?error=${encodeURIComponent(activationResult.error)}`);
   }
 
   redirect("/");

@@ -20,6 +20,7 @@ Ja existe base funcional para:
 - cadastro de empresas com CPF/CNPJ, telefone, celular, CEP e endereco estruturado normalizados;
 - cadastro, listagem e edicao de usuarios;
 - vinculo usuario x empresa;
+- envio e reenvio de convite/ativacao de usuarios por e-mail via Supabase Auth;
 - papeis/permissoes por usuario, empresa e modulo;
 - tabela de papeis por usuario com selecao e concessao/revogacao em lote;
 - catalogo de planos e modulos;
@@ -37,7 +38,6 @@ Ja existe base funcional para:
 Ainda precisam ser amadurecidos antes de entrar pesado nos modulos operacionais:
 
 - guards/policies completos alem do token interno;
-- envio efetivo de convite/ativacao de usuarios por e-mail;
 - fluxos de inativacao/soft delete na UI;
 - smoke tests manuais dos fluxos principais;
 - shell dos modulos Robots, Food e Tracking.
@@ -72,20 +72,22 @@ No estado atual do projeto:
 - `SUPABASE_SERVICE_ROLE_KEY` fica somente no backend e nunca deve ir para o frontend.
 - `FP_INTERNAL_API_TOKEN` fica somente no server-side do Next e no backend.
 - `FP_API_INTERNAL_URL` e usada pelo Next server-side para chamar a API interna.
-- `FP_WEB_URL` define a URL base usada em links server-side, como recuperacao de senha.
+- `FP_WEB_URL` define a URL base usada em links server-side, como recuperacao de senha e convite de usuarios.
 - `FP_CNPJ_LOOKUP_USER_AGENT` identifica a chamada server-side para provedores de CNPJ, como BrasilAPI.
 
 O cliente interno do frontend esta em `apps/web/src/lib/internal-api.ts` e usa `server-only`, impedindo importacao por componentes client.
 
 O login do Admin Console usa Supabase Auth pelo server-side do Next. A sessao fica em cookies HttpOnly e o navegador nao recebe a service role nem o token interno. Quando o access token expira, o proxy do Next renova a sessao com o refresh token HttpOnly antes de liberar a rota protegida.
 
-Para recuperacao de senha, cadastre a URL abaixo em Supabase Dashboard > Authentication > URL Configuration > Redirect URLs:
+Para recuperacao de senha e aceite de convite, cadastre a URL abaixo em Supabase Dashboard > Authentication > URL Configuration > Redirect URLs:
 
 ```text
 http://localhost:3000/login/atualizar-senha
 ```
 
 Em producao, cadastre a mesma rota usando o dominio real definido em `FP_WEB_URL`.
+
+O cadastro de usuarios do Admin Console usa `inviteUserByEmail` no backend Nest com service role. O link enviado pelo Supabase direciona para `/login/atualizar-senha`, onde o usuario define a senha inicial. Ao definir a senha, o servidor ativa o perfil e os vinculos pendentes no `core`. O reenvio de convite e permitido somente para usuarios e vinculos ainda pendentes.
 
 Se no futuro houver cliente Supabase direto no navegador, somente variaveis com prefixo explicito `NEXT_PUBLIC_SUPABASE_URL` e `NEXT_PUBLIC_SUPABASE_ANON_KEY` poderao ser usadas ali, com seguranca obrigatoriamente baseada em RLS, permissoes e escopo por empresa. A service role nunca pode ser exposta.
 
@@ -112,6 +114,8 @@ Endpoints internos atuais do Admin Console:
 - `POST /api/admin-console/users`
 - `PATCH /api/admin-console/users/:id`
 - `GET /api/admin-console/companies/:companyId/users/:userId/access`
+- `POST /api/admin-console/users/me/activate-invite`
+- `POST /api/admin-console/companies/:companyId/users/:userId/invite`
 - `POST /api/admin-console/companies/:companyId/users/:userId/roles`
 - `POST /api/admin-console/companies/:companyId/users/:userId/roles/bulk`
 - `POST /api/admin-console/companies/:companyId/users/:userId/roles/revoke`

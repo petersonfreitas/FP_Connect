@@ -259,3 +259,11 @@ export type BulkRevokeAdminUserRolesContract = {
   revoked: true;
   count: number;
 };
+
+export type ResendAdminUserInviteContract = {
+  sent: true;
+};
+
+export type ActivateAdminUserInviteContract = {
+  activated: boolean;
+};

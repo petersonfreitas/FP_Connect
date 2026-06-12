@@ -58,9 +58,10 @@ Este arquivo controla o avanco dos modulos do ecossistema.
 - [x] Indices complementares do `core` para consultas atuais
 - [x] Guard inicial do Admin Console com usuario ativo e bypass super-admin
 - [x] Policies granulares iniciais por permissao em rotas com contexto de empresa
+- [x] Envio efetivo de convite/ativacao de usuarios por e-mail
+- [x] Reenvio de convite para usuarios pendentes
+- [x] Ativacao de perfil e vinculos pendentes apos definicao de senha
 - [ ] Completar guards/policies em rotas globais, empresas, permissao e modulo
-- [ ] Envio efetivo de convite/ativacao de usuarios por e-mail
-- [ ] Reenvio de convite para usuarios pendentes
 - [ ] Bloqueio efetivo por empresa/modulo em todas as rotas sensiveis
 - [ ] Soft delete/inativacao exposto na UI quando autorizado
 - [ ] Smoke test manual dos fluxos principais
