@@ -14,10 +14,11 @@ import type {
   UpdateAdminUserInput,
   UpdateAdminCompanyApplicationInput
 } from "./admin-console.contracts";
+import { AdminConsoleAccessGuard } from "./admin-console-access.guard";
 import { AdminConsoleService } from "./admin-console.service";
 
 @Controller("admin-console")
-@UseGuards(InternalApiGuard)
+@UseGuards(InternalApiGuard, AdminConsoleAccessGuard)
 export class AdminConsoleController {
   constructor(private readonly adminConsole: AdminConsoleService) {}
 

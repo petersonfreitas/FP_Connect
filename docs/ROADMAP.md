@@ -61,10 +61,11 @@ Ja foram implementados:
 - regra documentada para API interna, API publica futura e variaveis server-side.
 - contrato de performance/seguranca para consultas Supabase;
 - indices complementares do `core` para listagens, auditoria e relacoes atuais.
+- guard inicial do Admin Console exigindo usuario ativo com `global_role = 'super_admin'`.
 
 Pendencias de fundacao antes dos modulos operacionais:
 
-- guards/policies completos por usuario, empresa, permissao e modulo;
+- guards/policies granulares por usuario, empresa, permissao e modulo;
 - bloqueio efetivo por modulo contratado nas rotas sensiveis;
 - soft delete/inativacao exposto na UI quando autorizado;
 - paginacao nas listagens principais;

@@ -226,6 +226,8 @@ Regras obrigatorias:
 
 No estado atual, a API Nest usa `SUPABASE_SERVICE_ROLE_KEY` server-side. Portanto, guards/policies no backend sao obrigatorios antes de qualquer otimizacao em dados sensiveis; RLS permanece como defesa em profundidade e contrato para futuros clientes Supabase diretos.
 
+O Admin Console exige `X-FP-Internal-Token` valido e `X-FP-Actor-User-Id` de usuario ativo com `global_role = 'super_admin'` antes de permitir acesso as rotas internas. Policies granulares por permissao devem evoluir sobre essa base.
+
 ---
 
 ## 8. Multiempresa, permissoes e modulos contratados

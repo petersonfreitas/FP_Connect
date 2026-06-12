@@ -56,6 +56,7 @@ Este arquivo controla o avanco dos modulos do ecossistema.
 - [x] `actor_user_id` real nas mutacoes auditadas
 - [x] Contrato de performance/seguranca para consultas Supabase
 - [x] Indices complementares do `core` para consultas atuais
+- [x] Guard inicial do Admin Console exigindo super-admin ativo
 - [ ] Guards/policies completos por usuario, empresa, permissao e modulo
 - [ ] Bloqueio efetivo por empresa/modulo em todas as rotas sensiveis
 - [ ] Soft delete/inativacao exposto na UI quando autorizado

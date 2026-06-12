@@ -24,6 +24,7 @@ Isso significa:
 - o frontend nao acessa Supabase diretamente;
 - RLS continua existindo como defesa em profundidade;
 - a API Nest precisa aplicar guard/policy antes de consultas sensiveis;
+- o Admin Console exige usuario ativo com `global_role = 'super_admin'` antes de acessar rotas internas;
 - toda mutacao auditavel deve receber contexto de usuario autenticado.
 
 Quando houver cliente Supabase no navegador, a decisao deve ser explicita e a seguranca deve depender de RLS, escopo por empresa e permissoes.
