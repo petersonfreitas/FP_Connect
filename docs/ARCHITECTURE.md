@@ -265,6 +265,8 @@ O frontend web atual consome a API interna pelo server-side do Next usando `apps
 
 O Admin Console autentica pelo Supabase Auth no server-side do Next. A sessao e armazenada em cookies HttpOnly. Mutacoes server-side para a API interna devem enviar o usuario autenticado como contexto interno para auditoria e autorizacao.
 
+Recuperacao de senha deve usar o fluxo do Supabase Auth com redirect autorizado para `/login/atualizar-senha`. O link pode carregar token de recovery no hash da URL; a pagina de atualizacao deve remover o hash do historico do navegador depois de ler o token.
+
 Se futuramente houver cliente Supabase direto no navegador, a exposicao deve ser explicita e limitada a:
 
 ```text

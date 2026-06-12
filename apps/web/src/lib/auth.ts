@@ -32,6 +32,12 @@ type SupabaseUserResponse = {
   email?: string | null;
 };
 
+type SupabaseErrorResponse = {
+  error?: string;
+  error_description?: string;
+  msg?: string;
+};
+
 export async function signInWithPassword(
   email: string,
   password: string
@@ -81,6 +87,86 @@ export async function signInWithPassword(
     sameSite: "lax",
     secure
   });
+
+  return { ok: true };
+}
+
+export async function requestPasswordRecovery(
+  email: string
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  const normalizedEmail = email.trim().toLowerCase();
+
+  if (!normalizedEmail) {
+    return { ok: false, error: "Informe o e-mail cadastrado." };
+  }
+
+  const redirectTo = `${getWebUrl()}/login/atualizar-senha`;
+  const response = await fetch(
+    `${getSupabaseUrl()}/auth/v1/recover?redirect_to=${encodeURIComponent(redirectTo)}`,
+    {
+      body: JSON.stringify({
+        email: normalizedEmail
+      }),
+      headers: getSupabaseAuthHeaders(),
+      method: "POST"
+    }
+  ).catch(() => undefined);
+
+  if (!response) {
+    return { ok: false, error: "Nao foi possivel conectar ao Supabase Auth." };
+  }
+
+  if (!response.ok) {
+    const body = (await response.json().catch(() => ({}))) as SupabaseErrorResponse;
+    return {
+      ok: false,
+      error: body.error_description ?? body.msg ?? body.error ?? "Nao foi possivel enviar o e-mail."
+    };
+  }
+
+  return { ok: true };
+}
+
+export async function updatePasswordWithRecoveryToken(
+  accessToken: string,
+  refreshToken: string | null,
+  password: string
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  const token = accessToken.trim();
+  const normalizedPassword = password.trim();
+
+  if (!token) {
+    return { ok: false, error: "Link de recuperacao invalido ou expirado." };
+  }
+
+  if (normalizedPassword.length < 8 || normalizedPassword.length > 128) {
+    return { ok: false, error: "A senha deve ter entre 8 e 128 caracteres." };
+  }
+
+  const response = await fetch(`${getSupabaseUrl()}/auth/v1/user`, {
+    body: JSON.stringify({
+      password: normalizedPassword
+    }),
+    headers: {
+      ...getSupabaseAuthHeaders(),
+      Authorization: `Bearer ${token}`
+    },
+    method: "PUT"
+  }).catch(() => undefined);
+
+  if (!response) {
+    return { ok: false, error: "Nao foi possivel conectar ao Supabase Auth." };
+  }
+
+  if (!response.ok) {
+    const body = (await response.json().catch(() => ({}))) as SupabaseErrorResponse;
+    return {
+      ok: false,
+      error: body.error_description ?? body.msg ?? body.error ?? "Nao foi possivel atualizar a senha."
+    };
+  }
+
+  await setSessionCookies(token, refreshToken);
 
   return { ok: true };
 }
@@ -141,6 +227,29 @@ async function getAccessToken(): Promise<string | undefined> {
   return cookieStore.get(ACCESS_TOKEN_COOKIE)?.value;
 }
 
+async function setSessionCookies(accessToken: string, refreshToken: string | null): Promise<void> {
+  const cookieStore = await cookies();
+  const secure = process.env.NODE_ENV === "production";
+
+  cookieStore.set(ACCESS_TOKEN_COOKIE, accessToken, {
+    httpOnly: true,
+    maxAge: DEFAULT_ACCESS_TOKEN_MAX_AGE,
+    path: "/",
+    sameSite: "lax",
+    secure
+  });
+
+  if (refreshToken) {
+    cookieStore.set(REFRESH_TOKEN_COOKIE, refreshToken, {
+      httpOnly: true,
+      maxAge: REFRESH_TOKEN_MAX_AGE,
+      path: "/",
+      sameSite: "lax",
+      secure
+    });
+  }
+}
+
 function getSupabaseAuthHeaders(): HeadersInit {
   const anonKey = getRequiredEnv("SUPABASE_ANON_KEY");
 
@@ -152,6 +261,10 @@ function getSupabaseAuthHeaders(): HeadersInit {
 
 function getSupabaseUrl(): string {
   return getRequiredUrl("SUPABASE_URL");
+}
+
+function getWebUrl(): string {
+  return getRequiredUrl("FP_WEB_URL");
 }
 
 function getRequiredEnv(key: string): string {

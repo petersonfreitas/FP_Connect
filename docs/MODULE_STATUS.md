@@ -46,6 +46,9 @@ Este arquivo controla o avanco dos modulos do ecossistema.
 - [x] Auditoria basica
 - [x] API interna Nest consumida pelo Next server-side
 - [x] Login/logout server-side com Supabase Auth
+- [x] Recuperacao de senha por e-mail
+- [x] Seed SQL inicial de super-admin
+- [x] Reset SQL de dados operacionais preservando catalogos nativos
 - [x] `actor_user_id` real nas mutacoes auditadas
 - [ ] Refresh de sessao e tratamento refinado de expiracao
 - [ ] Guards/policies completos por usuario, empresa, permissao e modulo

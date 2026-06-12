@@ -25,6 +25,7 @@ Ja existe base funcional para:
 - auditoria administrativa por escopo;
 - menu administrativo agrupado em `Cadastro`, `Movimentacao` e `Auditoria`;
 - login/logout server-side com Supabase Auth e cookies HttpOnly;
+- recuperacao de senha por e-mail via Supabase Auth;
 - `actor_user_id` real enviado pelo Next para a API interna em mutacoes auditadas;
 - API Nest interna consumida pelo Next server-side.
 
@@ -66,10 +67,19 @@ No estado atual do projeto:
 - `SUPABASE_SERVICE_ROLE_KEY` fica somente no backend e nunca deve ir para o frontend.
 - `FP_INTERNAL_API_TOKEN` fica somente no server-side do Next e no backend.
 - `FP_API_INTERNAL_URL` e usada pelo Next server-side para chamar a API interna.
+- `FP_WEB_URL` define a URL base usada em links server-side, como recuperacao de senha.
 
 O cliente interno do frontend esta em `apps/web/src/lib/internal-api.ts` e usa `server-only`, impedindo importacao por componentes client.
 
 O login do Admin Console usa Supabase Auth pelo server-side do Next. A sessao fica em cookies HttpOnly e o navegador nao recebe a service role nem o token interno.
+
+Para recuperacao de senha, cadastre a URL abaixo em Supabase Dashboard > Authentication > URL Configuration > Redirect URLs:
+
+```text
+http://localhost:3000/login/atualizar-senha
+```
+
+Em producao, cadastre a mesma rota usando o dominio real definido em `FP_WEB_URL`.
 
 Se no futuro houver cliente Supabase direto no navegador, somente variaveis com prefixo explicito `NEXT_PUBLIC_SUPABASE_URL` e `NEXT_PUBLIC_SUPABASE_ANON_KEY` poderao ser usadas ali, com seguranca obrigatoriamente baseada em RLS, permissoes e escopo por empresa. A service role nunca pode ser exposta.
 
@@ -122,6 +132,20 @@ pnpm supabase:stop
 O banco e unico e separado por schemas de modulo, com `core` centralizando empresas, usuarios, permissoes, modulos contratados e helpers de autorizacao.
 
 Para a API Nest consultar `core` via `@supabase/supabase-js`, o schema `core` precisa estar em Supabase Dashboard > Project Settings > Data API > Exposed schemas. No ambiente local, `supabase/config.toml` ja declara `core` em `[api].schemas`.
+
+### Scripts SQL operacionais
+
+Scripts manuais ficam em `supabase/sql`.
+
+- `supabase/sql/reset_business_data.sql`: limpa dados operacionais e preserva catalogos nativos do sistema.
+- `supabase/sql/seed_super_admin.sql`: transforma um usuario ja criado no Supabase Auth em super-admin no schema `core`.
+
+Fluxo recomendado para primeiro acesso:
+
+1. Criar manualmente o primeiro usuario no Supabase Auth.
+2. Copiar o UUID desse usuario.
+3. Substituir o UUID no CTE `seed` de `seed_super_admin.sql`.
+4. Executar o script no SQL Editor do Supabase.
 
 ## Documentacao viva
 

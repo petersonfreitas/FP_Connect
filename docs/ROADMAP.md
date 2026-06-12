@@ -48,6 +48,9 @@ Ja foram implementados:
 - auditoria administrativa com categoria propria;
 - menu administrativo em `Cadastro`, `Movimentacao` e `Auditoria`;
 - login/logout server-side com Supabase Auth e cookies HttpOnly;
+- recuperacao de senha por e-mail;
+- seed inicial de super-admin a partir de Auth manual;
+- reset SQL de dados operacionais preservando catalogos nativos;
 - propagacao do usuario autenticado para a API interna;
 - auditoria com `actor_user_id` real em mutacoes do Admin Console;
 - validacoes de formulario alinhadas ao banco em pontos ja implementados;

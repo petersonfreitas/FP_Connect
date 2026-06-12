@@ -247,6 +247,26 @@ a {
   padding: 12px 14px;
 }
 
+.form-success {
+  background: #ecfdf5;
+  border: 1px solid #a7f3d0;
+  border-radius: 8px;
+  color: #065f46;
+  font-weight: 700;
+  padding: 12px 14px;
+}
+
+.auth-link {
+  color: var(--accent);
+  font-weight: 800;
+  justify-self: center;
+}
+
+.auth-link:hover {
+  color: var(--accent-strong);
+  text-decoration: underline;
+}
+
 .topbar {
   align-items: center;
   display: flex;
