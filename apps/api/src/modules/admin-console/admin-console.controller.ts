@@ -1,5 +1,6 @@
-import { Body, Controller, Get, Param, Patch, Post, Query, UseGuards } from "@nestjs/common";
+import { Body, Controller, Get, Headers, Param, Patch, Post, Query, UseGuards } from "@nestjs/common";
 import { InternalApiGuard } from "../../auth/internal-api.guard";
+import { readInternalApiContext } from "../../auth/internal-api-context";
 import type {
   AdminAuditScope,
   CreateAdminCompanyInput,
@@ -73,21 +74,29 @@ export class AdminConsoleController {
   }
 
   @Post("companies")
-  createCompany(@Body() input: CreateAdminCompanyInput) {
-    return this.adminConsole.createCompany(input);
+  createCompany(
+    @Body() input: CreateAdminCompanyInput,
+    @Headers() headers: Record<string, string | string[] | undefined>
+  ) {
+    return this.adminConsole.createCompany(input, readInternalApiContext(headers));
   }
 
   @Patch("companies/:id")
-  updateCompany(@Param("id") id: string, @Body() input: UpdateAdminCompanyInput) {
-    return this.adminConsole.updateCompany(id, input);
+  updateCompany(
+    @Param("id") id: string,
+    @Body() input: UpdateAdminCompanyInput,
+    @Headers() headers: Record<string, string | string[] | undefined>
+  ) {
+    return this.adminConsole.updateCompany(id, input, readInternalApiContext(headers));
   }
 
   @Post("companies/:id/applications")
   updateCompanyApplication(
     @Param("id") id: string,
-    @Body() input: UpdateAdminCompanyApplicationInput
+    @Body() input: UpdateAdminCompanyApplicationInput,
+    @Headers() headers: Record<string, string | string[] | undefined>
   ) {
-    return this.adminConsole.updateCompanyApplication(id, input);
+    return this.adminConsole.updateCompanyApplication(id, input, readInternalApiContext(headers));
   }
 
   @Get("users")
@@ -101,30 +110,44 @@ export class AdminConsoleController {
   }
 
   @Post("users")
-  createUser(@Body() input: CreateAdminUserInput) {
-    return this.adminConsole.createUser(input);
+  createUser(
+    @Body() input: CreateAdminUserInput,
+    @Headers() headers: Record<string, string | string[] | undefined>
+  ) {
+    return this.adminConsole.createUser(input, readInternalApiContext(headers));
   }
 
   @Patch("users/:id")
-  updateUser(@Param("id") id: string, @Body() input: UpdateAdminUserInput) {
-    return this.adminConsole.updateUser(id, input);
+  updateUser(
+    @Param("id") id: string,
+    @Body() input: UpdateAdminUserInput,
+    @Headers() headers: Record<string, string | string[] | undefined>
+  ) {
+    return this.adminConsole.updateUser(id, input, readInternalApiContext(headers));
   }
 
   @Post("companies/:companyId/users/:userId/roles")
   grantUserRole(
     @Param("companyId") companyId: string,
     @Param("userId") userId: string,
-    @Body() input: GrantAdminUserRoleInput
+    @Body() input: GrantAdminUserRoleInput,
+    @Headers() headers: Record<string, string | string[] | undefined>
   ) {
-    return this.adminConsole.grantUserRole(companyId, userId, input);
+    return this.adminConsole.grantUserRole(companyId, userId, input, readInternalApiContext(headers));
   }
 
   @Post("companies/:companyId/users/:userId/roles/revoke")
   revokeUserRole(
     @Param("companyId") companyId: string,
     @Param("userId") userId: string,
-    @Body() input: RevokeAdminUserRoleInput
+    @Body() input: RevokeAdminUserRoleInput,
+    @Headers() headers: Record<string, string | string[] | undefined>
   ) {
-    return this.adminConsole.revokeUserRole(companyId, userId, input);
+    return this.adminConsole.revokeUserRole(
+      companyId,
+      userId,
+      input,
+      readInternalApiContext(headers)
+    );
   }
 }

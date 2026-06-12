@@ -47,14 +47,15 @@ Ja foram implementados:
 - modulos contratados por empresa;
 - auditoria administrativa com categoria propria;
 - menu administrativo em `Cadastro`, `Movimentacao` e `Auditoria`;
+- login/logout server-side com Supabase Auth e cookies HttpOnly;
+- propagacao do usuario autenticado para a API interna;
+- auditoria com `actor_user_id` real em mutacoes do Admin Console;
 - validacoes de formulario alinhadas ao banco em pontos ja implementados;
 - regra documentada para API interna, API publica futura e variaveis server-side.
 
 Pendencias de fundacao antes dos modulos operacionais:
 
-- autenticacao real da sessao no frontend;
-- propagacao do usuario autenticado para a API interna;
-- `actor_user_id` real na auditoria;
+- refresh de sessao e tratamento refinado de expiracao;
 - guards/policies completos por usuario, empresa, permissao e modulo;
 - bloqueio efetivo por modulo contratado nas rotas sensiveis;
 - soft delete/inativacao exposto na UI quando autorizado;
@@ -96,11 +97,9 @@ Objetivo: transformar a base funcional em fundacao segura para escalar.
 
 Itens:
 
-- login/sessao real no frontend;
-- leitura do usuario autenticado;
-- envio seguro do contexto para a API interna;
-- auditoria com `actor_user_id` real;
+- refresh de sessao;
 - guards/policies nas rotas sensiveis;
+- resolucao de empresa/contexto ativo;
 - revisao de bloqueios por empresa, permissao e modulo contratado;
 - smoke test de empresas, usuarios, permissoes, modulos e auditoria.
 

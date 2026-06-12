@@ -263,6 +263,8 @@ Regra atual:
 
 O frontend web atual consome a API interna pelo server-side do Next usando `apps/web/src/lib/internal-api.ts`, que usa `server-only`.
 
+O Admin Console autentica pelo Supabase Auth no server-side do Next. A sessao e armazenada em cookies HttpOnly. Mutacoes server-side para a API interna devem enviar o usuario autenticado como contexto interno para auditoria e autorizacao.
+
 Se futuramente houver cliente Supabase direto no navegador, a exposicao deve ser explicita e limitada a:
 
 ```text

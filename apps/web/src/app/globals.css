@@ -119,8 +119,9 @@ a {
   align-items: center;
   border-top: 1px solid rgb(255 255 255 / 14%);
   color: rgb(255 255 255 / 76%);
-  display: flex;
+  display: grid;
   font-size: 13px;
+  grid-template-columns: 40px minmax(0, 1fr);
   gap: 12px;
   margin-top: auto;
   padding-top: 20px;
@@ -132,9 +133,118 @@ a {
   padding: 6px;
 }
 
+.sidebar-user {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.sidebar-user span,
+.sidebar-user small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.sidebar-user span {
+  color: #ffffff;
+  font-weight: 700;
+}
+
+.sidebar-user small {
+  color: rgb(255 255 255 / 58%);
+}
+
+.sidebar-foot form {
+  grid-column: 1 / -1;
+}
+
+.logout-button {
+  background: rgb(255 255 255 / 8%);
+  border: 1px solid rgb(255 255 255 / 16%);
+  border-radius: 8px;
+  color: #ffffff;
+  cursor: pointer;
+  font: inherit;
+  font-weight: 800;
+  padding: 9px 12px;
+  width: 100%;
+}
+
+.logout-button:hover {
+  background: rgb(255 255 255 / 14%);
+}
+
 .workspace {
   min-width: 0;
   padding: 32px;
+}
+
+.login-screen {
+  align-items: center;
+  display: grid;
+  min-height: 100vh;
+  padding: 32px;
+}
+
+.login-panel {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  display: grid;
+  gap: 24px;
+  margin: 0 auto;
+  max-width: 440px;
+  padding: 32px;
+  width: 100%;
+}
+
+.login-panel img {
+  height: auto;
+  width: 210px;
+}
+
+.login-panel h1 {
+  font-size: 30px;
+  letter-spacing: 0;
+  line-height: 1.1;
+  margin: 8px 0;
+}
+
+.login-panel p {
+  color: var(--muted);
+  line-height: 1.6;
+  margin: 0;
+}
+
+.auth-form {
+  display: grid;
+  gap: 16px;
+}
+
+.auth-form label {
+  color: var(--accent-strong);
+  display: grid;
+  font-size: 14px;
+  font-weight: 800;
+  gap: 8px;
+}
+
+.auth-form input {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  color: var(--foreground);
+  font: inherit;
+  padding: 11px 12px;
+}
+
+.form-error {
+  background: #fff7ed;
+  border: 1px solid #fed7aa;
+  border-radius: 8px;
+  color: #7c2d12;
+  font-weight: 700;
+  padding: 12px 14px;
 }
 
 .topbar {

@@ -22,6 +22,7 @@ import type {
   UpdateAdminUserInput,
   UpdateAdminCompanyApplicationInput
 } from "@fp/types";
+import { requireCurrentUser } from "./auth";
 import { loadServerEnv } from "./server-env";
 
 const DEFAULT_INTERNAL_API_BASE_URL = "http://localhost:3001/api";
@@ -200,12 +201,14 @@ async function fetchInternal<T>(
   }
 
   const baseUrl = getInternalApiBaseUrl();
+  const actor = await requireCurrentUser();
   const response = await fetch(`${baseUrl}/${path}`, {
     cache: "no-store",
     ...init,
     headers: {
       "Content-Type": "application/json",
       "X-FP-Internal-Token": token,
+      ...(actor ? { "X-FP-Actor-User-Id": actor.id } : {}),
       ...init.headers
     }
   }).catch((error: unknown) => {

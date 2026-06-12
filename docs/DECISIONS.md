@@ -40,6 +40,7 @@ Este arquivo registra decisoes arquiteturais e operacionais para evitar retrabal
 | DEC-032 | Variaveis sensiveis devem permanecer server-side. `SUPABASE_SERVICE_ROLE_KEY` e `FP_INTERNAL_API_TOKEN` nunca podem ser expostos ao navegador. | Aprovada |
 | DEC-033 | O frontend web atual nao deve expor Supabase diretamente ao navegador; se isso mudar, somente `NEXT_PUBLIC_SUPABASE_URL` e `NEXT_PUBLIC_SUPABASE_ANON_KEY` podem ser usados com RLS obrigatoria. | Aprovada |
 | DEC-034 | Food e Tracking podem nascer como frontends separados, mas continuam usando o banco unico, Supabase Auth unico e controle central do `core`. | Aprovada |
+| DEC-035 | O Admin Console deve autenticar pelo Supabase Auth no server-side do Next, armazenar sessao em cookie HttpOnly e enviar contexto interno de usuario para a API Nest. | Aprovada |
 
 ---
 

@@ -1,6 +1,8 @@
 import Image from "next/image";
 import Link from "next/link";
 import type { ReactNode } from "react";
+import { signOutAction } from "@/lib/auth-actions";
+import { requireCurrentUser } from "@/lib/auth";
 
 type AppShellProps = {
   activePath?: string;
@@ -26,7 +28,9 @@ const auditoriaItems = [
   { href: "/auditoria/sistema", label: "Sistema" }
 ];
 
-export function AppShell({ activePath = "/", children }: AppShellProps) {
+export async function AppShell({ activePath = "/", children }: AppShellProps) {
+  const user = await requireCurrentUser();
+
   return (
     <main className="app-shell">
       <aside className="sidebar" aria-label="Navegacao principal">
@@ -85,7 +89,15 @@ export function AppShell({ activePath = "/", children }: AppShellProps) {
         </nav>
         <div className="sidebar-foot">
           <Image src="/brand/icon.png" alt="" width={40} height={40} />
-          <span>FP Connect Foundation</span>
+          <div className="sidebar-user">
+            <span>{user.email ?? "Usuario autenticado"}</span>
+            <small>FP Connect Foundation</small>
+          </div>
+          <form action={signOutAction}>
+            <button className="logout-button" type="submit">
+              Sair
+            </button>
+          </form>
         </div>
       </aside>
 

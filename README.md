@@ -24,12 +24,13 @@ Ja existe base funcional para:
 - modulos contratados por empresa;
 - auditoria administrativa por escopo;
 - menu administrativo agrupado em `Cadastro`, `Movimentacao` e `Auditoria`;
+- login/logout server-side com Supabase Auth e cookies HttpOnly;
+- `actor_user_id` real enviado pelo Next para a API interna em mutacoes auditadas;
 - API Nest interna consumida pelo Next server-side.
 
 Ainda precisam ser amadurecidos antes de entrar pesado nos modulos operacionais:
 
-- autenticacao real da sessao no frontend;
-- `actor_user_id` real nas acoes auditadas;
+- refresh de sessao e tratamento refinado de expiracao;
 - guards/policies completos alem do token interno;
 - fluxos de inativacao/soft delete na UI;
 - smoke tests manuais dos fluxos principais;
@@ -67,6 +68,8 @@ No estado atual do projeto:
 - `FP_API_INTERNAL_URL` e usada pelo Next server-side para chamar a API interna.
 
 O cliente interno do frontend esta em `apps/web/src/lib/internal-api.ts` e usa `server-only`, impedindo importacao por componentes client.
+
+O login do Admin Console usa Supabase Auth pelo server-side do Next. A sessao fica em cookies HttpOnly e o navegador nao recebe a service role nem o token interno.
 
 Se no futuro houver cliente Supabase direto no navegador, somente variaveis com prefixo explicito `NEXT_PUBLIC_SUPABASE_URL` e `NEXT_PUBLIC_SUPABASE_ANON_KEY` poderao ser usadas ali, com seguranca obrigatoriamente baseada em RLS, permissoes e escopo por empresa. A service role nunca pode ser exposta.
 

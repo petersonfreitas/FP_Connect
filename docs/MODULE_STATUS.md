@@ -45,8 +45,9 @@ Este arquivo controla o avanco dos modulos do ecossistema.
 - [x] Menu agrupado em Cadastro, Movimentacao e Auditoria
 - [x] Auditoria basica
 - [x] API interna Nest consumida pelo Next server-side
-- [ ] Autenticacao real da sessao no frontend
-- [ ] `actor_user_id` real nas acoes auditadas
+- [x] Login/logout server-side com Supabase Auth
+- [x] `actor_user_id` real nas mutacoes auditadas
+- [ ] Refresh de sessao e tratamento refinado de expiracao
 - [ ] Guards/policies completos por usuario, empresa, permissao e modulo
 - [ ] Bloqueio efetivo por empresa/modulo em todas as rotas sensiveis
 - [ ] Soft delete/inativacao exposto na UI quando autorizado
@@ -108,11 +109,10 @@ Este arquivo controla o avanco dos modulos do ecossistema.
 
 Antes de abrir implementacao pesada em Robots, Food e Tracking, fechar o hardening da fundacao:
 
-1. autenticar sessao real no frontend;
-2. propagar usuario autenticado para a API interna;
-3. gravar auditoria com `actor_user_id` real;
-4. aplicar guards/policies reais nas rotas sensiveis;
-5. validar smoke test completo de empresas, usuarios, permissoes, modulos e auditoria.
+1. aplicar guards/policies reais nas rotas sensiveis;
+2. resolver empresa/contexto ativo para autorizacao;
+3. adicionar refresh de sessao;
+4. validar smoke test completo de empresas, usuarios, permissoes, modulos e auditoria.
 
 ---
 

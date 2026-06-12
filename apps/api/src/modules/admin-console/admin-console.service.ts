@@ -32,6 +32,10 @@ import type {
   UpdateAdminUserInput,
   UpdateAdminCompanyApplicationInput
 } from "./admin-console.contracts";
+import {
+  emptyInternalApiContext,
+  type InternalApiContext
+} from "../../auth/internal-api-context";
 import { SupabaseService } from "../../supabase/supabase.service";
 
 type SupabaseFailure = {
@@ -512,7 +516,10 @@ export class AdminConsoleService {
     return mapCompany(data as CompanyRow);
   }
 
-  async createCompany(input: CreateAdminCompanyInput): Promise<AdminCompanyContract> {
+  async createCompany(
+    input: CreateAdminCompanyInput,
+    context: InternalApiContext = emptyInternalApiContext
+  ): Promise<AdminCompanyContract> {
     const company = normalizeCreateCompanyInput(input);
 
     const { data, error } = await this.supabase.core
@@ -537,17 +544,25 @@ export class AdminConsoleService {
     }
 
     const createdCompany = mapCompany(data as CompanyRow);
-    await this.createAuditLog(createdCompany.id, "core.company.created", "companies", createdCompany.id, {
-      legalName: createdCompany.legalName,
-      status: createdCompany.status
-    });
+    await this.createAuditLog(
+      createdCompany.id,
+      "core.company.created",
+      "companies",
+      createdCompany.id,
+      {
+        legalName: createdCompany.legalName,
+        status: createdCompany.status
+      },
+      context
+    );
 
     return createdCompany;
   }
 
   async updateCompany(
     companyId: string,
-    input: UpdateAdminCompanyInput
+    input: UpdateAdminCompanyInput,
+    context: InternalApiContext = emptyInternalApiContext
   ): Promise<AdminCompanyContract> {
     const normalizedCompanyId = normalizeUuid(companyId, "companyId");
     await this.ensureCompanyExists(normalizedCompanyId);
@@ -585,13 +600,17 @@ export class AdminConsoleService {
       {
         legalName: updatedCompany.legalName,
         status: updatedCompany.status
-      }
+      },
+      context
     );
 
     return updatedCompany;
   }
 
-  async createUser(input: CreateAdminUserInput): Promise<AdminCompanyUserContract> {
+  async createUser(
+    input: CreateAdminUserInput,
+    context: InternalApiContext = emptyInternalApiContext
+  ): Promise<AdminCompanyUserContract> {
     const userInput = normalizeCreateUserInput(input);
     await this.ensureCompanyExists(userInput.companyId);
 
@@ -651,10 +670,17 @@ export class AdminConsoleService {
 
       const [companyUser] = await this.hydrateCompanyUsers([membershipData as CompanyUserRow]);
 
-      await this.createAuditLog(userInput.companyId, "core.user.invited", "profiles", userId, {
-        email: userInput.email,
-        fullName: userInput.fullName
-      });
+      await this.createAuditLog(
+        userInput.companyId,
+        "core.user.invited",
+        "profiles",
+        userId,
+        {
+          email: userInput.email,
+          fullName: userInput.fullName
+        },
+        context
+      );
 
       return companyUser;
     } catch (error) {
@@ -671,7 +697,11 @@ export class AdminConsoleService {
     }
   }
 
-  async updateUser(id: string, input: UpdateAdminUserInput): Promise<AdminUserContract> {
+  async updateUser(
+    id: string,
+    input: UpdateAdminUserInput,
+    context: InternalApiContext = emptyInternalApiContext
+  ): Promise<AdminUserContract> {
     const userId = normalizeUuid(id, "userId");
     await this.getUser(userId);
     const userInput = normalizeUpdateUserInput(input);
@@ -711,18 +741,26 @@ export class AdminConsoleService {
     }
 
     const updatedUser = mapUser(data as UserRow);
-    await this.createAuditLog(null, "core.user.updated", "profiles", userId, {
-      email: updatedUser.email,
-      fullName: updatedUser.fullName,
-      status: updatedUser.status
-    });
+    await this.createAuditLog(
+      null,
+      "core.user.updated",
+      "profiles",
+      userId,
+      {
+        email: updatedUser.email,
+        fullName: updatedUser.fullName,
+        status: updatedUser.status
+      },
+      context
+    );
 
     return updatedUser;
   }
 
   async updateCompanyApplication(
     companyId: string,
-    input: UpdateAdminCompanyApplicationInput
+    input: UpdateAdminCompanyApplicationInput,
+    context: InternalApiContext = emptyInternalApiContext
   ): Promise<AdminCompanyApplicationContract> {
     await this.ensureCompanyExists(companyId);
 
@@ -777,7 +815,8 @@ export class AdminConsoleService {
         applicationId,
         applicationKey: application.key,
         status
-      }
+      },
+      context
     );
 
     return mapCompanyApplication(application, companyApplication);
@@ -786,7 +825,8 @@ export class AdminConsoleService {
   async grantUserRole(
     companyId: string,
     userId: string,
-    input: GrantAdminUserRoleInput
+    input: GrantAdminUserRoleInput,
+    context: InternalApiContext = emptyInternalApiContext
   ): Promise<AdminUserApplicationRoleContract> {
     const normalizedCompanyId = normalizeUuid(companyId, "companyId");
     const normalizedUserId = normalizeUuid(userId, "userId");
@@ -844,7 +884,8 @@ export class AdminConsoleService {
         applicationKey: application.key,
         roleId,
         userId: normalizedUserId
-      }
+      },
+      context
     );
 
     return this.hydrateUserApplicationRole(grant);
@@ -853,7 +894,8 @@ export class AdminConsoleService {
   async revokeUserRole(
     companyId: string,
     userId: string,
-    input: RevokeAdminUserRoleInput
+    input: RevokeAdminUserRoleInput,
+    context: InternalApiContext = emptyInternalApiContext
   ): Promise<RevokeAdminUserRoleContract> {
     const normalizedCompanyId = normalizeUuid(companyId, "companyId");
     const normalizedUserId = normalizeUuid(userId, "userId");
@@ -896,7 +938,8 @@ export class AdminConsoleService {
       grantId,
       {
         userId: normalizedUserId
-      }
+      },
+      context
     );
 
     return { revoked: true };
@@ -1200,10 +1243,12 @@ export class AdminConsoleService {
     action: string,
     entityTable: string,
     entityId: string,
-    metadata: Record<string, unknown>
+    metadata: Record<string, unknown>,
+    context: InternalApiContext = emptyInternalApiContext
   ): Promise<void> {
     const { error } = await this.supabase.core.from("audit_logs").insert({
       company_id: companyId,
+      actor_user_id: context.actorUserId,
       action,
       entity_table: entityTable,
       entity_id: entityId,
