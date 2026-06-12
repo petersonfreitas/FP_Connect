@@ -4,6 +4,10 @@ import type {
   AdminAuditScope,
   AdminAuditLogContract,
   AdminBasicPlanContract,
+  BulkGrantAdminUserRolesContract,
+  BulkGrantAdminUserRolesInput,
+  BulkRevokeAdminUserRolesContract,
+  BulkRevokeAdminUserRolesInput,
   BulkUpdateAdminCompanyApplicationsContract,
   BulkUpdateAdminCompanyApplicationsInput,
   AdminCompanyUserAccessContract,
@@ -187,6 +191,20 @@ export async function grantAdminUserRole(
   );
 }
 
+export async function bulkGrantAdminUserRoles(
+  companyId: string,
+  userId: string,
+  input: BulkGrantAdminUserRolesInput
+): Promise<InternalApiResult<BulkGrantAdminUserRolesContract>> {
+  return fetchInternal<BulkGrantAdminUserRolesContract>(
+    `admin-console/companies/${companyId}/users/${userId}/roles/bulk`,
+    {
+      body: JSON.stringify(input),
+      method: "POST"
+    }
+  );
+}
+
 export async function revokeAdminUserRole(
   companyId: string,
   userId: string,
@@ -194,6 +212,20 @@ export async function revokeAdminUserRole(
 ): Promise<InternalApiResult<RevokeAdminUserRoleContract>> {
   return fetchInternal<RevokeAdminUserRoleContract>(
     `admin-console/companies/${companyId}/users/${userId}/roles/revoke`,
+    {
+      body: JSON.stringify(input),
+      method: "POST"
+    }
+  );
+}
+
+export async function bulkRevokeAdminUserRoles(
+  companyId: string,
+  userId: string,
+  input: BulkRevokeAdminUserRolesInput
+): Promise<InternalApiResult<BulkRevokeAdminUserRolesContract>> {
+  return fetchInternal<BulkRevokeAdminUserRolesContract>(
+    `admin-console/companies/${companyId}/users/${userId}/roles/revoke-bulk`,
     {
       body: JSON.stringify(input),
       method: "POST"

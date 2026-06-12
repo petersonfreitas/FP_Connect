@@ -39,6 +39,7 @@ Este arquivo controla o avanco dos modulos do ecossistema.
 - [x] Edicao de usuarios
 - [x] Vinculo usuario/empresa
 - [x] Perfis/permissoes por usuario, empresa e modulo
+- [x] Concessao/revogacao de papeis em lote por usuario
 - [x] Catalogo de modulos
 - [x] Catalogo de planos
 - [x] Modulos contratados por empresa

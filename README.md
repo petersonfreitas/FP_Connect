@@ -21,6 +21,7 @@ Ja existe base funcional para:
 - cadastro, listagem e edicao de usuarios;
 - vinculo usuario x empresa;
 - papeis/permissoes por usuario, empresa e modulo;
+- tabela de papeis por usuario com selecao e concessao/revogacao em lote;
 - catalogo de planos e modulos;
 - modulos contratados por empresa;
 - tabela de modulos contratados com selecao e acao em lote por empresa;
@@ -103,13 +104,16 @@ Endpoints internos atuais do Admin Console:
 - `POST /api/admin-console/companies`
 - `PATCH /api/admin-console/companies/:id`
 - `POST /api/admin-console/companies/:id/applications`
+- `POST /api/admin-console/companies/:id/applications/bulk`
 - `GET /api/admin-console/users`
 - `GET /api/admin-console/users/:id`
 - `POST /api/admin-console/users`
 - `PATCH /api/admin-console/users/:id`
 - `GET /api/admin-console/companies/:companyId/users/:userId/access`
 - `POST /api/admin-console/companies/:companyId/users/:userId/roles`
+- `POST /api/admin-console/companies/:companyId/users/:userId/roles/bulk`
 - `POST /api/admin-console/companies/:companyId/users/:userId/roles/revoke`
+- `POST /api/admin-console/companies/:companyId/users/:userId/roles/revoke-bulk`
 
 Essas rotas usam Supabase server-side com `SUPABASE_SERVICE_ROLE_KEY` e exigem o header `X-FP-Internal-Token` com o valor de `FP_INTERNAL_API_TOKEN`.
 

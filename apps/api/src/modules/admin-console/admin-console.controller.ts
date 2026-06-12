@@ -3,6 +3,8 @@ import { InternalApiGuard } from "../../auth/internal-api.guard";
 import { readInternalApiContext } from "../../auth/internal-api-context";
 import type {
   AdminAuditScope,
+  BulkGrantAdminUserRolesInput,
+  BulkRevokeAdminUserRolesInput,
   BulkUpdateAdminCompanyApplicationsInput,
   CreateAdminCompanyInput,
   CreateAdminUserInput,
@@ -150,6 +152,21 @@ export class AdminConsoleController {
     return this.adminConsole.grantUserRole(companyId, userId, input, readInternalApiContext(headers));
   }
 
+  @Post("companies/:companyId/users/:userId/roles/bulk")
+  bulkGrantUserRoles(
+    @Param("companyId") companyId: string,
+    @Param("userId") userId: string,
+    @Body() input: BulkGrantAdminUserRolesInput,
+    @Headers() headers: Record<string, string | string[] | undefined>
+  ) {
+    return this.adminConsole.bulkGrantUserRoles(
+      companyId,
+      userId,
+      input,
+      readInternalApiContext(headers)
+    );
+  }
+
   @Post("companies/:companyId/users/:userId/roles/revoke")
   revokeUserRole(
     @Param("companyId") companyId: string,
@@ -158,6 +175,21 @@ export class AdminConsoleController {
     @Headers() headers: Record<string, string | string[] | undefined>
   ) {
     return this.adminConsole.revokeUserRole(
+      companyId,
+      userId,
+      input,
+      readInternalApiContext(headers)
+    );
+  }
+
+  @Post("companies/:companyId/users/:userId/roles/revoke-bulk")
+  bulkRevokeUserRoles(
+    @Param("companyId") companyId: string,
+    @Param("userId") userId: string,
+    @Body() input: BulkRevokeAdminUserRolesInput,
+    @Headers() headers: Record<string, string | string[] | undefined>
+  ) {
+    return this.adminConsole.bulkRevokeUserRoles(
       companyId,
       userId,
       input,

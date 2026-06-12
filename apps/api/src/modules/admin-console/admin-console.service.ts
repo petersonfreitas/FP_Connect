@@ -12,6 +12,10 @@ import type {
   AdminApplicationContract,
   AdminBasicPlanCatalogContract,
   AdminBasicPlanContract,
+  BulkGrantAdminUserRolesContract,
+  BulkGrantAdminUserRolesInput,
+  BulkRevokeAdminUserRolesContract,
+  BulkRevokeAdminUserRolesInput,
   BulkUpdateAdminCompanyApplicationsContract,
   BulkUpdateAdminCompanyApplicationsInput,
   AdminCatalogContract,
@@ -952,6 +956,27 @@ export class AdminConsoleService {
     return this.hydrateUserApplicationRole(grant);
   }
 
+  async bulkGrantUserRoles(
+    companyId: string,
+    userId: string,
+    input: BulkGrantAdminUserRolesInput,
+    context: InternalApiContext = emptyInternalApiContext
+  ): Promise<BulkGrantAdminUserRolesContract> {
+    const roleIds = normalizeUuidList(input.roleIds, "roleIds");
+
+    if (roleIds.length === 0) {
+      throw new BadRequestException("Selecione ao menos um papel");
+    }
+
+    const granted: AdminUserApplicationRoleContract[] = [];
+
+    for (const roleId of roleIds) {
+      granted.push(await this.grantUserRole(companyId, userId, { roleId }, context));
+    }
+
+    return { granted };
+  }
+
   async revokeUserRole(
     companyId: string,
     userId: string,
@@ -1004,6 +1029,25 @@ export class AdminConsoleService {
     );
 
     return { revoked: true };
+  }
+
+  async bulkRevokeUserRoles(
+    companyId: string,
+    userId: string,
+    input: BulkRevokeAdminUserRolesInput,
+    context: InternalApiContext = emptyInternalApiContext
+  ): Promise<BulkRevokeAdminUserRolesContract> {
+    const grantIds = normalizeUuidList(input.grantIds, "grantIds");
+
+    if (grantIds.length === 0) {
+      throw new BadRequestException("Selecione ao menos uma concessao");
+    }
+
+    for (const grantId of grantIds) {
+      await this.revokeUserRole(companyId, userId, { grantId }, context);
+    }
+
+    return { revoked: true, count: grantIds.length };
   }
 
   private async ensureCompanyExists(companyId: string): Promise<void> {

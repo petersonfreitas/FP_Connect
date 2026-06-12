@@ -44,6 +44,7 @@ Ja foram implementados:
 - usuarios: cadastro, listagem e edicao;
 - vinculo usuario x empresa;
 - papeis/permissoes por usuario, empresa e modulo;
+- concessao/revogacao de papeis em lote por usuario;
 - catalogo de planos e modulos;
 - modulos contratados por empresa;
 - acao em lote para modulos contratados por empresa;

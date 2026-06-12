@@ -2,11 +2,12 @@ import Link from "next/link";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { AppShell } from "@/components/app-shell";
+import { UserRolesTable } from "@/components/user-roles-table";
 import {
+  bulkGrantAdminUserRoles,
+  bulkRevokeAdminUserRoles,
   getAdminCompany,
-  getAdminCompanyUserAccess,
-  grantAdminUserRole,
-  revokeAdminUserRole
+  getAdminCompanyUserAccess
 } from "@/lib/internal-api";
 
 export const dynamic = "force-dynamic";
@@ -37,6 +38,8 @@ export default async function UserAccessPage({ params, searchParams }: UserAcces
   const query = searchParams ? await searchParams : {};
   const accessError = getQueryValue(query.accessError);
   const accessSaved = getQueryValue(query.accessSaved);
+  const accessSavedMessage =
+    accessSaved && accessSaved !== "1" ? accessSaved : "Acessos atualizados com sucesso.";
   const [companyResult, accessResult] = await Promise.all([
     getAdminCompany(id),
     getAdminCompanyUserAccess(id, userId)
@@ -46,11 +49,11 @@ export default async function UserAccessPage({ params, searchParams }: UserAcces
   const availableRoles = access?.availableRoles ?? [];
   const grants = access?.grants ?? [];
 
-  async function grantRoleAction(formData: FormData) {
+  async function bulkGrantRolesAction(formData: FormData) {
     "use server";
 
-    const result = await grantAdminUserRole(id, userId, {
-      roleId: readFormValue(formData, "roleId")
+    const result = await bulkGrantAdminUserRoles(id, userId, {
+      roleIds: readFormValues(formData, "roleIds")
     });
 
     revalidatePath(`/cadastro/empresas/${id}/usuarios/${userId}`);
@@ -63,14 +66,26 @@ export default async function UserAccessPage({ params, searchParams }: UserAcces
       );
     }
 
-    redirect(`/cadastro/empresas/${id}/usuarios/${userId}?accessSaved=1`);
+    if (!result.data) {
+      redirect(
+        `/cadastro/empresas/${id}/usuarios/${userId}?accessError=${encodeURIComponent(
+          "API interna nao retornou dados da concessao."
+        )}`
+      );
+    }
+
+    redirect(
+      `/cadastro/empresas/${id}/usuarios/${userId}?accessSaved=${encodeURIComponent(
+        `${result.data.granted.length} papel(eis) concedido(s).`
+      )}`
+    );
   }
 
-  async function revokeRoleAction(formData: FormData) {
+  async function bulkRevokeRolesAction(formData: FormData) {
     "use server";
 
-    const result = await revokeAdminUserRole(id, userId, {
-      grantId: readFormValue(formData, "grantId")
+    const result = await bulkRevokeAdminUserRoles(id, userId, {
+      grantIds: readFormValues(formData, "grantIds")
     });
 
     revalidatePath(`/cadastro/empresas/${id}/usuarios/${userId}`);
@@ -83,7 +98,19 @@ export default async function UserAccessPage({ params, searchParams }: UserAcces
       );
     }
 
-    redirect(`/cadastro/empresas/${id}/usuarios/${userId}?accessSaved=1`);
+    if (!result.data) {
+      redirect(
+        `/cadastro/empresas/${id}/usuarios/${userId}?accessError=${encodeURIComponent(
+          "API interna nao retornou dados da revogacao."
+        )}`
+      );
+    }
+
+    redirect(
+      `/cadastro/empresas/${id}/usuarios/${userId}?accessSaved=${encodeURIComponent(
+        `${result.data.count} papel(eis) revogado(s).`
+      )}`
+    );
   }
 
   return (
@@ -121,7 +148,7 @@ export default async function UserAccessPage({ params, searchParams }: UserAcces
 
       {accessSaved ? (
         <section className="form-alert neutral page-feedback" role="status">
-          Acessos atualizados com sucesso.
+          {accessSavedMessage}
         </section>
       ) : null}
 
@@ -154,62 +181,20 @@ export default async function UserAccessPage({ params, searchParams }: UserAcces
           <section className="content-panel stack-panel">
             <div className="panel-heading">
               <div>
-                <h1>Conceder papel</h1>
-                <p>Disponivel apenas para modulos contratados em implantacao ou ativos.</p>
+                <h1>Papeis e permissoes</h1>
+                <p>
+                  Conceda ou revogue acessos em lote para modulos contratados em implantacao ou
+                  ativos.
+                </p>
               </div>
             </div>
 
-            {availableRoles.length > 0 ? (
-              <form className="access-grant-form" action={grantRoleAction}>
-                <label>
-                  Papel
-                  <select name="roleId" required defaultValue="">
-                    <option value="">Selecione um papel</option>
-                    {availableRoles.map((role) => (
-                      <option key={role.id} value={role.id}>
-                        {role.applicationName} - {role.name}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-                <button className="primary-action" type="submit">
-                  Conceder
-                </button>
-              </form>
-            ) : (
-              <div className="empty-state">
-                Nenhum papel disponivel. Contrate ou ative um modulo antes de conceder acessos.
-              </div>
-            )}
-          </section>
-
-          <section className="content-panel stack-panel">
-            <div className="panel-heading">
-              <div>
-                <h1>Papeis concedidos</h1>
-                <p>Papeis atualmente ativos para este usuario nesta empresa.</p>
-              </div>
-            </div>
-
-            {grants.length > 0 ? (
-              <div className="access-role-list">
-                {grants.map((grant) => (
-                  <form action={revokeRoleAction} className="access-role-row" key={grant.id}>
-                    <input name="grantId" type="hidden" value={grant.id} />
-                    <div>
-                      <strong>{grant.roleName}</strong>
-                      <small>{grant.applicationName}</small>
-                    </div>
-                    <span>{grant.roleKey}</span>
-                    <button className="secondary-action" type="submit">
-                      Revogar
-                    </button>
-                  </form>
-                ))}
-              </div>
-            ) : (
-              <div className="empty-state">Nenhum papel concedido para este usuario ainda.</div>
-            )}
+            <UserRolesTable
+              availableRoles={availableRoles}
+              grantAction={bulkGrantRolesAction}
+              grants={grants}
+              revokeAction={bulkRevokeRolesAction}
+            />
           </section>
 
           <section className="content-panel stack-panel">
@@ -251,7 +236,6 @@ function getQueryValue(value: string | string[] | undefined): string | null {
   return value ?? null;
 }
 
-function readFormValue(formData: FormData, key: string): string {
-  const value = formData.get(key);
-  return typeof value === "string" ? value : "";
+function readFormValues(formData: FormData, key: string): string[] {
+  return formData.getAll(key).flatMap((value) => (typeof value === "string" ? [value] : []));
 }

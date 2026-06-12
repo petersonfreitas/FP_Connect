@@ -235,10 +235,27 @@ export type GrantAdminUserRoleInput = {
   roleId: string;
 };
 
+export type BulkGrantAdminUserRolesInput = {
+  roleIds: string[];
+};
+
+export type BulkGrantAdminUserRolesContract = {
+  granted: AdminUserApplicationRoleContract[];
+};
+
 export type RevokeAdminUserRoleInput = {
   grantId: string;
 };
 
 export type RevokeAdminUserRoleContract = {
   revoked: true;
+};
+
+export type BulkRevokeAdminUserRolesInput = {
+  grantIds: string[];
+};
+
+export type BulkRevokeAdminUserRolesContract = {
+  revoked: true;
+  count: number;
 };
