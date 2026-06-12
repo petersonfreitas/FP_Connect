@@ -2,13 +2,18 @@ import "server-only";
 
 import type {
   AdminBasicPlanContract,
+  AdminCompanyUserAccessContract,
   AdminCompanyApplicationContract,
   AdminCompanyUserContract,
   AdminCompanyContract,
   AdminConsoleOverviewContract,
+  AdminUserApplicationRoleContract,
   AdminUserContract,
   CreateAdminCompanyInput,
   CreateAdminUserInput,
+  GrantAdminUserRoleInput,
+  RevokeAdminUserRoleContract,
+  RevokeAdminUserRoleInput,
   UpdateAdminCompanyApplicationInput
 } from "@fp/types";
 import { loadServerEnv } from "./server-env";
@@ -55,6 +60,15 @@ export async function listAdminCompanyApplications(
   );
 }
 
+export async function getAdminCompanyUserAccess(
+  companyId: string,
+  userId: string
+): Promise<InternalApiResult<AdminCompanyUserAccessContract>> {
+  return fetchInternal<AdminCompanyUserAccessContract>(
+    `admin-console/companies/${companyId}/users/${userId}/access`
+  );
+}
+
 export async function createAdminCompany(
   input: CreateAdminCompanyInput
 ): Promise<InternalApiResult<AdminCompanyContract>> {
@@ -94,6 +108,34 @@ export async function createAdminUser(
     body: JSON.stringify(input),
     method: "POST"
   });
+}
+
+export async function grantAdminUserRole(
+  companyId: string,
+  userId: string,
+  input: GrantAdminUserRoleInput
+): Promise<InternalApiResult<AdminUserApplicationRoleContract>> {
+  return fetchInternal<AdminUserApplicationRoleContract>(
+    `admin-console/companies/${companyId}/users/${userId}/roles`,
+    {
+      body: JSON.stringify(input),
+      method: "POST"
+    }
+  );
+}
+
+export async function revokeAdminUserRole(
+  companyId: string,
+  userId: string,
+  input: RevokeAdminUserRoleInput
+): Promise<InternalApiResult<RevokeAdminUserRoleContract>> {
+  return fetchInternal<RevokeAdminUserRoleContract>(
+    `admin-console/companies/${companyId}/users/${userId}/roles/revoke`,
+    {
+      body: JSON.stringify(input),
+      method: "POST"
+    }
+  );
 }
 
 async function fetchInternal<T>(

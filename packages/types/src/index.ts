@@ -60,6 +60,45 @@ export type AdminCompanyApplicationContract = {
   cancelledAt: string | null;
 };
 
+export type AdminPermissionContract = {
+  id: string;
+  applicationId: string;
+  key: string;
+  name: string;
+  description: string | null;
+};
+
+export type AdminRoleContract = {
+  id: string;
+  applicationId: string;
+  applicationKey: string;
+  applicationName: string;
+  key: string;
+  name: string;
+  description: string | null;
+  permissions: AdminPermissionContract[];
+};
+
+export type AdminUserApplicationRoleContract = {
+  id: string;
+  companyId: string;
+  userId: string;
+  applicationId: string;
+  applicationKey: string;
+  applicationName: string;
+  roleId: string;
+  roleKey: string;
+  roleName: string;
+  createdAt: string;
+};
+
+export type AdminCompanyUserAccessContract = {
+  user: AdminCompanyUserContract;
+  applications: AdminCompanyApplicationContract[];
+  availableRoles: AdminRoleContract[];
+  grants: AdminUserApplicationRoleContract[];
+};
+
 export type CreateAdminCompanyInput = {
   personType: CompanyPersonType;
   legalName: string;
@@ -108,4 +147,16 @@ export type UpdateAdminCompanyApplicationInput = {
   applicationId: string;
   status: CompanyApplicationStatus;
   implementationNotes?: string | null;
+};
+
+export type GrantAdminUserRoleInput = {
+  roleId: string;
+};
+
+export type RevokeAdminUserRoleInput = {
+  grantId: string;
+};
+
+export type RevokeAdminUserRoleContract = {
+  revoked: true;
 };

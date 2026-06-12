@@ -255,7 +255,12 @@ export default async function CompanyDetailPage({ params, searchParams }: Compan
                 </span>
                 <span>{user.email ?? "Nao informado"}</span>
                 <span>{user.membershipStatus}</span>
-                <span>{user.isPrimaryContact ? "Principal" : "-"}</span>
+                <span>
+                  {user.isPrimaryContact ? "Principal" : "-"}
+                  <small>
+                    <Link href={`/cadastro/empresas/${id}/usuarios/${user.id}`}>Acessos</Link>
+                  </small>
+                </span>
               </div>
             ))}
           </div>

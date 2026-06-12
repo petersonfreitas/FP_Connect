@@ -10,12 +10,19 @@ import type {
   AdminApplicationContract,
   AdminBasicPlanContract,
   AdminCompanyApplicationContract,
+  AdminCompanyUserAccessContract,
   AdminCompanyUserContract,
   AdminCompanyContract,
   AdminConsoleOverviewContract,
+  AdminPermissionContract,
+  AdminRoleContract,
   AdminUserContract,
+  AdminUserApplicationRoleContract,
   CreateAdminCompanyInput,
   CreateAdminUserInput,
+  GrantAdminUserRoleInput,
+  RevokeAdminUserRoleContract,
+  RevokeAdminUserRoleInput,
   UpdateAdminCompanyApplicationInput
 } from "./admin-console.contracts";
 import { SupabaseService } from "../../supabase/supabase.service";
@@ -85,12 +92,46 @@ type CompanyApplicationRow = {
   cancelled_at: string | null;
 };
 
+type PermissionRow = {
+  id: string;
+  application_id: string;
+  key: string;
+  name: string;
+  description: string | null;
+};
+
+type RoleRow = {
+  id: string;
+  application_id: string;
+  key: string;
+  name: string;
+  description: string | null;
+};
+
+type RolePermissionRow = {
+  role_id: string;
+  permission_id: string;
+};
+
+type UserApplicationRoleRow = {
+  id: string;
+  company_id: string;
+  user_id: string;
+  application_id: string;
+  role_id: string;
+  created_at: string;
+};
+
 const companySelect =
   "id,person_type,legal_name,trade_name,document,primary_email,primary_phone,primary_responsible_name,primary_responsible_email,status,basic_plan_id,implementation_notes,created_at";
 const userSelect = "id,full_name,email,status,created_at";
 const applicationSelect = "id,key,name,description,entry_path,status,sort_order";
 const companyApplicationSelect =
   "id,company_id,application_id,status,implementation_notes,activated_at,suspended_at,cancelled_at";
+const permissionSelect = "id,application_id,key,name,description";
+const roleSelect = "id,application_id,key,name,description";
+const rolePermissionSelect = "role_id,permission_id";
+const userApplicationRoleSelect = "id,company_id,user_id,application_id,role_id,created_at";
 
 @Injectable()
 export class AdminConsoleService {
@@ -222,6 +263,63 @@ export class AdminConsoleService {
     }
 
     return this.hydrateCompanyUsers((data ?? []) as CompanyUserRow[]);
+  }
+
+  async getCompanyUserAccess(
+    companyId: string,
+    userId: string
+  ): Promise<AdminCompanyUserAccessContract> {
+    const normalizedCompanyId = normalizeUuid(companyId, "companyId");
+    const normalizedUserId = normalizeUuid(userId, "userId");
+    const membership = await this.getCompanyMembership(normalizedCompanyId, normalizedUserId);
+    const [user] = await this.hydrateCompanyUsers([membership]);
+
+    if (!user) {
+      throw new NotFoundException("User profile not found");
+    }
+
+    const [allApplications, grantRows] = await Promise.all([
+      this.listCompanyApplications(normalizedCompanyId),
+      this.listUserApplicationRoleRows(normalizedCompanyId, normalizedUserId)
+    ]);
+    const contractedApplications = allApplications.filter((application) => application.companyStatus);
+    const grantableApplicationIds = new Set(
+      allApplications.filter(isGrantableCompanyApplication).map((application) => application.id)
+    );
+    const roleApplicationIds = unique([
+      ...Array.from(grantableApplicationIds),
+      ...grantRows.map((grant) => grant.application_id)
+    ]);
+    const roleRows = await this.listRoleRowsByApplicationIds(roleApplicationIds);
+    const rolePermissionsByRoleId = await this.listPermissionsByRoleId(roleRows);
+    const applicationsById = new Map(allApplications.map((application) => [application.id, application]));
+    const roles = roleRows.flatMap((role) => {
+      const application = applicationsById.get(role.application_id);
+
+      if (!application) {
+        return [];
+      }
+
+      return [mapRole(role, application, rolePermissionsByRoleId.get(role.id) ?? [])];
+    });
+    const rolesById = new Map(roles.map((role) => [role.id, role]));
+    const grants = grantRows.flatMap((grant) => {
+      const role = rolesById.get(grant.role_id);
+      const application = applicationsById.get(grant.application_id);
+
+      if (!role || !application) {
+        return [];
+      }
+
+      return [mapUserApplicationRole(grant, application, role)];
+    });
+
+    return {
+      user,
+      applications: contractedApplications,
+      availableRoles: roles.filter((role) => grantableApplicationIds.has(role.applicationId)),
+      grants
+    };
   }
 
   async getCompany(id: string): Promise<AdminCompanyContract> {
@@ -423,8 +521,147 @@ export class AdminConsoleService {
     return mapCompanyApplication(application, companyApplication);
   }
 
+  async grantUserRole(
+    companyId: string,
+    userId: string,
+    input: GrantAdminUserRoleInput
+  ): Promise<AdminUserApplicationRoleContract> {
+    const normalizedCompanyId = normalizeUuid(companyId, "companyId");
+    const normalizedUserId = normalizeUuid(userId, "userId");
+    const roleId = normalizeUuid(input.roleId, "roleId");
+    await this.getCompanyMembership(normalizedCompanyId, normalizedUserId);
+
+    const role = await this.getRole(roleId);
+    const application = await this.getApplication(role.application_id);
+    const companyApplication = await this.getCurrentCompanyApplication(
+      normalizedCompanyId,
+      application.id
+    );
+
+    if (!companyApplication || !isGrantableCompanyApplicationStatus(companyApplication.status)) {
+      throw new BadRequestException(
+        "Modulo precisa estar contratado e em implantacao ou ativo para receber papeis"
+      );
+    }
+
+    const current = await this.getCurrentUserApplicationRole(
+      normalizedCompanyId,
+      normalizedUserId,
+      application.id,
+      roleId
+    );
+
+    if (current) {
+      return this.hydrateUserApplicationRole(current);
+    }
+
+    const { data, error } = await this.supabase.core
+      .from("user_application_roles")
+      .insert({
+        company_id: normalizedCompanyId,
+        user_id: normalizedUserId,
+        application_id: application.id,
+        role_id: roleId
+      })
+      .select(userApplicationRoleSelect)
+      .single();
+
+    if (error) {
+      throwSupabaseError(error);
+    }
+
+    const grant = data as UserApplicationRoleRow;
+
+    await this.createAuditLog(
+      normalizedCompanyId,
+      "core.user_application_role.granted",
+      "user_application_roles",
+      grant.id,
+      {
+        applicationId: application.id,
+        applicationKey: application.key,
+        roleId,
+        userId: normalizedUserId
+      }
+    );
+
+    return this.hydrateUserApplicationRole(grant);
+  }
+
+  async revokeUserRole(
+    companyId: string,
+    userId: string,
+    input: RevokeAdminUserRoleInput
+  ): Promise<RevokeAdminUserRoleContract> {
+    const normalizedCompanyId = normalizeUuid(companyId, "companyId");
+    const normalizedUserId = normalizeUuid(userId, "userId");
+    const grantId = normalizeUuid(input.grantId, "grantId");
+    await this.getCompanyMembership(normalizedCompanyId, normalizedUserId);
+
+    const { data, error } = await this.supabase.core
+      .from("user_application_roles")
+      .select(userApplicationRoleSelect)
+      .eq("id", grantId)
+      .eq("company_id", normalizedCompanyId)
+      .eq("user_id", normalizedUserId)
+      .is("deleted_at", null)
+      .maybeSingle();
+
+    if (error) {
+      throwSupabaseError(error);
+    }
+
+    if (!data) {
+      throw new NotFoundException("User role grant not found");
+    }
+
+    const { error: updateError } = await this.supabase.core
+      .from("user_application_roles")
+      .update({
+        deleted_at: new Date().toISOString(),
+        delete_reason: "Revogado pelo Admin Console"
+      })
+      .eq("id", grantId);
+
+    if (updateError) {
+      throwSupabaseError(updateError);
+    }
+
+    await this.createAuditLog(
+      normalizedCompanyId,
+      "core.user_application_role.revoked",
+      "user_application_roles",
+      grantId,
+      {
+        userId: normalizedUserId
+      }
+    );
+
+    return { revoked: true };
+  }
+
   private async ensureCompanyExists(companyId: string): Promise<void> {
     await this.getCompany(companyId);
+  }
+
+  private async getCompanyMembership(companyId: string, userId: string): Promise<CompanyUserRow> {
+    const { data, error } = await this.supabase.core
+      .from("company_memberships")
+      .select("id,company_id,user_id,status,is_primary_contact")
+      .eq("company_id", companyId)
+      .eq("user_id", userId)
+      .is("deleted_at", null)
+      .maybeSingle();
+
+    if (error) {
+      throwSupabaseError(error);
+    }
+
+    if (!data) {
+      throw new NotFoundException("Company user membership not found");
+    }
+
+    return data as CompanyUserRow;
   }
 
   private async getApplication(applicationId: string): Promise<ApplicationRow> {
@@ -463,6 +700,149 @@ export class AdminConsoleService {
     }
 
     return (data as CompanyApplicationRow | null) ?? null;
+  }
+
+  private async getRole(roleId: string): Promise<RoleRow> {
+    const { data, error } = await this.supabase.core
+      .from("roles")
+      .select(roleSelect)
+      .eq("id", roleId)
+      .is("deleted_at", null)
+      .maybeSingle();
+
+    if (error) {
+      throwSupabaseError(error);
+    }
+
+    if (!data) {
+      throw new NotFoundException("Role not found");
+    }
+
+    return data as RoleRow;
+  }
+
+  private async listRoleRowsByApplicationIds(applicationIds: string[]): Promise<RoleRow[]> {
+    if (applicationIds.length === 0) {
+      return [];
+    }
+
+    const { data, error } = await this.supabase.core
+      .from("roles")
+      .select(roleSelect)
+      .in("application_id", applicationIds)
+      .is("deleted_at", null)
+      .order("name", { ascending: true });
+
+    if (error) {
+      throwSupabaseError(error);
+    }
+
+    return (data ?? []) as RoleRow[];
+  }
+
+  private async listPermissionsByRoleId(
+    roles: RoleRow[]
+  ): Promise<Map<string, AdminPermissionContract[]>> {
+    const roleIds = roles.map((role) => role.id);
+
+    if (roleIds.length === 0) {
+      return new Map();
+    }
+
+    const [permissionsResult, rolePermissionsResult] = await Promise.all([
+      this.supabase.core
+        .from("permissions")
+        .select(permissionSelect)
+        .in("application_id", unique(roles.map((role) => role.application_id)))
+        .is("deleted_at", null),
+      this.supabase.core
+        .from("role_permissions")
+        .select(rolePermissionSelect)
+        .in("role_id", roleIds)
+    ]);
+
+    if (permissionsResult.error) {
+      throwSupabaseError(permissionsResult.error);
+    }
+
+    if (rolePermissionsResult.error) {
+      throwSupabaseError(rolePermissionsResult.error);
+    }
+
+    const permissionsById = new Map(
+      ((permissionsResult.data ?? []) as PermissionRow[]).map((permission) => [
+        permission.id,
+        mapPermission(permission)
+      ])
+    );
+    const permissionsByRoleId = new Map<string, AdminPermissionContract[]>();
+
+    for (const row of (rolePermissionsResult.data ?? []) as RolePermissionRow[]) {
+      const permission = permissionsById.get(row.permission_id);
+
+      if (!permission) {
+        continue;
+      }
+
+      const permissions = permissionsByRoleId.get(row.role_id) ?? [];
+      permissions.push(permission);
+      permissionsByRoleId.set(row.role_id, permissions);
+    }
+
+    return permissionsByRoleId;
+  }
+
+  private async listUserApplicationRoleRows(
+    companyId: string,
+    userId: string
+  ): Promise<UserApplicationRoleRow[]> {
+    const { data, error } = await this.supabase.core
+      .from("user_application_roles")
+      .select(userApplicationRoleSelect)
+      .eq("company_id", companyId)
+      .eq("user_id", userId)
+      .is("deleted_at", null)
+      .order("created_at", { ascending: false });
+
+    if (error) {
+      throwSupabaseError(error);
+    }
+
+    return (data ?? []) as UserApplicationRoleRow[];
+  }
+
+  private async getCurrentUserApplicationRole(
+    companyId: string,
+    userId: string,
+    applicationId: string,
+    roleId: string
+  ): Promise<UserApplicationRoleRow | null> {
+    const { data, error } = await this.supabase.core
+      .from("user_application_roles")
+      .select(userApplicationRoleSelect)
+      .eq("company_id", companyId)
+      .eq("user_id", userId)
+      .eq("application_id", applicationId)
+      .eq("role_id", roleId)
+      .is("deleted_at", null)
+      .maybeSingle();
+
+    if (error) {
+      throwSupabaseError(error);
+    }
+
+    return (data as UserApplicationRoleRow | null) ?? null;
+  }
+
+  private async hydrateUserApplicationRole(
+    grant: UserApplicationRoleRow
+  ): Promise<AdminUserApplicationRoleContract> {
+    const [application, role] = await Promise.all([
+      this.getApplication(grant.application_id),
+      this.getRole(grant.role_id)
+    ]);
+
+    return mapUserApplicationRole(grant, application, mapRole(role, application, []));
   }
 
   private async hydrateCompanyUsers(
@@ -554,6 +934,52 @@ function mapCompanyApplication(
     activatedAt: companyApplication?.activated_at ?? null,
     suspendedAt: companyApplication?.suspended_at ?? null,
     cancelledAt: companyApplication?.cancelled_at ?? null
+  };
+}
+
+function mapPermission(row: PermissionRow): AdminPermissionContract {
+  return {
+    id: row.id,
+    applicationId: row.application_id,
+    key: row.key,
+    name: row.name,
+    description: row.description
+  };
+}
+
+function mapRole(
+  row: RoleRow,
+  application: { id: string; key: string; name: string },
+  permissions: AdminPermissionContract[]
+): AdminRoleContract {
+  return {
+    id: row.id,
+    applicationId: row.application_id,
+    applicationKey: application.key,
+    applicationName: application.name,
+    key: row.key,
+    name: row.name,
+    description: row.description,
+    permissions
+  };
+}
+
+function mapUserApplicationRole(
+  row: UserApplicationRoleRow,
+  application: { id: string; key: string; name: string },
+  role: AdminRoleContract
+): AdminUserApplicationRoleContract {
+  return {
+    id: row.id,
+    companyId: row.company_id,
+    userId: row.user_id,
+    applicationId: row.application_id,
+    applicationKey: application.key,
+    applicationName: application.name,
+    roleId: row.role_id,
+    roleKey: role.key,
+    roleName: role.name,
+    createdAt: row.created_at
   };
 }
 
@@ -663,6 +1089,23 @@ function normalizeCompanyApplicationStatus(
   }
 
   throw new BadRequestException("status must be implementation, active, suspended or cancelled");
+}
+
+function isGrantableCompanyApplication(application: AdminCompanyApplicationContract): boolean {
+  return (
+    application.applicationStatus === "active" &&
+    isGrantableCompanyApplicationStatus(application.companyStatus)
+  );
+}
+
+function isGrantableCompanyApplicationStatus(
+  status: AdminCompanyApplicationContract["companyStatus"]
+): boolean {
+  return status === "implementation" || status === "active";
+}
+
+function unique(values: string[]): string[] {
+  return Array.from(new Set(values));
 }
 
 function normalizeEmail(value: unknown): string {
