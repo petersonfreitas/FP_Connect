@@ -18,7 +18,7 @@ Este arquivo controla o avanco dos modulos do ecossistema.
 
 | Modulo | Prioridade atual | Nivel | Status | Observacao |
 |---|---:|---:|---|---|
-| FP Connect Admin Console | Alta | 2 | Base funcional estabilizada | Empresas, usuarios, papel de plataforma, permissoes, modulos contratados, catalogo, auditoria, guards, bloqueios, paginacao inicial e inativacao operacional ja possuem API e telas principais. |
+| FP Connect Admin Console | Alta | 2 | Base funcional estabilizada | Empresas, usuarios, papel de plataforma, permissoes, modulos contratados, suporte por carteira, catalogo, auditoria, guards, bloqueios, paginacao inicial e inativacao operacional ja possuem API e telas principais. |
 | FP Robots | Alta | 1 | Shell criado | Rota `/robots`, menu, layout inicial e fronteira conceitual com FP Gateway criados; falta dominio funcional e persistencia. |
 | FP Food | Alta | 0 | Fundacao de acesso preparada | Endpoint interno `/api/food/access` ja valida empresa, modulo contratado e permissao; deve nascer como frontend separado quando entrar em desenvolvimento. |
 | FP Tracking | Alta | 0 | Fundacao de acesso preparada | Endpoint interno `/api/tracking/access` ja valida empresa, modulo contratado e permissao; deve nascer como frontend separado quando entrar em desenvolvimento. |
@@ -79,7 +79,7 @@ Este arquivo controla o avanco dos modulos do ecossistema.
 - [x] Cadastro contextual de usuarios no detalhe da empresa
 - [x] Edicao/inativacao contextual de vinculo empresarial
 - [ ] CRUD separado para usuarios do Console
-- [ ] Vinculo de suporte por carteira de empresa
+- [x] Vinculo simples de suporte por carteira de empresa
 - [ ] Smoke test manual dos fluxos principais
 
 ---

@@ -287,6 +287,10 @@ export type UpdateAdminCompanyUserInput = {
   isPrimaryContact: boolean;
 };
 
+export type LinkAdminCompanySupportInput = {
+  userId: string;
+};
+
 export type UpdateAdminUserInput = {
   fullName: string;
   email: string;

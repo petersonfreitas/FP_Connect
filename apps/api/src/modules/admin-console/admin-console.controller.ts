@@ -9,6 +9,7 @@ import type {
   CreateAdminCompanyInput,
   CreateAdminUserInput,
   GrantAdminUserRoleInput,
+  LinkAdminCompanySupportInput,
   RevokeAdminUserRoleInput,
   UpdateAdminCompanyUserInput,
   UpdateAdminCompanyInput,
@@ -88,6 +89,12 @@ export class AdminConsoleController {
     return this.adminConsole.listCompanyUsers(id);
   }
 
+  @Get("companies/:id/support-candidates")
+  @AdminConsolePolicy({ companyParam: "id", permissionKey: "admin.users.manage" })
+  listCompanySupportCandidates(@Param("id") id: string) {
+    return this.adminConsole.listCompanySupportCandidates(id);
+  }
+
   @Get("companies/:companyId/users/:userId/access")
   @AdminConsolePolicy({ companyParam: "companyId", permissionKey: "admin.users.manage" })
   getCompanyUserAccess(@Param("companyId") companyId: string, @Param("userId") userId: string) {
@@ -141,6 +148,16 @@ export class AdminConsoleController {
       input,
       readInternalApiContext(headers)
     );
+  }
+
+  @Post("companies/:id/support")
+  @AdminConsolePolicy({ companyParam: "id", permissionKey: "admin.users.manage" })
+  linkCompanySupport(
+    @Param("id") id: string,
+    @Body() input: LinkAdminCompanySupportInput,
+    @Headers() headers: Record<string, string | string[] | undefined>
+  ) {
+    return this.adminConsole.linkCompanySupport(id, input, readInternalApiContext(headers));
   }
 
   @Get("users")

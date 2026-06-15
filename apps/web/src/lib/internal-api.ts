@@ -24,6 +24,7 @@ import type {
   CreateAdminCompanyInput,
   CreateAdminUserInput,
   GrantAdminUserRoleInput,
+  LinkAdminCompanySupportInput,
   ModuleAccessContract,
   ModuleApplicationKey,
   PaginatedContract,
@@ -85,6 +86,14 @@ export async function listAdminCompanyUsers(
   companyId: string
 ): Promise<InternalApiResult<AdminCompanyUserContract[]>> {
   return fetchInternal<AdminCompanyUserContract[]>(`admin-console/companies/${companyId}/users`);
+}
+
+export async function listAdminCompanySupportCandidates(
+  companyId: string
+): Promise<InternalApiResult<AdminUserContract[]>> {
+  return fetchInternal<AdminUserContract[]>(
+    `admin-console/companies/${companyId}/support-candidates`
+  );
 }
 
 export async function listAdminCompanyApplications(
@@ -228,6 +237,16 @@ export async function updateAdminCompanyUserMembership(
       method: "PATCH"
     }
   );
+}
+
+export async function linkAdminCompanySupport(
+  companyId: string,
+  input: LinkAdminCompanySupportInput
+): Promise<InternalApiResult<AdminCompanyUserContract>> {
+  return fetchInternal<AdminCompanyUserContract>(`admin-console/companies/${companyId}/support`, {
+    body: JSON.stringify(input),
+    method: "POST"
+  });
 }
 
 export async function activateCurrentUserInvite(): Promise<

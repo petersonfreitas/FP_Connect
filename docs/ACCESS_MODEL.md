@@ -307,7 +307,7 @@ Antes de codar, o plano recomendado e:
 2. trocar a home global por portal contextual; [iniciado]
 3. gerar menus pelo contrato de acesso; [iniciado]
 4. separar CRUD de usuarios do Console e usuarios da empresa; [iniciado com cadastro e edicao contextual de vinculo no detalhe da empresa]
-5. modelar vinculos de suporte por empresa;
+5. modelar vinculos de suporte por empresa; [iniciado com modelo simples via `company_memberships` + papel `company-admin`]
 6. automatizar vinculo de suporte para superadmin ao cadastrar empresa;
 7. permitir delegacao de suporte por carteira para admins do Console;
 8. manter backend/policies como fonte real de seguranca.
@@ -319,8 +319,8 @@ Antes de codar, o plano recomendado e:
 Pontos ainda a detalhar antes da migration definitiva:
 
 - nome final da tabela de acesso de plataforma;
-- nome final da tabela ou atributo para carteira de suporte;
-- se suporte sera um tipo de `company_membership` ou uma tabela propria de atribuicao;
+- nome final da tabela ou atributo definitivo para carteira de suporte;
+- se suporte permanecera como tipo operacional de `company_membership` ou evoluira para uma tabela propria de atribuicao;
 - quais papeis globais entram no MVP do Console;
 - quais acoes de alto risco exigem permissao adicional mesmo para suporte;
 - como o futuro FP Suporte consumira a carteira de atendimento.

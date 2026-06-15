@@ -151,6 +151,7 @@ Status inicial:
 - CRUD central de usuarios ja permite ajustar papel de plataforma; CRUD separado por contexto ainda deve ser refinado.
 - cadastro de usuario da empresa ja nasce no detalhe da empresa, mantendo `/cadastro/usuarios` como gestao central de perfis.
 - edicao de status e contato principal do vinculo empresarial ja ocorre no contexto empresa/usuario.
+- vinculo simples de suporte por carteira usa `company_memberships` e concede o papel `company-admin` do Admin Console para usuarios `super_admin`, `fp_admin` ou `support` ativos.
 
 ### Bloco B - Shell dos modulos prioritarios
 

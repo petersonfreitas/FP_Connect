@@ -38,6 +38,7 @@ import type {
   CreateAdminCompanyInput,
   CreateAdminUserInput,
   GrantAdminUserRoleInput,
+  LinkAdminCompanySupportInput,
   ResendAdminUserInviteContract,
   RevokeAdminUserRoleContract,
   RevokeAdminUserRoleInput,
@@ -218,6 +219,7 @@ const basicPlanApplicationSelect = "basic_plan_id,application_id";
 const defaultPage = 1;
 const defaultPageSize = 20;
 const maxPageSize = 100;
+const supportAssignmentRoles = new Set<UserGlobalRole>(["super_admin", "fp_admin", "support"]);
 
 @Injectable()
 export class AdminConsoleService {
@@ -596,22 +598,106 @@ export class AdminConsoleService {
   }
 
   async listCompanyUsers(companyId: string): Promise<AdminCompanyUserContract[]> {
-    if (!isUuid(companyId)) {
-      throw new BadRequestException("Invalid company id");
-    }
+    const normalizedCompanyId = normalizeUuid(companyId, "companyId");
+    const memberships = await this.listCompanyMembershipRows(normalizedCompanyId);
 
+    return this.hydrateCompanyUsers(memberships);
+  }
+
+  async listCompanySupportCandidates(companyId: string): Promise<AdminUserContract[]> {
+    const normalizedCompanyId = normalizeUuid(companyId, "companyId");
+    await this.ensureCompanyExists(normalizedCompanyId);
+
+    const memberships = await this.listCompanyMembershipRows(normalizedCompanyId);
+    const linkedUserIds = new Set(memberships.map((membership) => membership.user_id));
     const { data, error } = await this.supabase.core
-      .from("company_memberships")
-      .select("id,company_id,user_id,status,is_primary_contact")
-      .eq("company_id", companyId)
+      .from("profiles")
+      .select(userSelect)
+      .in("global_role", Array.from(supportAssignmentRoles))
+      .eq("status", "active")
       .is("deleted_at", null)
-      .order("created_at", { ascending: false });
+      .order("full_name", { ascending: true });
 
     if (error) {
       throwSupabaseError(error);
     }
 
-    return this.hydrateCompanyUsers((data ?? []) as CompanyUserRow[]);
+    return ((data ?? []) as UserRow[])
+      .map(mapUser)
+      .filter((user) => !linkedUserIds.has(user.id));
+  }
+
+  async linkCompanySupport(
+    companyId: string,
+    input: LinkAdminCompanySupportInput,
+    context: InternalApiContext = emptyInternalApiContext
+  ): Promise<AdminCompanyUserContract> {
+    const normalizedCompanyId = normalizeUuid(companyId, "companyId");
+    const normalizedUserId = normalizeUuid(input.userId, "userId");
+    await this.ensureCompanyExists(normalizedCompanyId);
+
+    const user = await this.getUser(normalizedUserId);
+
+    if (!supportAssignmentRoles.has(user.globalRole)) {
+      throw new BadRequestException(
+        "Usuario precisa ter papel super_admin, fp_admin ou support para virar suporte da empresa"
+      );
+    }
+
+    if (user.status !== "active") {
+      throw new BadRequestException("Usuario de suporte precisa estar ativo");
+    }
+
+    const companyAdminRole = await this.getRoleByApplicationKey("admin-console", "company-admin");
+    const companyApplication = await this.getCurrentCompanyApplication(
+      normalizedCompanyId,
+      companyAdminRole.application_id
+    );
+
+    if (!companyApplication || !isGrantableCompanyApplicationStatus(companyApplication.status)) {
+      throw new BadRequestException(
+        "Admin Console precisa estar contratado e em implantacao ou ativo para vincular suporte administrativo"
+      );
+    }
+
+    const currentMembership = await this.getOptionalCompanyMembership(
+      normalizedCompanyId,
+      normalizedUserId
+    );
+    const now = new Date().toISOString();
+    const membership = currentMembership
+      ? await this.updateSupportMembership(currentMembership, now)
+      : await this.createSupportMembership(normalizedCompanyId, normalizedUserId, now);
+
+    await this.grantUserRole(
+      normalizedCompanyId,
+      normalizedUserId,
+      {
+        roleId: companyAdminRole.id
+      },
+      context
+    );
+
+    const [companyUser] = await this.hydrateCompanyUsers([membership]);
+
+    if (!companyUser) {
+      throw new NotFoundException("User profile not found");
+    }
+
+    await this.createAuditLog(
+      normalizedCompanyId,
+      "core.company_support.linked",
+      "company_memberships",
+      membership.id,
+      {
+        globalRole: user.globalRole,
+        previousMembershipStatus: currentMembership?.status ?? null,
+        userId: normalizedUserId
+      },
+      context
+    );
+
+    return companyUser;
   }
 
   async getCompanyUserAccess(
@@ -1488,6 +1574,21 @@ export class AdminConsoleService {
     return (data ?? []) as CompanyUserRow[];
   }
 
+  private async listCompanyMembershipRows(companyId: string): Promise<CompanyUserRow[]> {
+    const { data, error } = await this.supabase.core
+      .from("company_memberships")
+      .select("id,company_id,user_id,status,is_primary_contact")
+      .eq("company_id", companyId)
+      .is("deleted_at", null)
+      .order("created_at", { ascending: false });
+
+    if (error) {
+      throwSupabaseError(error);
+    }
+
+    return (data ?? []) as CompanyUserRow[];
+  }
+
   private async getCompanyMembership(companyId: string, userId: string): Promise<CompanyUserRow> {
     const { data, error } = await this.supabase.core
       .from("company_memberships")
@@ -1503,6 +1604,72 @@ export class AdminConsoleService {
 
     if (!data) {
       throw new NotFoundException("Company user membership not found");
+    }
+
+    return data as CompanyUserRow;
+  }
+
+  private async getOptionalCompanyMembership(
+    companyId: string,
+    userId: string
+  ): Promise<CompanyUserRow | null> {
+    const { data, error } = await this.supabase.core
+      .from("company_memberships")
+      .select("id,company_id,user_id,status,is_primary_contact")
+      .eq("company_id", companyId)
+      .eq("user_id", userId)
+      .is("deleted_at", null)
+      .maybeSingle();
+
+    if (error) {
+      throwSupabaseError(error);
+    }
+
+    return (data as CompanyUserRow | null) ?? null;
+  }
+
+  private async createSupportMembership(
+    companyId: string,
+    userId: string,
+    now: string
+  ): Promise<CompanyUserRow> {
+    const { data, error } = await this.supabase.core
+      .from("company_memberships")
+      .insert({
+        accepted_at: now,
+        company_id: companyId,
+        is_primary_contact: false,
+        status: "active",
+        user_id: userId
+      })
+      .select("id,company_id,user_id,status,is_primary_contact")
+      .single();
+
+    if (error) {
+      throwSupabaseError(error);
+    }
+
+    return data as CompanyUserRow;
+  }
+
+  private async updateSupportMembership(
+    membership: CompanyUserRow,
+    now: string
+  ): Promise<CompanyUserRow> {
+    const { data, error } = await this.supabase.core
+      .from("company_memberships")
+      .update({
+        accepted_at: now,
+        is_primary_contact: false,
+        status: "active"
+      })
+      .eq("id", membership.id)
+      .is("deleted_at", null)
+      .select("id,company_id,user_id,status,is_primary_contact")
+      .single();
+
+    if (error) {
+      throwSupabaseError(error);
     }
 
     return data as CompanyUserRow;
@@ -1583,6 +1750,25 @@ export class AdminConsoleService {
     return data as ApplicationRow;
   }
 
+  private async getApplicationByKey(applicationKey: string): Promise<ApplicationRow> {
+    const { data, error } = await this.supabase.core
+      .from("applications")
+      .select(applicationSelect)
+      .eq("key", applicationKey)
+      .is("deleted_at", null)
+      .maybeSingle();
+
+    if (error) {
+      throwSupabaseError(error);
+    }
+
+    if (!data) {
+      throw new NotFoundException("Application not found");
+    }
+
+    return data as ApplicationRow;
+  }
+
   private async listApplicationsById(applicationIds: string[]): Promise<Map<string, ApplicationRow>> {
     if (applicationIds.length === 0) {
       return new Map();
@@ -1625,6 +1811,30 @@ export class AdminConsoleService {
       .from("roles")
       .select(roleSelect)
       .eq("id", roleId)
+      .is("deleted_at", null)
+      .maybeSingle();
+
+    if (error) {
+      throwSupabaseError(error);
+    }
+
+    if (!data) {
+      throw new NotFoundException("Role not found");
+    }
+
+    return data as RoleRow;
+  }
+
+  private async getRoleByApplicationKey(
+    applicationKey: string,
+    roleKey: string
+  ): Promise<RoleRow> {
+    const application = await this.getApplicationByKey(applicationKey);
+    const { data, error } = await this.supabase.core
+      .from("roles")
+      .select(roleSelect)
+      .eq("application_id", application.id)
+      .eq("key", roleKey)
       .is("deleted_at", null)
       .maybeSingle();
 
@@ -2255,6 +2465,7 @@ function getAuditScopeActions(scope: AdminAuditScope): string[] | null {
 
   if (scope === "users") {
     return [
+      "core.company_support.linked",
       "core.company_membership.updated",
       "core.user.invited",
       "core.user.updated",
