@@ -115,64 +115,63 @@ a {
   color: #ffffff;
 }
 
-.sidebar-foot {
+.workspace-account {
   align-items: center;
-  border-top: 1px solid rgb(255 255 255 / 14%);
-  color: rgb(255 255 255 / 76%);
-  display: grid;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  color: var(--muted);
+  display: flex;
   font-size: 13px;
-  grid-template-columns: 40px minmax(0, 1fr);
   gap: 12px;
-  margin-top: auto;
-  padding-top: 20px;
+  margin: 0 0 20px auto;
+  max-width: 1180px;
+  padding: 8px;
+  width: fit-content;
 }
 
-.sidebar-foot img {
-  background: rgb(255 255 255 / 9%);
+.workspace-account img {
+  background: var(--accent-soft);
   border-radius: 8px;
   padding: 6px;
 }
 
-.sidebar-user {
+.workspace-user {
   display: grid;
   gap: 2px;
   min-width: 0;
 }
 
-.sidebar-user span,
-.sidebar-user small {
+.workspace-user span,
+.workspace-user small {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-.sidebar-user span {
-  color: #ffffff;
+.workspace-user span {
+  color: var(--foreground);
   font-weight: 700;
 }
 
-.sidebar-user small {
-  color: rgb(255 255 255 / 58%);
-}
-
-.sidebar-foot form {
-  grid-column: 1 / -1;
+.workspace-user small {
+  color: var(--muted);
 }
 
 .logout-button {
-  background: rgb(255 255 255 / 8%);
-  border: 1px solid rgb(255 255 255 / 16%);
+  background: var(--accent);
+  border: 1px solid var(--accent);
   border-radius: 8px;
   color: #ffffff;
   cursor: pointer;
   font: inherit;
   font-weight: 800;
   padding: 9px 12px;
-  width: 100%;
 }
 
 .logout-button:hover {
-  background: rgb(255 255 255 / 14%);
+  background: var(--accent-strong);
+  border-color: var(--accent-strong);
 }
 
 .workspace {
@@ -1271,12 +1270,13 @@ button:disabled {
     min-height: auto;
   }
 
-  .sidebar-foot {
-    display: none;
-  }
-
   .workspace {
     padding: 24px;
+  }
+
+  .workspace-account {
+    justify-self: stretch;
+    width: 100%;
   }
 
   .hero {

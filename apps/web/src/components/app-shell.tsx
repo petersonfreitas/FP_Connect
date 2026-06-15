@@ -57,9 +57,12 @@ export async function AppShell({ access, activePath = "/", children }: AppShellP
             </details>
           ))}
         </nav>
-        <div className="sidebar-foot">
-          <Image src="/brand/icon.png" alt="" width={40} height={40} />
-          <div className="sidebar-user">
+      </aside>
+
+      <section className="workspace">
+        <div className="workspace-account" aria-label="Usuario logado">
+          <Image src="/brand/icon.png" alt="" width={36} height={36} />
+          <div className="workspace-user">
             <span>{user.email ?? "Usuario autenticado"}</span>
             <small>FP Connect Foundation</small>
           </div>
@@ -69,9 +72,8 @@ export async function AppShell({ access, activePath = "/", children }: AppShellP
             </PendingSubmitButton>
           </form>
         </div>
-      </aside>
-
-      <section className="workspace">{children}</section>
+        {children}
+      </section>
     </main>
   );
 }
