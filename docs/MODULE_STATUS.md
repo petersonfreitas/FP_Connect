@@ -18,14 +18,19 @@ Este arquivo controla o avanco dos modulos do ecossistema.
 
 | Modulo | Prioridade atual | Nivel | Status | Observacao |
 |---|---:|---:|---|---|
-| FP Connect Admin Console | Alta | 2 | Base funcional em fechamento | Empresas, usuarios, permissoes, modulos contratados, catalogo e auditoria ja possuem API e telas principais. |
-| FP Robots | Alta | 0 | Nao iniciado | Proximo modulo de plataforma recomendado apos hardening final do Admin Console. |
-| FP Food | Alta | 0 | Nao iniciado | Deve nascer como frontend separado quando entrar em desenvolvimento. |
-| FP Tracking | Alta | 0 | Nao iniciado | Deve nascer como frontend separado quando entrar em desenvolvimento. |
-| FP Billing | Futura | 0 | Aguardando fase posterior | Entrara apos base operacional. |
-| FP Tickets | Futura | 0 | Aguardando fase posterior | Entrara apos base operacional. |
-| FP Sales | Futura | 0 | Aguardando fase posterior | Entrara apos base operacional. |
-| FP Marketing | Futura | 0 | Aguardando fase posterior | Entrara apos base operacional. |
+| FP Connect Admin Console | Alta | 2 | Base funcional estabilizada | Empresas, usuarios, permissoes, modulos contratados, catalogo, auditoria, guards, bloqueios, paginacao inicial e inativacao operacional ja possuem API e telas principais. |
+| FP Robots | Alta | 1 | Shell criado | Rota `/robots`, menu, layout inicial e fronteira conceitual com FP Gateway criados; falta dominio funcional e persistencia. |
+| FP Food | Alta | 0 | Fundacao de acesso preparada | Endpoint interno `/api/food/access` ja valida empresa, modulo contratado e permissao; deve nascer como frontend separado quando entrar em desenvolvimento. |
+| FP Tracking | Alta | 0 | Fundacao de acesso preparada | Endpoint interno `/api/tracking/access` ja valida empresa, modulo contratado e permissao; deve nascer como frontend separado quando entrar em desenvolvimento. |
+| FP Billing | Futura | 0 | Fundacao de acesso preparada | Endpoint interno `/api/billing/access` ja valida empresa, modulo contratado e permissao; entrara apos base operacional. |
+| FP Tickets | Futura | 0 | Fundacao de acesso preparada | Endpoint interno `/api/tickets/access` ja valida empresa, modulo contratado e permissao; entrara apos base operacional. |
+| FP Sales | Futura | 0 | Fundacao de acesso preparada | Endpoint interno `/api/sales/access` ja valida empresa, modulo contratado e permissao; entrara apos base operacional. |
+| FP Marketing | Futura | 0 | Fundacao de acesso preparada | Endpoint interno `/api/marketing/access` ja valida empresa, modulo contratado e permissao; entrara apos base operacional. |
+| FP Gateway | Alta | 0 | Backlog criado | Integracoes externas, credenciais, OAuth, pagamentos, Mercado Pago, WhatsApp e Meta; LinkedIn e gov.br fora do escopo inicial. |
+| FP Fiscal | Alta/Media | 0 | Backlog criado | Modulo fiscal proprio, com foco inicial na evolucao fiscal do FP Food. |
+| FP Sign | Media | 0 | Backlog criado | Aceite simples, contratos, propostas e arquivamento documental; sem assinatura digital avancada no MVP. |
+| FP BI | Media/Baixa | 0 | Backlog criado | Indicadores e dashboards; evoluir apos maturidade dos modulos transacionais. |
+| FP Router | Baixa | 0 | Backlog criado | Complemento futuro do FP Tracking; absorve o antigo conceito EixoGuard. |
 | FP Monitor | Plataforma/Futura | 0 | Deferido | Modulo de observabilidade de APIs, servicos, integracoes e incidentes; pode antecipar se houver necessidade operacional. |
 
 ---
@@ -61,15 +66,26 @@ Este arquivo controla o avanco dos modulos do ecossistema.
 - [x] Envio efetivo de convite/ativacao de usuarios por e-mail
 - [x] Reenvio de convite para usuarios pendentes
 - [x] Ativacao de perfil e vinculos pendentes apos definicao de senha
-- [ ] Completar guards/policies em rotas globais, empresas, permissao e modulo
-- [ ] Bloqueio efetivo por empresa/modulo em todas as rotas sensiveis
-- [ ] Soft delete/inativacao exposto na UI quando autorizado
+- [x] Policies explicitas em rotas globais, empresas, permissoes e modulos do Admin Console
+- [x] Bloqueio efetivo por modulo contratado nos endpoints internos de acesso dos produtos operacionais
+- [x] Inativacao operacional de empresas e usuarios exposta na UI administrativa
+- [x] Paginacao nas listagens principais de empresas e usuarios
+- [x] Bloqueio visual de botoes enquanto formularios e acoes em lote processam
+- [x] Modelo documental de acesso, plataforma, empresas e suporte operacional
+- [x] Contrato inicial de acesso do usuario atual
+- [x] Portal inicial contextual por escopo de acesso
+- [x] Menu gerado conforme permissoes reais do usuario
+- [ ] CRUD separado para usuarios do Console
+- [ ] CRUD de usuarios da empresa no detalhe da empresa
+- [ ] Vinculo de suporte por carteira de empresa
 - [ ] Smoke test manual dos fluxos principais
 
 ---
 
 ## Checklist - FP Robots
 
+- [x] Shell visual V0
+- [x] Separacao conceitual entre orquestracao do Robots e provedores externos via futuro FP Gateway
 - [ ] Estrutura do modulo
 - [ ] Registro de eventos
 - [ ] Outbox/event log
@@ -120,11 +136,11 @@ Este arquivo controla o avanco dos modulos do ecossistema.
 
 ## Proximo marco recomendado
 
-Antes de abrir implementacao pesada em Robots, Food e Tracking, fechar o hardening da fundacao:
+Antes de abrir implementacao pesada em Robots, Food e Tracking, concluir a validacao final da fundacao:
 
-1. aplicar guards/policies reais nas rotas sensiveis;
-2. resolver empresa/contexto ativo para autorizacao;
-3. validar smoke test completo de empresas, usuarios, permissoes, modulos e auditoria.
+1. ajustar portal inicial, menus e CRUDs de usuario conforme `docs/ACCESS_MODEL.md`;
+2. executar smoke test completo de empresas, usuarios, permissoes, modulos e auditoria;
+3. evoluir o FP Robots para contratos de eventos e event log quando a fundacao estiver validada.
 
 ---
 

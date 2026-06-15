@@ -33,14 +33,26 @@ Ja existe base funcional para:
 - refresh de sessao por refresh token HttpOnly no proxy do Next;
 - contrato de performance/seguranca para consultas Supabase;
 - `actor_user_id` real enviado pelo Next para a API interna em mutacoes auditadas;
+- guards/policies explicitos nas rotas do Admin Console, com rotas globais super-admin only e rotas por empresa validadas por permissao e modulo contratado;
+- bloqueio efetivo por modulo contratado nos endpoints internos de acesso dos produtos operacionais;
+- inativacao operacional de empresas e usuarios pela UI administrativa;
+- paginacao nas listagens principais de empresas e usuarios;
+- bloqueio visual de botoes enquanto formularios e acoes em lote estao processando;
+- contrato de acesso do usuario atual para portal contextual e menu permissionado;
+- home contextual que evita carregar overview global para usuarios sem perfil superadmin;
 - API Nest interna consumida pelo Next server-side.
 
 Ainda precisam ser amadurecidos antes de entrar pesado nos modulos operacionais:
 
-- guards/policies completos alem do token interno;
-- fluxos de inativacao/soft delete na UI;
-- smoke tests manuais dos fluxos principais;
-- shell dos modulos Robots, Food e Tracking.
+- smoke tests manuais dos fluxos principais, pendentes enquanto o acesso ao Supabase estiver instavel;
+- CRUD separado para usuarios do Console e usuarios da empresa;
+- carteira de suporte por empresa;
+- shell dos modulos Food e Tracking;
+- separacao conceitual entre FP Robots e o futuro FP Gateway.
+
+O shell V0 do FP Robots ja possui rota `/robots`, entrada no menu, tela inicial, secoes planejadas e estado vazio sem persistencia nova.
+
+Nota de arquitetura futura: o FP Robots deve orquestrar eventos, regras, acoes, execucoes, falhas e reprocessamentos. O futuro FP Gateway devera encapsular provedores externos como WhatsApp, Instagram, Facebook, Ads, Mercado Pago, PagSeguro e canais equivalentes, sem transferir para ele a decisao de negocio das automacoes.
 
 ## Comandos
 
@@ -96,12 +108,13 @@ Se no futuro houver cliente Supabase direto no navegador, somente variaveis com 
 Endpoints internos atuais do Admin Console:
 
 - `GET /api/admin-console/overview`
+- `GET /api/admin-console/users/me/access`
 - `GET /api/admin-console/applications`
 - `GET /api/admin-console/basic-plans`
 - `GET /api/admin-console/catalog`
 - `GET /api/admin-console/contracted-modules`
 - `GET /api/admin-console/audit-logs`
-- `GET /api/admin-console/companies`
+- `GET /api/admin-console/companies?page=1&pageSize=20`
 - `GET /api/admin-console/companies/:id`
 - `GET /api/admin-console/companies/:id/users`
 - `GET /api/admin-console/companies/:id/applications`
@@ -109,7 +122,7 @@ Endpoints internos atuais do Admin Console:
 - `PATCH /api/admin-console/companies/:id`
 - `POST /api/admin-console/companies/:id/applications`
 - `POST /api/admin-console/companies/:id/applications/bulk`
-- `GET /api/admin-console/users`
+- `GET /api/admin-console/users?page=1&pageSize=20`
 - `GET /api/admin-console/users/:id`
 - `POST /api/admin-console/users`
 - `PATCH /api/admin-console/users/:id`
@@ -121,9 +134,21 @@ Endpoints internos atuais do Admin Console:
 - `POST /api/admin-console/companies/:companyId/users/:userId/roles/revoke`
 - `POST /api/admin-console/companies/:companyId/users/:userId/roles/revoke-bulk`
 
+Endpoints internos de acesso aos modulos operacionais:
+
+- `GET /api/billing/access`
+- `GET /api/food/access`
+- `GET /api/marketing/access`
+- `GET /api/robots/access`
+- `GET /api/sales/access`
+- `GET /api/tickets/access`
+- `GET /api/tracking/access`
+
 Essas rotas usam Supabase server-side com `SUPABASE_SERVICE_ROLE_KEY` e exigem o header `X-FP-Internal-Token` com o valor de `FP_INTERNAL_API_TOKEN`.
 
 As rotas do Admin Console tambem exigem `X-FP-Actor-User-Id` apontando para um usuario ativo no `core.profiles`. `super_admin` possui bypass global. Rotas com contexto de empresa podem usar policies granulares por permissao, como `admin.companies.read`, `admin.companies.manage`, `admin.users.manage` e `admin.modules.manage`. Rotas globais continuam restritas a super-admin.
+
+As rotas internas dos modulos tambem exigem `X-FP-Actor-User-Id` e `X-FP-Company-Id`. A empresa precisa estar ativa, o modulo precisa estar contratado e ativo, e usuarios comuns precisam possuir a permissao do modulo. `super_admin` ignora a permissao granular, mas nao ignora o bloqueio por modulo contratado.
 
 Em desenvolvimento local, o padrao esperado para o frontend chamar a API e:
 
@@ -167,8 +192,11 @@ Fluxo recomendado para primeiro acesso:
 ## Documentacao viva
 
 - `docs/ARCHITECTURE.md`: contrato tecnico do ecossistema.
+- `docs/ACCESS_MODEL.md`: modelo de identidade, acesso de plataforma, empresas, modulos e suporte operacional.
+- `docs/ATUALIZACOES_DOCUMENTOS_BASE_FPWEBTECH_v1.0.0.md`: plano fonte de atualizacao dos documentos-base.
 - `docs/DECISIONS.md`: decisoes arquiteturais aprovadas.
 - `docs/PERFORMANCE_SECURITY.md`: padrao de consultas Supabase com seguranca.
 - `docs/ROADMAP.md`: plano macro e proximos passos.
 - `docs/MODULE_STATUS.md`: maturidade atual dos modulos.
+- `docs/backlog/00.indice_backlogs_pendentes_fpwebtech_v1.0.0.md`: indice dos backlogs pendentes formalizados.
 - `docs/backlog/*.md`: fonte funcional de escopo por modulo.

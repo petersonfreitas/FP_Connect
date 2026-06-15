@@ -2,6 +2,7 @@
 
 import type { AdminCompanyApplicationContract, CompanyApplicationStatus } from "@fp/types";
 import { useMemo, useState } from "react";
+import { PendingSubmitButton } from "@/components/pending-submit-button";
 
 type CompanyModulesTableProps = {
   action: (formData: FormData) => void | Promise<void>;
@@ -66,9 +67,9 @@ export function CompanyModulesTable({ action, applications }: CompanyModulesTabl
           Observacoes
           <input maxLength={1000} name="implementationNotes" placeholder="Opcional" />
         </label>
-        <button className="primary-action" disabled={selectedCount === 0} type="submit">
+        <PendingSubmitButton disabled={selectedCount === 0} pendingLabel="Aplicando...">
           Aplicar em lote
-        </button>
+        </PendingSubmitButton>
       </div>
 
       <div className="modules-table" role="table" aria-label="Modulos contratados">

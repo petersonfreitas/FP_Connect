@@ -68,8 +68,16 @@ export class AdminConsoleAccessGuard implements CanActivate {
       [context.getHandler(), context.getClass()]
     );
 
-    if (!policy?.permissionKey || (!policy.companyParam && !policy.companyBody)) {
+    if (policy?.authenticatedOnly) {
+      return true;
+    }
+
+    if (policy?.superAdminOnly) {
       throw new ForbiddenException("Admin Console requires an active super-admin user");
+    }
+
+    if (!policy?.permissionKey || (!policy.companyParam && !policy.companyBody)) {
+      throw new ForbiddenException("Admin Console route policy is incomplete");
     }
 
     const companyId = policy.companyParam

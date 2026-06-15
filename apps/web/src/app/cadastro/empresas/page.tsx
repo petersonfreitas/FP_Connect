@@ -1,8 +1,16 @@
 import Link from "next/link";
 import { AppShell } from "@/components/app-shell";
+import { PaginationControls } from "@/components/pagination-controls";
 import { listAdminCompanies } from "@/lib/internal-api";
 
 export const dynamic = "force-dynamic";
+const pageSize = 20;
+
+type CompaniesPageProps = {
+  searchParams?: Promise<{
+    page?: string;
+  }>;
+};
 
 const statusLabels = {
   active: "Ativa",
@@ -16,9 +24,12 @@ const personTypeLabels = {
   legal_entity: "Pessoa Juridica"
 };
 
-export default async function CompaniesPage() {
-  const companiesResult = await listAdminCompanies();
-  const companies = companiesResult.data ?? [];
+export default async function CompaniesPage({ searchParams }: CompaniesPageProps) {
+  const query = searchParams ? await searchParams : {};
+  const page = normalizePage(query.page);
+  const companiesResult = await listAdminCompanies({ page, pageSize });
+  const pagination = companiesResult.data;
+  const companies = pagination?.items ?? [];
 
   return (
     <AppShell activePath="/cadastro/empresas">
@@ -45,7 +56,7 @@ export default async function CompaniesPage() {
             <h1>Empresas cadastradas</h1>
             <p>Base central do Admin Console para liberar usuarios, modulos e permissoes.</p>
           </div>
-          <span>{companies.length} registro(s)</span>
+          <span>{pagination?.total ?? 0} registro(s)</span>
         </div>
 
         {companies.length > 0 ? (
@@ -77,9 +88,24 @@ export default async function CompaniesPage() {
             Admin Console.
           </div>
         )}
+
+        {pagination ? (
+          <PaginationControls
+            basePath="/cadastro/empresas"
+            page={pagination.page}
+            pageSize={pagination.pageSize}
+            total={pagination.total}
+            totalPages={pagination.totalPages}
+          />
+        ) : null}
       </section>
     </AppShell>
   );
+}
+
+function normalizePage(value: string | undefined): number {
+  const page = Number(value);
+  return Number.isInteger(page) && page > 0 ? page : 1;
 }
 
 function formatDocument(value: string | null, personType: "individual" | "legal_entity"): string {

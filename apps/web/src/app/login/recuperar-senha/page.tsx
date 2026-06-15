@@ -1,6 +1,7 @@
 import Image from "next/image";
 import Link from "next/link";
 import { redirect } from "next/navigation";
+import { PendingSubmitButton } from "@/components/pending-submit-button";
 import { requestPasswordRecoveryAction } from "@/lib/auth-actions";
 import { getCurrentUser } from "@/lib/auth";
 
@@ -51,9 +52,7 @@ export default async function RecoverPasswordPage({ searchParams }: RecoverPassw
             E-mail
             <input autoComplete="email" maxLength={254} name="email" required type="email" />
           </label>
-          <button className="primary-action" type="submit">
-            Enviar link
-          </button>
+          <PendingSubmitButton pendingLabel="Enviando...">Enviar link</PendingSubmitButton>
         </form>
 
         <Link className="auth-link" href="/login">

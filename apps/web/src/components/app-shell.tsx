@@ -1,35 +1,27 @@
 import Image from "next/image";
 import Link from "next/link";
 import type { ReactNode } from "react";
+import type { AdminCurrentUserAccessContract, AdminNavigationContract } from "@fp/types";
+import { PendingSubmitButton } from "@/components/pending-submit-button";
 import { signOutAction } from "@/lib/auth-actions";
 import { requireCurrentUser } from "@/lib/auth";
+import { getCurrentAdminAccess } from "@/lib/internal-api";
 
 type AppShellProps = {
   activePath?: string;
+  access?: AdminCurrentUserAccessContract | null;
   children: ReactNode;
 };
 
-const cadastroItems = [
-  { href: "/cadastro/empresas", label: "Empresas" },
-  { href: "/cadastro/usuarios", label: "Usuarios" },
-  { href: "/cadastro/planos", label: "Planos" },
-  { href: "/cadastro/modulos", label: "Modulos" }
-];
+const fallbackNavigation: AdminNavigationContract = {
+  primary: [{ href: "/", label: "Portal" }],
+  groups: []
+};
 
-const movimentacaoItems = [
-  { href: "/movimentacao/modulos-contratados", label: "Modulos contratados" }
-];
-
-const auditoriaItems = [
-  { href: "/auditoria", label: "Visao geral" },
-  { href: "/auditoria/empresas", label: "Empresas" },
-  { href: "/auditoria/usuarios", label: "Usuarios" },
-  { href: "/auditoria/modulos", label: "Modulos e permissoes" },
-  { href: "/auditoria/sistema", label: "Sistema" }
-];
-
-export async function AppShell({ activePath = "/", children }: AppShellProps) {
+export async function AppShell({ access, activePath = "/", children }: AppShellProps) {
   const user = await requireCurrentUser();
+  const accessResult = access === undefined ? await getCurrentAdminAccess() : null;
+  const navigation = access?.navigation ?? accessResult?.data?.navigation ?? fallbackNavigation;
 
   return (
     <main className="app-shell">
@@ -38,54 +30,32 @@ export async function AppShell({ activePath = "/", children }: AppShellProps) {
           <Image src="/brand/logo-b.png" alt="FP WebTech" width={270} height={95} priority />
         </div>
         <nav className="nav-list">
-          <Link className={activePath === "/" ? "nav-item active" : "nav-item"} href="/">
-            Portal
-          </Link>
+          {navigation.primary.map((item) => (
+            <Link
+              className={activePath === item.href ? "nav-item active" : "nav-item"}
+              href={item.href}
+              key={item.href}
+            >
+              {item.label}
+            </Link>
+          ))}
 
-          <details className="nav-group" open>
-            <summary>Cadastro</summary>
-            <div className="nav-group-items">
-              {cadastroItems.map((item) => (
-                <Link
-                  className={activePath === item.href ? "nav-item active" : "nav-item"}
-                  href={item.href}
-                  key={item.label}
-                >
-                  {item.label}
-                </Link>
-              ))}
-            </div>
-          </details>
-
-          <details className="nav-group" open>
-            <summary>Movimentacao</summary>
-            <div className="nav-group-items">
-              {movimentacaoItems.map((item) => (
-                <Link
-                  className={activePath === item.href ? "nav-item active" : "nav-item"}
-                  href={item.href}
-                  key={item.label}
-                >
-                  {item.label}
-                </Link>
-              ))}
-            </div>
-          </details>
-
-          <details className="nav-group" open>
-            <summary>Auditoria</summary>
-            <div className="nav-group-items">
-              {auditoriaItems.map((item) => (
-                <Link
-                  className={activePath === item.href ? "nav-item active" : "nav-item"}
-                  href={item.href}
-                  key={item.label}
-                >
-                  {item.label}
-                </Link>
-              ))}
-            </div>
-          </details>
+          {navigation.groups.map((group) => (
+            <details className="nav-group" key={group.label} open>
+              <summary>{group.label}</summary>
+              <div className="nav-group-items">
+                {group.items.map((item) => (
+                  <Link
+                    className={activePath === item.href ? "nav-item active" : "nav-item"}
+                    href={item.href}
+                    key={`${group.label}:${item.href}:${item.label}`}
+                  >
+                    {item.label}
+                  </Link>
+                ))}
+              </div>
+            </details>
+          ))}
         </nav>
         <div className="sidebar-foot">
           <Image src="/brand/icon.png" alt="" width={40} height={40} />
@@ -94,9 +64,9 @@ export async function AppShell({ activePath = "/", children }: AppShellProps) {
             <small>FP Connect Foundation</small>
           </div>
           <form action={signOutAction}>
-            <button className="logout-button" type="submit">
+            <PendingSubmitButton className="logout-button" pendingLabel="Saindo...">
               Sair
-            </button>
+            </PendingSubmitButton>
           </form>
         </div>
       </aside>

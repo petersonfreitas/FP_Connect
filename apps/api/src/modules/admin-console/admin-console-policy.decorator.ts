@@ -3,9 +3,11 @@ import { SetMetadata } from "@nestjs/common";
 export const ADMIN_CONSOLE_POLICY_KEY = "adminConsolePolicy";
 
 export type AdminConsolePolicy = {
+  authenticatedOnly?: boolean;
   companyBody?: string;
   permissionKey?: AdminConsolePermissionKey;
   companyParam?: string;
+  superAdminOnly?: boolean;
 };
 
 export type AdminConsolePermissionKey =
@@ -18,4 +20,12 @@ export type AdminConsolePermissionKey =
 
 export function AdminConsolePolicy(policy: AdminConsolePolicy) {
   return SetMetadata(ADMIN_CONSOLE_POLICY_KEY, policy);
+}
+
+export function AdminConsoleSuperAdminOnly() {
+  return AdminConsolePolicy({ superAdminOnly: true });
+}
+
+export function AdminConsoleAuthenticatedOnly() {
+  return AdminConsolePolicy({ authenticatedOnly: true });
 }

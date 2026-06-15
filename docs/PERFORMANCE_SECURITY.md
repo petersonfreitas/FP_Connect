@@ -28,6 +28,7 @@ Isso significa:
 - `super_admin` possui bypass global;
 - rotas com contexto de empresa podem usar policies granulares por permissao;
 - rotas globais continuam restritas a super-admin;
+- endpoints internos de acesso dos produtos operacionais exigem empresa ativa, modulo contratado ativo e permissao do modulo; `super_admin` ignora permissao granular, mas nao ignora modulo contratado;
 - toda mutacao auditavel deve receber contexto de usuario autenticado.
 
 Quando houver cliente Supabase no navegador, a decisao deve ser explicita e a seguranca deve depender de RLS, escopo por empresa e permissoes.
@@ -41,7 +42,8 @@ Toda query nova deve seguir estes pontos:
 - aplicar escopo por `company_id` em entidades de negocio;
 - validar acesso antes de consultar dados sensiveis;
 - usar `limit` em listagens;
-- preferir paginacao por cursor/keyset quando houver ordenacao por data ou id;
+- usar paginacao com limite maximo definido pelo backend;
+- preferir cursor/keyset quando houver volume alto, ordenacao temporal intensa ou necessidade de evitar saltos em dados mutaveis;
 - evitar N+1; buscar ids em lote com `in(...)` quando apropriado;
 - retornar payload enxuto para listagens e detalhe separado para dados pesados;
 - usar `Promise.all` apenas para consultas independentes;
@@ -67,11 +69,17 @@ Listagens novas devem nascer paginadas.
 
 Padrao recomendado:
 
-- `limit` padrao entre 25 e 50;
+- `page` e `pageSize` sao aceitaveis para listagens administrativas de volume moderado;
+- `pageSize` padrao entre 20 e 50;
 - `limit` maximo definido pelo backend;
 - cursor por `created_at` e `id` quando a ordenacao for temporal;
 - filtros permitidos explicitamente no contrato;
-- retorno com `items` e `nextCursor`.
+- retorno com `items` e metadados de paginacao, como `page`, `pageSize`, `total` e `totalPages`, ou `nextCursor` em listagens por cursor.
+
+Estado atual:
+
+- empresas e usuarios do Admin Console usam `page`, `pageSize`, `total` e `totalPages`;
+- auditoria e modulos contratados ainda usam limite fixo/listagem simples e devem ser os proximos candidatos a paginacao quando o volume exigir.
 
 Listagens pequenas de catalogo global podem continuar sem paginacao enquanto tiverem volume controlado.
 
@@ -116,3 +124,14 @@ Antes de concluir uma entidade nova em qualquer schema de modulo:
 - [ ] listagens sao paginadas ou justificadamente pequenas;
 - [ ] API valida autenticacao, empresa, vinculo, permissao e modulo contratado;
 - [ ] frontend nao recebe segredos nem depende de regra critica visual.
+
+## UX de processamento
+
+Formularios e acoes que disparam chamadas server-side devem bloquear novo envio enquanto a solicitacao esta pendente.
+
+Padrao atual:
+
+- usar componente de submit com estado pendente quando a acao usa Server Action;
+- alterar o texto do botao para indicar processamento;
+- desabilitar botoes em acoes em lote quando nao houver selecao ou enquanto a acao estiver pendente;
+- usar modal/overlay apenas para operacoes longas, criticas ou com progresso real conhecido.

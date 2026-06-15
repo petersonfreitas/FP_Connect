@@ -4,10 +4,12 @@ import type {
   AdminBasicPlanContract,
   AdminCompanyContract,
   CnpjLookupContract,
+  CompanyStatus,
   CompanyPersonType
 } from "@fp/types";
 import { useState, type FormEvent } from "react";
 import { isValidCnpj, isValidCpf, normalizeBrazilPhone, onlyDigits } from "@/lib/br-documents";
+import { PendingSubmitButton } from "@/components/pending-submit-button";
 
 type CompanyFormProps = {
   action: (formData: FormData) => void | Promise<void>;
@@ -241,6 +243,19 @@ export function CompanyForm({
         </select>
       </label>
 
+      {company ? (
+        <label>
+          Status da empresa
+          <select name="status" defaultValue={company.status}>
+            {Object.entries(companyStatusLabels).map(([value, label]) => (
+              <option key={value} value={value}>
+                {label}
+              </option>
+            ))}
+          </select>
+        </label>
+      ) : null}
+
       <label>
         E-mail principal
         <input
@@ -417,9 +432,7 @@ export function CompanyForm({
         <a className="secondary-action" href={cancelHref}>
           Cancelar
         </a>
-        <button className="primary-action" type="submit">
-          {submitLabel}
-        </button>
+        <PendingSubmitButton pendingLabel="Salvando...">{submitLabel}</PendingSubmitButton>
       </div>
     </form>
   );
@@ -493,6 +506,13 @@ const streetTypes = [
   "Largo",
   "Outro"
 ];
+
+const companyStatusLabels: Record<CompanyStatus, string> = {
+  active: "Ativa",
+  cancelled: "Cancelada",
+  implementation: "Em implantacao",
+  suspended: "Suspensa"
+};
 
 const brazilianStates = [
   { uf: "AC", name: "Acre" },

@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation";
 import { AppShell } from "@/components/app-shell";
+import { PendingSubmitButton } from "@/components/pending-submit-button";
 import { createAdminUser, listAdminCompanies } from "@/lib/internal-api";
 
 export const dynamic = "force-dynamic";
@@ -12,8 +13,8 @@ type NewUserPageProps = {
 
 export default async function NewUserPage({ searchParams }: NewUserPageProps) {
   const params = await searchParams;
-  const companiesResult = await listAdminCompanies();
-  const companies = companiesResult.data ?? [];
+  const companiesResult = await listAdminCompanies({ pageSize: 100 });
+  const companies = companiesResult.data?.items ?? [];
 
   async function createUserAction(formData: FormData) {
     "use server";
@@ -99,9 +100,9 @@ export default async function NewUserPage({ searchParams }: NewUserPageProps) {
             <a className="secondary-action" href="/cadastro/usuarios">
               Cancelar
             </a>
-            <button className="primary-action" type="submit">
+            <PendingSubmitButton pendingLabel="Enviando convite...">
               Enviar convite
-            </button>
+            </PendingSubmitButton>
           </div>
         </form>
       </section>

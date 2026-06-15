@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation";
 import { AppShell } from "@/components/app-shell";
+import { PendingSubmitButton } from "@/components/pending-submit-button";
 import { getAdminUser, updateAdminUser } from "@/lib/internal-api";
 
 export const dynamic = "force-dynamic";
@@ -104,9 +105,9 @@ export default async function EditUserPage({ params, searchParams }: EditUserPag
               <a className="secondary-action" href="/cadastro/usuarios">
                 Cancelar
               </a>
-              <button className="primary-action" type="submit">
+              <PendingSubmitButton pendingLabel="Salvando...">
                 Salvar alteracoes
-              </button>
+              </PendingSubmitButton>
             </div>
           </form>
         </section>

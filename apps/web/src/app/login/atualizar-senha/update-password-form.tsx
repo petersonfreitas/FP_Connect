@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { PendingSubmitButton } from "@/components/pending-submit-button";
 import { updatePasswordWithRecoveryAction } from "@/lib/auth-actions";
 
 type RecoveryTokens = {
@@ -64,9 +65,9 @@ export function UpdatePasswordForm() {
           type="password"
         />
       </label>
-      <button className="primary-action" type="submit">
+      <PendingSubmitButton pendingLabel="Atualizando...">
         Atualizar senha
-      </button>
+      </PendingSubmitButton>
     </form>
   );
 }

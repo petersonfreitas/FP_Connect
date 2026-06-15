@@ -1,6 +1,7 @@
 import Image from "next/image";
 import Link from "next/link";
 import { redirect } from "next/navigation";
+import { PendingSubmitButton } from "@/components/pending-submit-button";
 import { signInAction } from "@/lib/auth-actions";
 import { getCurrentUser } from "@/lib/auth";
 
@@ -56,9 +57,7 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
               type="password"
             />
           </label>
-          <button className="primary-action" type="submit">
-            Entrar
-          </button>
+          <PendingSubmitButton pendingLabel="Entrando...">Entrar</PendingSubmitButton>
         </form>
 
         <Link className="auth-link" href="/login/recuperar-senha">

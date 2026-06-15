@@ -41,7 +41,19 @@ Nesta fase, priorize:
 3. `03.backlog_funcional_fp_food_v1.0.0.md`
 4. `04.backlog_funcional_fp_tracking_v1.0.0.md`
 
-Os demais backlogs entram depois, conforme necessidade de integracao e evolucao do ecossistema.
+Backlogs formalizados para fases futuras:
+
+1. `05.backlog_funcional_fp_marketing_v1.0.0.md`
+2. `06.backlog_funcional_fp_sales_v1.0.0.md`
+3. `07.backlog_funcional_fp_tickets_v1.0.0.md`
+4. `08.backlog_funcional_fp_billing_v1.0.0.md`
+5. `09.backlog_funcional_fp_gateway_v1.0.0.md`
+6. `10.backlog_funcional_fp_fiscal_v1.0.0.md`
+7. `11.backlog_funcional_fp_router_v1.0.0.md`
+8. `12.backlog_funcional_fp_sign_v1.0.0.md`
+9. `13.backlog_funcional_fp_bi_v1.0.0.md`
+
+Os backlogs futuros orientam arquitetura e fronteiras, mas so viram implementacao quando houver necessidade real, prioridade definida ou autorizacao explicita do usuario.
 
 Nao implemente escopo fora do backlog atual sem autorizacao explicita do usuario.
 
@@ -55,7 +67,8 @@ A prioridade atual e construir:
 2. Admin Console minimo e seguro;
 3. Robots minimo para eventos;
 4. Food como primeiro produto operacional;
-5. Tracking como complemento operacional do Food.
+5. Tracking como complemento operacional do Food;
+6. Gateway antes de integracoes automaticas externas como pagamentos, WhatsApp e Meta, quando o fluxo exigir.
 
 A implementacao pode transitar entre Admin Console, Robots, Food e Tracking quando houver dependencia real de fluxo.
 

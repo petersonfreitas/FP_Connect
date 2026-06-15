@@ -3,6 +3,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { AppShell } from "@/components/app-shell";
 import { CompanyModulesTable } from "@/components/company-modules-table";
+import { PendingSubmitButton } from "@/components/pending-submit-button";
 import {
   bulkUpdateAdminCompanyApplications,
   getAdminCompany,
@@ -271,9 +272,12 @@ export default async function CompanyDetailPage({ params, searchParams }: Compan
                   {user.status === "invited" && user.membershipStatus === "invited" ? (
                     <form action={resendInviteAction}>
                       <input name="userId" type="hidden" value={user.id} />
-                      <button className="secondary-action compact-action" type="submit">
+                      <PendingSubmitButton
+                        className="secondary-action compact-action"
+                        pendingLabel="Reenviando..."
+                      >
                         Reenviar convite
-                      </button>
+                      </PendingSubmitButton>
                     </form>
                   ) : null}
                 </span>

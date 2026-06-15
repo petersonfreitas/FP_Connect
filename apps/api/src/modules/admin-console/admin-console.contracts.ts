@@ -5,6 +5,15 @@ export type ApplicationStatus = "active" | "inactive" | "hidden";
 export type CompanyApplicationStatus = "implementation" | "active" | "suspended" | "cancelled";
 export type BasicPlanStatus = "active" | "inactive";
 export type AdminAuditScope = "all" | "companies" | "users" | "modules" | "system";
+export type UserGlobalRole = "company_user" | "fp_admin" | "super_admin" | "support";
+
+export type PaginatedContract<T> = {
+  items: T[];
+  page: number;
+  pageSize: number;
+  total: number;
+  totalPages: number;
+};
 
 export type AdminApplicationContract = {
   id: string;
@@ -134,6 +143,51 @@ export type AdminCompanyUserAccessContract = {
   grants: AdminUserApplicationRoleContract[];
 };
 
+export type AdminNavigationItemContract = {
+  href: string;
+  label: string;
+};
+
+export type AdminNavigationGroupContract = {
+  label: string;
+  items: AdminNavigationItemContract[];
+};
+
+export type AdminNavigationContract = {
+  primary: AdminNavigationItemContract[];
+  groups: AdminNavigationGroupContract[];
+};
+
+export type AdminCurrentUserModuleAccessContract = {
+  applicationId: string;
+  applicationKey: string;
+  applicationName: string;
+  companyId: string;
+  companyName: string;
+  entryPath: string | null;
+  permissions: string[];
+};
+
+export type AdminCurrentUserCompanyAccessContract = {
+  company: AdminCompanyContract;
+  membershipId: string;
+  membershipStatus: UserStatus;
+  isPrimaryContact: boolean;
+  adminPermissions: string[];
+  modules: AdminCurrentUserModuleAccessContract[];
+};
+
+export type AdminCurrentUserAccessContract = {
+  user: AdminUserContract & {
+    globalRole: UserGlobalRole;
+    isInternalUser: boolean;
+  };
+  isSuperAdmin: boolean;
+  isPlatformUser: boolean;
+  companies: AdminCurrentUserCompanyAccessContract[];
+  navigation: AdminNavigationContract;
+};
+
 export type AdminAuditLogContract = {
   id: string;
   companyId: string | null;
@@ -169,7 +223,9 @@ export type CreateAdminCompanyInput = {
   implementationNotes?: string | null;
 };
 
-export type UpdateAdminCompanyInput = CreateAdminCompanyInput;
+export type UpdateAdminCompanyInput = CreateAdminCompanyInput & {
+  status: CompanyStatus;
+};
 
 export type AdminUserContract = {
   id: string;

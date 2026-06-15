@@ -15,7 +15,11 @@ import type {
   UpdateAdminCompanyApplicationInput
 } from "./admin-console.contracts";
 import { AdminConsoleAccessGuard } from "./admin-console-access.guard";
-import { AdminConsolePolicy } from "./admin-console-policy.decorator";
+import {
+  AdminConsoleAuthenticatedOnly,
+  AdminConsolePolicy,
+  AdminConsoleSuperAdminOnly
+} from "./admin-console-policy.decorator";
 import { AdminConsoleService } from "./admin-console.service";
 
 @Controller("admin-console")
@@ -23,39 +27,52 @@ import { AdminConsoleService } from "./admin-console.service";
 export class AdminConsoleController {
   constructor(private readonly adminConsole: AdminConsoleService) {}
 
+  @Get("users/me/access")
+  @AdminConsoleAuthenticatedOnly()
+  getCurrentUserAccess(@Headers() headers: Record<string, string | string[] | undefined>) {
+    return this.adminConsole.getCurrentUserAccess(readInternalApiContext(headers));
+  }
+
   @Get("overview")
+  @AdminConsoleSuperAdminOnly()
   getOverview() {
     return this.adminConsole.getOverview();
   }
 
   @Get("applications")
+  @AdminConsoleSuperAdminOnly()
   listApplications() {
     return this.adminConsole.listApplications();
   }
 
   @Get("basic-plans")
+  @AdminConsoleSuperAdminOnly()
   listBasicPlans() {
     return this.adminConsole.listBasicPlans();
   }
 
   @Get("catalog")
+  @AdminConsoleSuperAdminOnly()
   getCatalog() {
     return this.adminConsole.getCatalog();
   }
 
   @Get("contracted-modules")
+  @AdminConsoleSuperAdminOnly()
   listContractedModules() {
     return this.adminConsole.listContractedModules();
   }
 
   @Get("audit-logs")
+  @AdminConsoleSuperAdminOnly()
   listAuditLogs(@Query("scope") scope?: AdminAuditScope) {
     return this.adminConsole.listAuditLogs(scope);
   }
 
   @Get("companies")
-  listCompanies() {
-    return this.adminConsole.listCompanies();
+  @AdminConsoleSuperAdminOnly()
+  listCompanies(@Query("page") page?: string, @Query("pageSize") pageSize?: string) {
+    return this.adminConsole.listCompanies({ page, pageSize });
   }
 
   @Get("companies/:id")
@@ -83,6 +100,7 @@ export class AdminConsoleController {
   }
 
   @Post("companies")
+  @AdminConsoleSuperAdminOnly()
   createCompany(
     @Body() input: CreateAdminCompanyInput,
     @Headers() headers: Record<string, string | string[] | undefined>
@@ -125,11 +143,13 @@ export class AdminConsoleController {
   }
 
   @Get("users")
-  listUsers() {
-    return this.adminConsole.listUsers();
+  @AdminConsoleSuperAdminOnly()
+  listUsers(@Query("page") page?: string, @Query("pageSize") pageSize?: string) {
+    return this.adminConsole.listUsers({ page, pageSize });
   }
 
   @Get("users/:id")
+  @AdminConsoleSuperAdminOnly()
   getUser(@Param("id") id: string) {
     return this.adminConsole.getUser(id);
   }
@@ -154,6 +174,7 @@ export class AdminConsoleController {
   }
 
   @Patch("users/:id")
+  @AdminConsoleSuperAdminOnly()
   updateUser(
     @Param("id") id: string,
     @Body() input: UpdateAdminUserInput,

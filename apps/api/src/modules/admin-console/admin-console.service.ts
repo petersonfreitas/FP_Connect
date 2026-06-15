@@ -26,7 +26,12 @@ import type {
   AdminCompanyContract,
   AdminConsoleOverviewContract,
   AdminContractedModuleContract,
+  AdminCurrentUserAccessContract,
+  AdminCurrentUserCompanyAccessContract,
+  AdminCurrentUserModuleAccessContract,
+  AdminNavigationContract,
   AdminPermissionContract,
+  PaginatedContract,
   AdminRoleContract,
   AdminUserContract,
   AdminUserApplicationRoleContract,
@@ -38,7 +43,8 @@ import type {
   RevokeAdminUserRoleInput,
   UpdateAdminCompanyInput,
   UpdateAdminUserInput,
-  UpdateAdminCompanyApplicationInput
+  UpdateAdminCompanyApplicationInput,
+  UserGlobalRole
 } from "./admin-console.contracts";
 import {
   emptyInternalApiContext,
@@ -49,6 +55,11 @@ import { SupabaseService } from "../../supabase/supabase.service";
 
 type SupabaseFailure = {
   message: string;
+};
+
+type PaginationOptions = {
+  page?: string;
+  pageSize?: string;
 };
 
 type ApplicationRow = {
@@ -105,6 +116,11 @@ type UserRow = {
   email: string | null;
   status: AdminUserContract["status"];
   created_at: string;
+};
+
+type CurrentUserProfileRow = UserRow & {
+  global_role: UserGlobalRole;
+  is_internal_user: boolean;
 };
 
 type CompanyUserRow = {
@@ -196,6 +212,9 @@ const userApplicationRoleSelect = "id,company_id,user_id,application_id,role_id,
 const auditLogSelect =
   "id,company_id,actor_user_id,action,entity_schema,entity_table,entity_id,metadata,created_at";
 const basicPlanApplicationSelect = "basic_plan_id,application_id";
+const defaultPage = 1;
+const defaultPageSize = 20;
+const maxPageSize = 100;
 
 @Injectable()
 export class AdminConsoleService {
@@ -204,17 +223,138 @@ export class AdminConsoleService {
     private readonly supabase: SupabaseService
   ) {}
 
+  async getCurrentUserAccess(
+    context: InternalApiContext = emptyInternalApiContext
+  ): Promise<AdminCurrentUserAccessContract> {
+    if (!context.actorUserId) {
+      throw new UnauthorizedException("Authenticated actor is required");
+    }
+
+    const actorUserId = normalizeUuid(context.actorUserId, "actorUserId");
+    const profile = await this.getCurrentUserProfile(actorUserId);
+    const isSuperAdmin = profile.global_role === "super_admin";
+    const isPlatformUser =
+      isSuperAdmin ||
+      profile.global_role === "fp_admin" ||
+      profile.global_role === "support" ||
+      profile.is_internal_user;
+    const memberships = await this.listUserMembershipRows(actorUserId);
+    const companyIds = unique(memberships.map((membership) => membership.company_id));
+    const [companiesById, grantRows, companyApplicationRows] = await Promise.all([
+      this.listCompaniesById(companyIds),
+      this.listUserApplicationRoleRowsByUserId(actorUserId, companyIds),
+      this.listCompanyApplicationRowsByCompanyIds(companyIds)
+    ]);
+    const applicationIds = unique([
+      ...grantRows.map((grant) => grant.application_id),
+      ...companyApplicationRows.map((companyApplication) => companyApplication.application_id)
+    ]);
+    const [applicationsById, roleRows] = await Promise.all([
+      this.listApplicationsById(applicationIds),
+      this.listRoleRowsByApplicationIds(unique(grantRows.map((grant) => grant.application_id)))
+    ]);
+    const rolePermissionsByRoleId = await this.listPermissionsByRoleId(roleRows);
+    const rolesById = new Map(roleRows.map((role) => [role.id, role]));
+    const companyApplicationsByCompanyAndApplication = new Map(
+      companyApplicationRows.map((row) => [
+        `${row.company_id}:${row.application_id}`,
+        row
+      ])
+    );
+    const grantsByCompanyId = new Map<string, UserApplicationRoleRow[]>();
+
+    for (const grant of grantRows) {
+      const grants = grantsByCompanyId.get(grant.company_id) ?? [];
+      grants.push(grant);
+      grantsByCompanyId.set(grant.company_id, grants);
+    }
+
+    const companies = memberships.flatMap((membership): AdminCurrentUserCompanyAccessContract[] => {
+      const company = companiesById.get(membership.company_id);
+
+      if (!company) {
+        return [];
+      }
+
+      const grants = grantsByCompanyId.get(membership.company_id) ?? [];
+      const adminPermissions = new Set<string>();
+      const modulesByCompanyAndApplication = new Map<string, AdminCurrentUserModuleAccessContract>();
+
+      for (const grant of grants) {
+        const application = applicationsById.get(grant.application_id);
+        const role = rolesById.get(grant.role_id);
+
+        if (!application || !role || application.status !== "active") {
+          continue;
+        }
+
+        const permissions = rolePermissionsByRoleId.get(role.id) ?? [];
+        const permissionKeys = permissions.map((permission) => permission.key);
+        const companyApplication = companyApplicationsByCompanyAndApplication.get(
+          `${membership.company_id}:${grant.application_id}`
+        );
+        const isActiveContractedModule = companyApplication?.status === "active";
+
+        if (application.key === "admin-console" && isActiveContractedModule) {
+          for (const permissionKey of permissionKeys) {
+            adminPermissions.add(permissionKey);
+          }
+          continue;
+        }
+
+        if (!isActiveContractedModule || permissionKeys.length === 0) {
+          continue;
+        }
+
+        modulesByCompanyAndApplication.set(`${membership.company_id}:${application.id}`, {
+          applicationId: application.id,
+          applicationKey: application.key,
+          applicationName: application.name,
+          companyId: membership.company_id,
+          companyName: getCompanyDisplayName(company),
+          entryPath: application.entry_path,
+          permissions: permissionKeys
+        });
+      }
+
+      return [
+        {
+          company: mapCompany(company),
+          membershipId: membership.id,
+          membershipStatus: membership.status,
+          isPrimaryContact: membership.is_primary_contact,
+          adminPermissions: Array.from(adminPermissions).sort(),
+          modules: Array.from(modulesByCompanyAndApplication.values()).sort((first, second) =>
+            first.applicationName.localeCompare(second.applicationName, "pt-BR")
+          )
+        }
+      ];
+    });
+
+    return {
+      user: {
+        ...mapUser(profile),
+        globalRole: profile.global_role,
+        isInternalUser: profile.is_internal_user
+      },
+      isSuperAdmin,
+      isPlatformUser,
+      companies,
+      navigation: buildCurrentUserNavigation(isSuperAdmin, companies)
+    };
+  }
+
   async getOverview(): Promise<AdminConsoleOverviewContract> {
-    const [applications, basicPlans, companies] = await Promise.all([
+    const [applications, basicPlans, companiesPage] = await Promise.all([
       this.listApplications(),
       this.listBasicPlans(),
-      this.listCompanies()
+      this.listCompanies({ page: "1", pageSize: "1000" })
     ]);
 
     return {
       applications,
       basicPlans,
-      companies
+      companies: companiesPage.items
     };
   }
 
@@ -389,32 +529,46 @@ export class AdminConsoleService {
     return rows.map((row) => mapAuditLog(row, companiesById.get(row.company_id ?? "")));
   }
 
-  async listCompanies(): Promise<AdminCompanyContract[]> {
-    const { data, error } = await this.supabase.core
+  async listCompanies(options: PaginationOptions = {}): Promise<PaginatedContract<AdminCompanyContract>> {
+    const pagination = normalizePagination(options);
+    const { from, to } = getPaginationRange(pagination);
+    const { count, data, error } = await this.supabase.core
       .from("companies")
-      .select(companySelect)
+      .select(companySelect, { count: "exact" })
       .is("deleted_at", null)
-      .order("created_at", { ascending: false });
+      .order("created_at", { ascending: false })
+      .range(from, to);
 
     if (error) {
       throwSupabaseError(error);
     }
 
-    return ((data ?? []) as CompanyRow[]).map(mapCompany);
+    return mapPaginatedResult(
+      ((data ?? []) as CompanyRow[]).map(mapCompany),
+      count,
+      pagination
+    );
   }
 
-  async listUsers(): Promise<AdminUserContract[]> {
-    const { data, error } = await this.supabase.core
+  async listUsers(options: PaginationOptions = {}): Promise<PaginatedContract<AdminUserContract>> {
+    const pagination = normalizePagination(options);
+    const { from, to } = getPaginationRange(pagination);
+    const { count, data, error } = await this.supabase.core
       .from("profiles")
-      .select(userSelect)
+      .select(userSelect, { count: "exact" })
       .is("deleted_at", null)
-      .order("created_at", { ascending: false });
+      .order("created_at", { ascending: false })
+      .range(from, to);
 
     if (error) {
       throwSupabaseError(error);
     }
 
-    return ((data ?? []) as UserRow[]).map(mapUser);
+    return mapPaginatedResult(
+      ((data ?? []) as UserRow[]).map(mapUser),
+      count,
+      pagination
+    );
   }
 
   async getUser(id: string): Promise<AdminUserContract> {
@@ -595,8 +749,8 @@ export class AdminConsoleService {
     context: InternalApiContext = emptyInternalApiContext
   ): Promise<AdminCompanyContract> {
     const normalizedCompanyId = normalizeUuid(companyId, "companyId");
-    await this.ensureCompanyExists(normalizedCompanyId);
-    const company = normalizeCreateCompanyInput(input);
+    const currentCompany = await this.getCompany(normalizedCompanyId);
+    const company = normalizeUpdateCompanyInput(input, currentCompany.status);
 
     const { data, error } = await this.supabase.core
       .from("companies")
@@ -619,7 +773,8 @@ export class AdminConsoleService {
         address_city: company.addressCity,
         address_state: company.addressState,
         basic_plan_id: company.basicPlanId,
-        implementation_notes: company.implementationNotes
+        implementation_notes: company.implementationNotes,
+        status: company.status
       })
       .eq("id", normalizedCompanyId)
       .is("deleted_at", null)
@@ -920,6 +1075,18 @@ export class AdminConsoleService {
     }
 
     const updatedUser = mapUser(data as UserRow);
+    const { error: membershipError } = await this.supabase.core
+      .from("company_memberships")
+      .update({
+        status: updatedUser.status
+      })
+      .eq("user_id", userId)
+      .is("deleted_at", null);
+
+    if (membershipError) {
+      throwSupabaseError(membershipError);
+    }
+
     await this.createAuditLog(
       null,
       "core.user.updated",
@@ -928,6 +1095,7 @@ export class AdminConsoleService {
       {
         email: updatedUser.email,
         fullName: updatedUser.fullName,
+        membershipStatus: updatedUser.status,
         status: updatedUser.status
       },
       context
@@ -1200,6 +1368,40 @@ export class AdminConsoleService {
     await this.getCompany(companyId);
   }
 
+  private async getCurrentUserProfile(userId: string): Promise<CurrentUserProfileRow> {
+    const { data, error } = await this.supabase.core
+      .from("profiles")
+      .select("id,full_name,email,status,created_at,global_role,is_internal_user")
+      .eq("id", userId)
+      .is("deleted_at", null)
+      .maybeSingle();
+
+    if (error) {
+      throwSupabaseError(error);
+    }
+
+    if (!data) {
+      throw new NotFoundException("User profile not found");
+    }
+
+    return data as CurrentUserProfileRow;
+  }
+
+  private async listUserMembershipRows(userId: string): Promise<CompanyUserRow[]> {
+    const { data, error } = await this.supabase.core
+      .from("company_memberships")
+      .select("id,company_id,user_id,status,is_primary_contact")
+      .eq("user_id", userId)
+      .is("deleted_at", null)
+      .order("created_at", { ascending: false });
+
+    if (error) {
+      throwSupabaseError(error);
+    }
+
+    return (data ?? []) as CompanyUserRow[];
+  }
+
   private async getCompanyMembership(companyId: string, userId: string): Promise<CompanyUserRow> {
     const { data, error } = await this.supabase.core
       .from("company_memberships")
@@ -1218,6 +1420,24 @@ export class AdminConsoleService {
     }
 
     return data as CompanyUserRow;
+  }
+
+  private async listCompaniesById(companyIds: string[]): Promise<Map<string, CompanyRow>> {
+    if (companyIds.length === 0) {
+      return new Map();
+    }
+
+    const { data, error } = await this.supabase.core
+      .from("companies")
+      .select(companySelect)
+      .in("id", companyIds)
+      .is("deleted_at", null);
+
+    if (error) {
+      throwSupabaseError(error);
+    }
+
+    return new Map(((data ?? []) as CompanyRow[]).map((company) => [company.id, company]));
   }
 
   private async listAuditCompaniesById(companyIds: string[]): Promise<Map<string, AuditCompanyRow>> {
@@ -1423,6 +1643,49 @@ export class AdminConsoleService {
     return (data ?? []) as UserApplicationRoleRow[];
   }
 
+  private async listUserApplicationRoleRowsByUserId(
+    userId: string,
+    companyIds: string[]
+  ): Promise<UserApplicationRoleRow[]> {
+    if (companyIds.length === 0) {
+      return [];
+    }
+
+    const { data, error } = await this.supabase.core
+      .from("user_application_roles")
+      .select(userApplicationRoleSelect)
+      .eq("user_id", userId)
+      .in("company_id", companyIds)
+      .is("deleted_at", null)
+      .order("created_at", { ascending: false });
+
+    if (error) {
+      throwSupabaseError(error);
+    }
+
+    return (data ?? []) as UserApplicationRoleRow[];
+  }
+
+  private async listCompanyApplicationRowsByCompanyIds(
+    companyIds: string[]
+  ): Promise<CompanyApplicationRow[]> {
+    if (companyIds.length === 0) {
+      return [];
+    }
+
+    const { data, error } = await this.supabase.core
+      .from("company_applications")
+      .select(companyApplicationSelect)
+      .in("company_id", companyIds)
+      .is("deleted_at", null);
+
+    if (error) {
+      throwSupabaseError(error);
+    }
+
+    return (data ?? []) as CompanyApplicationRow[];
+  }
+
   private async getCurrentUserApplicationRole(
     companyId: string,
     userId: string,
@@ -1521,6 +1784,55 @@ function throwSupabaseError(error: SupabaseFailure): never {
     message: "Supabase query failed",
     detail: error.message
   });
+}
+
+function normalizePagination(options: PaginationOptions): Required<PaginationOptions> {
+  const page = normalizePositiveInteger(options.page, defaultPage);
+  const requestedPageSize = normalizePositiveInteger(options.pageSize, defaultPageSize);
+
+  return {
+    page: String(page),
+    pageSize: String(Math.min(requestedPageSize, maxPageSize))
+  };
+}
+
+function normalizePositiveInteger(value: string | undefined, fallback: number): number {
+  const parsed = Number(value);
+
+  if (!Number.isInteger(parsed) || parsed < 1) {
+    return fallback;
+  }
+
+  return parsed;
+}
+
+function getPaginationRange(pagination: Required<PaginationOptions>): { from: number; to: number } {
+  const page = Number(pagination.page);
+  const pageSize = Number(pagination.pageSize);
+  const from = (page - 1) * pageSize;
+
+  return {
+    from,
+    to: from + pageSize - 1
+  };
+}
+
+function mapPaginatedResult<T>(
+  items: T[],
+  count: number | null,
+  pagination: Required<PaginationOptions>
+): PaginatedContract<T> {
+  const total = count ?? items.length;
+  const page = Number(pagination.page);
+  const pageSize = Number(pagination.pageSize);
+
+  return {
+    items,
+    page,
+    pageSize,
+    total,
+    totalPages: Math.max(1, Math.ceil(total / pageSize))
+  };
 }
 
 function mapApplication(row: ApplicationRow): AdminApplicationContract {
@@ -1658,6 +1970,10 @@ function mapBasicPlanCatalog(
   };
 }
 
+function getCompanyDisplayName(row: CompanyRow): string {
+  return row.trade_name ?? row.legal_name;
+}
+
 function mapCompany(row: CompanyRow): AdminCompanyContract {
   return {
     id: row.id,
@@ -1738,6 +2054,16 @@ function normalizeCreateCompanyInput(input: CreateAdminCompanyInput): CreateAdmi
     addressState: normalizeState(input.addressState),
     basicPlanId: normalizeOptional(input.basicPlanId),
     implementationNotes: normalizeOptional(input.implementationNotes, 1000)
+  };
+}
+
+function normalizeUpdateCompanyInput(
+  input: UpdateAdminCompanyInput,
+  fallbackStatus: UpdateAdminCompanyInput["status"]
+): UpdateAdminCompanyInput {
+  return {
+    ...normalizeCreateCompanyInput(input),
+    status: normalizeCompanyStatus(input.status ?? fallbackStatus)
   };
 }
 
@@ -1840,6 +2166,100 @@ function getAuditScopeActions(scope: AdminAuditScope): string[] | null {
   return null;
 }
 
+function buildCurrentUserNavigation(
+  isSuperAdmin: boolean,
+  companies: AdminCurrentUserCompanyAccessContract[]
+): AdminNavigationContract {
+  const primary = [{ href: "/", label: "Portal" }];
+
+  if (isSuperAdmin) {
+    return {
+      primary,
+      groups: [
+        {
+          label: "Cadastro",
+          items: [
+            { href: "/cadastro/empresas", label: "Empresas" },
+            { href: "/cadastro/usuarios", label: "Usuarios" },
+            { href: "/cadastro/planos", label: "Planos" },
+            { href: "/cadastro/modulos", label: "Modulos" }
+          ]
+        },
+        {
+          label: "Movimentacao",
+          items: [{ href: "/movimentacao/modulos-contratados", label: "Modulos contratados" }]
+        },
+        {
+          label: "Sistemas",
+          items: [{ href: "/robots", label: "FP Robots" }]
+        },
+        {
+          label: "Auditoria",
+          items: [
+            { href: "/auditoria", label: "Visao geral" },
+            { href: "/auditoria/empresas", label: "Empresas" },
+            { href: "/auditoria/usuarios", label: "Usuarios" },
+            { href: "/auditoria/modulos", label: "Modulos e permissoes" },
+            { href: "/auditoria/sistema", label: "Sistema" }
+          ]
+        }
+      ]
+    };
+  }
+
+  const groups: AdminNavigationContract["groups"] = [];
+  const companyItems = companies
+    .filter((company) => company.adminPermissions.includes("admin.companies.read"))
+    .map((company) => ({
+      href: `/cadastro/empresas/${company.company.id}`,
+      label: company.company.tradeName ?? company.company.legalName
+    }));
+  const moduleItems = buildModuleNavigationItems(companies);
+
+  if (companyItems.length > 0) {
+    groups.push({
+      label: "Minhas empresas",
+      items: companyItems
+    });
+  }
+
+  if (moduleItems.length > 0) {
+    groups.push({
+      label: "Sistemas",
+      items: moduleItems
+    });
+  }
+
+  return {
+    primary,
+    groups
+  };
+}
+
+function buildModuleNavigationItems(companies: AdminCurrentUserCompanyAccessContract[]) {
+  const modules = companies.flatMap((company) =>
+    company.modules.filter((module) => module.entryPath)
+  );
+  const pathCounts = new Map<string, number>();
+
+  for (const module of modules) {
+    const path = module.entryPath ?? "";
+    pathCounts.set(path, (pathCounts.get(path) ?? 0) + 1);
+  }
+
+  return modules.map((module) => {
+    const path = module.entryPath ?? "/";
+    const shouldShowCompany = (pathCounts.get(path) ?? 0) > 1;
+
+    return {
+      href: path,
+      label: shouldShowCompany
+        ? `${module.applicationName} - ${module.companyName}`
+        : module.applicationName
+    };
+  });
+}
+
 function isGrantableCompanyApplication(application: AdminCompanyApplicationContract): boolean {
   return (
     application.applicationStatus === "active" &&
@@ -1916,6 +2336,19 @@ function normalizePersonType(value: unknown): CreateAdminCompanyInput["personTyp
   }
 
   throw new BadRequestException("personType must be individual or legal_entity");
+}
+
+function normalizeCompanyStatus(value: unknown): UpdateAdminCompanyInput["status"] {
+  if (
+    value === "implementation" ||
+    value === "active" ||
+    value === "suspended" ||
+    value === "cancelled"
+  ) {
+    return value;
+  }
+
+  throw new BadRequestException("status must be implementation, active, suspended or cancelled");
 }
 
 function normalizeDocument(

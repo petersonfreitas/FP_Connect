@@ -14,6 +14,8 @@ Ele deve orientar o desenvolvimento sem substituir:
 
 Use este arquivo como contrato tecnico enxuto para manter consistencia entre modulos.
 
+O modelo detalhado de identidade, acesso de plataforma, vinculos empresariais e suporte operacional fica em `docs/ACCESS_MODEL.md`.
+
 ---
 
 ## 2. Stack oficial
@@ -46,7 +48,22 @@ Modulos futuros:
 1. FP Billing;
 2. FP Tickets;
 3. FP Sales;
-4. FP Marketing.
+4. FP Marketing;
+5. FP Gateway;
+6. FP Fiscal;
+7. FP Sign;
+8. FP BI;
+9. FP Router.
+
+O FP Gateway possui backlog proprio e deve ser tratado como modulo oficial de integracoes externas, credenciais, OAuth, pagamentos, Mercado Pago, futuros provedores de pagamento, WhatsApp e Meta.
+
+O FP Fiscal sera modulo proprio para configuracao, emissao, controle e historico fiscal, com foco inicial na evolucao fiscal do FP Food.
+
+O FP Sign sera modulo futuro para aceite simples, contratos, propostas e arquivamento documental, sem assinatura digital avancada no MVP.
+
+O FP BI sera modulo futuro de indicadores, dashboards e relatorios do ecossistema, evoluindo quando houver maturidade dos modulos transacionais.
+
+O FP Router sera modulo futuro de baixa prioridade, complementar ao FP Tracking, responsavel por planejamento de rotas, roteirizacao inteligente e apoio logistico/fiscal. O conceito antigo de EixoGuard fica absorvido pelo FP Router e nao deve ser tratado como modulo independente.
 
 Modulo de plataforma previsto:
 
@@ -160,6 +177,11 @@ marketing
 sales
 tickets
 billing
+gateway
+fiscal
+router
+sign
+bi
 monitoring
 ```
 
@@ -228,6 +250,8 @@ No estado atual, a API Nest usa `SUPABASE_SERVICE_ROLE_KEY` server-side. Portant
 
 O Admin Console exige `X-FP-Internal-Token` valido e `X-FP-Actor-User-Id` de usuario ativo antes de permitir acesso as rotas internas. `super_admin` possui bypass global. Rotas com contexto de empresa podem usar policies granulares por permissao; rotas globais continuam restritas a super-admin para evitar exposicao entre empresas.
 
+Os produtos operacionais possuem endpoints internos de acesso no formato `/api/<modulo>/access`. Esses endpoints tambem exigem `X-FP-Internal-Token`, `X-FP-Actor-User-Id` e `X-FP-Company-Id`, e passam pelo guard comum de modulo, que valida usuario ativo, empresa ativa, modulo contratado ativo e permissao do modulo. `super_admin` pode ignorar permissao granular, mas nao ignora a obrigatoriedade de modulo contratado ativo para a empresa.
+
 ---
 
 ## 8. Multiempresa, permissoes e modulos contratados
@@ -235,6 +259,10 @@ O Admin Console exige `X-FP-Internal-Token` valido e `X-FP-Actor-User-Id` de usu
 O sistema e SaaS multiempresa.
 
 Toda entidade de negocio deve ter `company_id`, salvo entidade claramente global.
+
+Identidade, acesso de plataforma, vinculos empresariais e permissoes de modulo sao conceitos separados. Um usuario pode ter acesso global ao Console, estar vinculado a uma ou mais empresas e possuir permissoes diferentes por empresa/modulo.
+
+Superadmins e admins do Console podem ser vinculados operacionalmente como suporte de empresas especificas. Esse vinculo de suporte serve para atendimento, implantacao e futura integracao com FP Suporte, e concede poder administrativo auditavel dentro da empresa atendida. Acoes de alto risco podem exigir permissao adicional mesmo para suporte.
 
 Toda acao sensivel deve validar:
 
@@ -246,6 +274,8 @@ Toda acao sensivel deve validar:
 6. escopo por `company_id`.
 
 Menus podem ser ocultados no frontend, mas seguranca real deve estar no backend, no banco ou em ambos.
+
+A navegacao do frontend deve evoluir para ser derivada do acesso real do usuario atual, evitando expor menus globais para usuarios que possuem apenas vinculos empresariais ou modulos especificos.
 
 Entidades normalmente globais:
 
@@ -325,6 +355,8 @@ Regras:
 - devem aplicar regras criticas no backend, banco ou ambos;
 - devem usar contratos compartilhados quando houver acoplamento relevante entre modulos.
 
+No estagio atual, os endpoints de acesso dos modulos (`/api/food/access`, `/api/tracking/access`, `/api/robots/access` e equivalentes futuros ja registrados) servem como contrato minimo para shells e frontends separados confirmarem se a empresa e o usuario podem acessar o produto antes de carregar dados operacionais.
+
 ### APIs publicas/externas
 
 APIs publicas/externas sao endpoints expostos para clientes, parceiros ou sistemas terceiros integrarem com o ecossistema.
@@ -363,6 +395,36 @@ Webhooks de saida, automacoes, e-mails, retries e reprocessamentos pertencem ao 
 ## 11. FP Robots e eventos
 
 O FP Robots e o centro de eventos, logs, webhooks, e-mails, reprocessamentos e automacoes.
+
+O FP Robots deve atuar como orquestrador de automacoes: ele recebe eventos, avalia regras, cria acoes, acompanha execucoes, registra falhas e permite reprocessamento. Ele nao deve incorporar diretamente detalhes operacionais de provedores externos quando houver um modulo proprio para isso.
+
+O FP Gateway devera encapsular integracoes com provedores externos como WhatsApp, Meta, Mercado Pago, futuros provedores de pagamento e canais equivalentes. Nesse desenho, o FP Robots decide quando uma acao deve acontecer, enquanto o FP Gateway executa a comunicacao com o provedor externo, normaliza respostas e devolve status operacional.
+
+Fluxo conceitual recomendado:
+
+```text
+Sistema de origem
+-> emite evento
+-> FP Robots valida catalogo e avalia regras
+-> FP Robots cria acao padronizada
+-> FP Gateway executa a chamada externa, quando o destino for provedor externo
+-> FP Robots registra sucesso, falha ou reprocessamento
+```
+
+Exemplos de acoes futuras que devem ser padronizadas pelo FP Robots sem acoplamento direto ao provedor:
+
+```text
+gateway.whatsapp.send_message
+gateway.instagram.send_message
+gateway.facebook.publish_event
+gateway.ads.sync_audience
+gateway.payments.create_charge
+gateway.payments.check_status
+```
+
+LinkedIn e gov.br ficam fora do escopo inicial do FP Gateway. Integracoes futuras podem ser avaliadas em novas versoes, com backlog especifico.
+
+O FP Robots pode manter conectores simples previstos no backlog enquanto o FP Gateway nao for implementado, mas deve evitar modelagens que misturem regra de automacao com credenciais, APIs e detalhes especificos de provedores externos.
 
 Eventos devem ser criados somente quando estiverem no backlog da etapa atual ou quando houver autorizacao explicita.
 
