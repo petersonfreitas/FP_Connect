@@ -282,6 +282,12 @@ export type CreateAdminUserInput = {
   isPrimaryContact?: boolean;
 };
 
+export type CreateAdminConsoleUserInput = {
+  fullName: string;
+  email: string;
+  globalRole: Extract<UserGlobalRole, "super_admin" | "fp_admin" | "support">;
+};
+
 export type UpdateAdminCompanyUserInput = {
   status: UserStatus;
   isPrimaryContact: boolean;

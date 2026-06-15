@@ -266,6 +266,18 @@ Usuario sem acesso liberado:
 
 O backend continua sendo a camada real de seguranca. O menu permissionado melhora experiencia e reduz exposicao visual desnecessaria.
 
+### Matriz inicial de papeis do Console
+
+`super_admin` representa o dono administrativo da plataforma. Ele possui bypass global no Admin Console, pode criar empresas, criar usuarios internos, alterar papeis de plataforma, contratar modulos, consultar auditoria global e executar acoes sensiveis. Toda acao deve continuar auditada.
+
+`fp_admin` representa o administrador operacional da plataforma. Ele deve atuar por permissao e carteira, sem bypass global. Pode administrar empresas sob sua responsabilidade, apoiar configuracoes, vincular suporte quando autorizado e consultar auditoria apenas nos escopos permitidos.
+
+`support` representa suporte operacional interno. Ele deve atuar apenas nas empresas em que estiver vinculado como suporte administrativo, com poder de admin dentro da empresa atendida, mas sem criar empresas, alterar papeis globais ou acessar auditoria global.
+
+`company_user` representa usuario do cliente. Ele nasce e deve ser administrado no contexto da empresa, com acesso definido por vinculo empresarial, modulo contratado e papel/permissao do modulo.
+
+Rotas de menu devem apontar diretamente para a tela final. Paginas que existem apenas para redirecionar devem ser removidas em uma limpeza futura, depois que todos os links ativos ja estiverem apontando para as rotas definitivas.
+
 ---
 
 ## 7. Auditoria
@@ -306,7 +318,7 @@ Antes de codar, o plano recomendado e:
 1. criar contrato de acesso do usuario atual; [iniciado]
 2. trocar a home global por portal contextual; [iniciado]
 3. gerar menus pelo contrato de acesso; [iniciado]
-4. separar CRUD de usuarios do Console e usuarios da empresa; [iniciado com cadastro e edicao contextual de vinculo no detalhe da empresa]
+4. separar CRUD de usuarios do Console e usuarios da empresa; [implementado com rota propria para usuarios internos e cadastro contextual na empresa]
 5. modelar vinculos de suporte por empresa; [iniciado com modelo simples via `company_memberships` + papel `company-admin`]
 6. automatizar vinculo de suporte para superadmin ao cadastrar empresa; [implementado para o superadmin criador]
 7. permitir delegacao de suporte por carteira para admins do Console;

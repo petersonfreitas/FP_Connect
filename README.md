@@ -20,6 +20,7 @@ Ja existe base funcional para:
 - cadastro de empresas com CPF/CNPJ, telefone, celular, CEP e endereco estruturado normalizados;
 - cadastro, listagem e edicao de usuarios;
 - definicao de papel de plataforma no perfil central do usuario;
+- cadastro direto de usuarios internos do Console por convite;
 - vinculo usuario x empresa;
 - cadastro contextual de usuarios dentro do detalhe da empresa;
 - vinculo de suporte administrativo por carteira de empresa;
@@ -130,7 +131,9 @@ Endpoints internos atuais do Admin Console:
 - `POST /api/admin-console/companies/:id/applications/bulk`
 - `POST /api/admin-console/companies/:id/support`
 - `GET /api/admin-console/users?page=1&pageSize=20`
+- `GET /api/admin-console/users?page=1&pageSize=20&scope=platform`
 - `GET /api/admin-console/users/:id`
+- `POST /api/admin-console/users/console`
 - `POST /api/admin-console/users`
 - `PATCH /api/admin-console/users/:id`
 - `GET /api/admin-console/companies/:companyId/users/:userId/access`

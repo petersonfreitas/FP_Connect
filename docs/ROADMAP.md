@@ -148,11 +148,12 @@ Status inicial:
 - contrato `GET /api/admin-console/users/me/access` criado;
 - home evita `overview` global para usuarios que nao sao superadmin;
 - menu lateral usa a navegacao retornada pelo backend.
-- CRUD central de usuarios ja permite ajustar papel de plataforma; CRUD separado por contexto ainda deve ser refinado.
+- CRUD de usuarios do Console possui rota propria para listagem, convite e edicao de perfis internos.
 - cadastro de usuario da empresa ja nasce no detalhe da empresa, mantendo `/cadastro/usuarios` como gestao central de perfis.
 - edicao de status e contato principal do vinculo empresarial ja ocorre no contexto empresa/usuario.
 - vinculo simples de suporte por carteira usa `company_memberships` e concede o papel `company-admin` do Admin Console para usuarios `super_admin`, `fp_admin` ou `support` ativos.
 - ao criar uma empresa, o superadmin autenticado e vinculado automaticamente como suporte administrativo da nova empresa.
+- rotas de menu devem apontar direto para o destino final; paginas usadas apenas como redirecionamento devem ser removidas em limpeza futura.
 
 ### Bloco B - Shell dos modulos prioritarios
 

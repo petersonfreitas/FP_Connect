@@ -7,6 +7,7 @@ import type {
   BulkRevokeAdminUserRolesInput,
   BulkUpdateAdminCompanyApplicationsInput,
   CreateAdminCompanyInput,
+  CreateAdminConsoleUserInput,
   CreateAdminUserInput,
   GrantAdminUserRoleInput,
   LinkAdminCompanySupportInput,
@@ -162,8 +163,12 @@ export class AdminConsoleController {
 
   @Get("users")
   @AdminConsoleSuperAdminOnly()
-  listUsers(@Query("page") page?: string, @Query("pageSize") pageSize?: string) {
-    return this.adminConsole.listUsers({ page, pageSize });
+  listUsers(
+    @Query("page") page?: string,
+    @Query("pageSize") pageSize?: string,
+    @Query("scope") scope?: string
+  ) {
+    return this.adminConsole.listUsers({ page, pageSize, scope });
   }
 
   @Get("users/:id")
@@ -179,6 +184,15 @@ export class AdminConsoleController {
     @Headers() headers: Record<string, string | string[] | undefined>
   ) {
     return this.adminConsole.createUser(input, readInternalApiContext(headers));
+  }
+
+  @Post("users/console")
+  @AdminConsoleSuperAdminOnly()
+  createConsoleUser(
+    @Body() input: CreateAdminConsoleUserInput,
+    @Headers() headers: Record<string, string | string[] | undefined>
+  ) {
+    return this.adminConsole.createConsoleUser(input, readInternalApiContext(headers));
   }
 
   @Post("companies/:companyId/users/:userId/invite")

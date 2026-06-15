@@ -36,6 +36,7 @@ import type {
   AdminUserContract,
   AdminUserApplicationRoleContract,
   CreateAdminCompanyInput,
+  CreateAdminConsoleUserInput,
   CreateAdminUserInput,
   GrantAdminUserRoleInput,
   LinkAdminCompanySupportInput,
@@ -62,6 +63,12 @@ type SupabaseFailure = {
 type PaginationOptions = {
   page?: string;
   pageSize?: string;
+};
+
+type UserListScope = "all" | "company" | "platform";
+
+type UserListOptions = PaginationOptions & {
+  scope?: string;
 };
 
 type ApplicationRow = {
@@ -555,15 +562,25 @@ export class AdminConsoleService {
     );
   }
 
-  async listUsers(options: PaginationOptions = {}): Promise<PaginatedContract<AdminUserContract>> {
+  async listUsers(options: UserListOptions = {}): Promise<PaginatedContract<AdminUserContract>> {
     const pagination = normalizePagination(options);
+    const scope = normalizeUserListScope(options.scope);
     const { from, to } = getPaginationRange(pagination);
-    const { count, data, error } = await this.supabase.core
+    let query = this.supabase.core
       .from("profiles")
       .select(userSelect, { count: "exact" })
       .is("deleted_at", null)
-      .order("created_at", { ascending: false })
-      .range(from, to);
+      .order("created_at", { ascending: false });
+
+    if (scope === "platform") {
+      query = query.in("global_role", Array.from(supportAssignmentRoles));
+    }
+
+    if (scope === "company") {
+      query = query.eq("global_role", "company_user");
+    }
+
+    const { count, data, error } = await query.range(from, to);
 
     if (error) {
       throwSupabaseError(error);
@@ -978,6 +995,86 @@ export class AdminConsoleService {
       }
 
       throw new InternalServerErrorException("Core user creation failed");
+    }
+  }
+
+  async createConsoleUser(
+    input: CreateAdminConsoleUserInput,
+    context: InternalApiContext = emptyInternalApiContext
+  ): Promise<AdminUserContract> {
+    const userInput = normalizeCreateConsoleUserInput(input);
+
+    const { data: authData, error: authError } =
+      await this.supabase.admin.auth.admin.inviteUserByEmail(userInput.email, {
+        redirectTo: this.getPasswordRedirectUrl(),
+        data: {
+          full_name: userInput.fullName
+        }
+      });
+
+    if (authError) {
+      if (authError.message.toLowerCase().includes("already")) {
+        throw new ConflictException("Usuario ja existe no Supabase Auth");
+      }
+
+      throw new InternalServerErrorException({
+        message: "Supabase auth invitation failed",
+        detail: authError.message
+      });
+    }
+
+    const userId = authData.user?.id;
+
+    if (!userId) {
+      throw new InternalServerErrorException("Supabase Auth did not return a user id");
+    }
+
+    try {
+      const { data, error } = await this.supabase.core
+        .from("profiles")
+        .insert({
+          email: userInput.email,
+          full_name: userInput.fullName,
+          global_role: userInput.globalRole,
+          id: userId,
+          is_internal_user: true,
+          status: "invited"
+        })
+        .select(userSelect)
+        .single();
+
+      if (error) {
+        throw error;
+      }
+
+      const createdUser = mapUser(data as UserRow);
+
+      await this.createAuditLog(
+        null,
+        "core.user.invited",
+        "profiles",
+        userId,
+        {
+          email: userInput.email,
+          fullName: userInput.fullName,
+          globalRole: userInput.globalRole,
+          source: "console_user"
+        },
+        context
+      );
+
+      return createdUser;
+    } catch (error) {
+      await this.supabase.admin.auth.admin.deleteUser(userId).catch(() => undefined);
+
+      if (error instanceof Error) {
+        throw new InternalServerErrorException({
+          message: "Core console user creation failed",
+          detail: error.message
+        });
+      }
+
+      throw new InternalServerErrorException("Core console user creation failed");
     }
   }
 
@@ -2141,6 +2238,14 @@ function normalizePositiveInteger(value: string | undefined, fallback: number): 
   return parsed;
 }
 
+function normalizeUserListScope(value: string | undefined): UserListScope {
+  if (value === "company" || value === "platform") {
+    return value;
+  }
+
+  return "all";
+}
+
 function getPaginationRange(pagination: Required<PaginationOptions>): { from: number; to: number } {
   const page = Number(pagination.page);
   const pageSize = Number(pagination.pageSize);
@@ -2413,6 +2518,16 @@ function normalizeCreateUserInput(input: CreateAdminUserInput): Required<CreateA
   };
 }
 
+function normalizeCreateConsoleUserInput(
+  input: CreateAdminConsoleUserInput
+): CreateAdminConsoleUserInput {
+  return {
+    fullName: normalizeRequired(input.fullName, "fullName", 140),
+    email: normalizeEmail(input.email),
+    globalRole: normalizePlatformGlobalRole(input.globalRole)
+  };
+}
+
 function normalizeUpdateCompanyUserInput(
   input: UpdateAdminCompanyUserInput
 ): UpdateAdminCompanyUserInput {
@@ -2442,6 +2557,14 @@ function normalizeGlobalRole(value: unknown): UserGlobalRole {
   }
 
   throw new BadRequestException("globalRole must be company_user, fp_admin, super_admin or support");
+}
+
+function normalizePlatformGlobalRole(value: unknown): CreateAdminConsoleUserInput["globalRole"] {
+  if (value === "fp_admin" || value === "super_admin" || value === "support") {
+    return value;
+  }
+
+  throw new BadRequestException("globalRole must be fp_admin, super_admin or support");
 }
 
 function normalizeUserStatus(value: unknown): UpdateAdminUserInput["status"] {
@@ -2542,7 +2665,7 @@ function buildCurrentUserNavigation(
           label: "Cadastro",
           items: [
             { href: "/cadastro/empresas", label: "Empresas" },
-            { href: "/cadastro/usuarios", label: "Usuarios" },
+            { href: "/cadastro/usuarios-console", label: "Usuarios do Console" },
             { href: "/cadastro/planos", label: "Planos" },
             { href: "/cadastro/modulos", label: "Modulos" }
           ]

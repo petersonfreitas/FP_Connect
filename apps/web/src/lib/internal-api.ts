@@ -22,6 +22,7 @@ import type {
   AdminUserApplicationRoleContract,
   AdminUserContract,
   CreateAdminCompanyInput,
+  CreateAdminConsoleUserInput,
   CreateAdminUserInput,
   GrantAdminUserRoleInput,
   LinkAdminCompanySupportInput,
@@ -66,6 +67,7 @@ export async function getCurrentAdminAccess(): Promise<
 type PaginationParams = {
   page?: number;
   pageSize?: number;
+  scope?: "all" | "company" | "platform";
 };
 
 export async function listAdminCompanies(
@@ -208,6 +210,15 @@ export async function createAdminUser(
   input: CreateAdminUserInput
 ): Promise<InternalApiResult<AdminCompanyUserContract>> {
   return fetchInternal<AdminCompanyUserContract>("admin-console/users", {
+    body: JSON.stringify(input),
+    method: "POST"
+  });
+}
+
+export async function createAdminConsoleUser(
+  input: CreateAdminConsoleUserInput
+): Promise<InternalApiResult<AdminUserContract>> {
+  return fetchInternal<AdminUserContract>("admin-console/users/console", {
     body: JSON.stringify(input),
     method: "POST"
   });
@@ -381,7 +392,7 @@ function getInternalApiBaseUrl(): string {
   return value.replace(/\/$/, "");
 }
 
-function formatPaginationSearch({ page, pageSize }: PaginationParams): string {
+function formatPaginationSearch({ page, pageSize, scope }: PaginationParams): string {
   const params = new URLSearchParams();
 
   if (page) {
@@ -390,6 +401,10 @@ function formatPaginationSearch({ page, pageSize }: PaginationParams): string {
 
   if (pageSize) {
     params.set("pageSize", String(pageSize));
+  }
+
+  if (scope && scope !== "all") {
+    params.set("scope", scope);
   }
 
   const search = params.toString();

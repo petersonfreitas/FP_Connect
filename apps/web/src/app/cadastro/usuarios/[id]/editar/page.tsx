@@ -33,6 +33,9 @@ export default async function EditUserPage({ params, searchParams }: EditUserPag
   const { id } = await params;
   const query = await searchParams;
   const returnTo = getSafeReturnPath(query?.returnTo);
+  const activePath = returnTo?.startsWith("/cadastro/usuarios-console")
+    ? "/cadastro/usuarios-console"
+    : "/cadastro/usuarios";
   const userResult = await getAdminUser(id);
   const user = userResult.data;
 
@@ -61,7 +64,7 @@ export default async function EditUserPage({ params, searchParams }: EditUserPag
   }
 
   return (
-    <AppShell activePath="/cadastro/usuarios">
+    <AppShell activePath={activePath}>
       <header className="topbar">
         <div>
           <div className="eyebrow">Cadastro</div>
