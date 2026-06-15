@@ -10,6 +10,7 @@ import type {
   CreateAdminUserInput,
   GrantAdminUserRoleInput,
   RevokeAdminUserRoleInput,
+  UpdateAdminCompanyUserInput,
   UpdateAdminCompanyInput,
   UpdateAdminUserInput,
   UpdateAdminCompanyApplicationInput
@@ -171,6 +172,22 @@ export class AdminConsoleController {
     @Headers() headers: Record<string, string | string[] | undefined>
   ) {
     return this.adminConsole.resendUserInvite(companyId, userId, readInternalApiContext(headers));
+  }
+
+  @Patch("companies/:companyId/users/:userId/membership")
+  @AdminConsolePolicy({ companyParam: "companyId", permissionKey: "admin.users.manage" })
+  updateCompanyUserMembership(
+    @Param("companyId") companyId: string,
+    @Param("userId") userId: string,
+    @Body() input: UpdateAdminCompanyUserInput,
+    @Headers() headers: Record<string, string | string[] | undefined>
+  ) {
+    return this.adminConsole.updateCompanyUserMembership(
+      companyId,
+      userId,
+      input,
+      readInternalApiContext(headers)
+    );
   }
 
   @Patch("users/:id")

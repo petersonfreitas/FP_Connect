@@ -22,6 +22,7 @@ Ja existe base funcional para:
 - definicao de papel de plataforma no perfil central do usuario;
 - vinculo usuario x empresa;
 - cadastro contextual de usuarios dentro do detalhe da empresa;
+- edicao e inativacao contextual do vinculo empresarial sem inativar o perfil central;
 - envio e reenvio de convite/ativacao de usuarios por e-mail via Supabase Auth;
 - papeis/permissoes por usuario, empresa e modulo;
 - tabela de papeis por usuario com selecao e concessao/revogacao em lote;
@@ -131,6 +132,7 @@ Endpoints internos atuais do Admin Console:
 - `GET /api/admin-console/companies/:companyId/users/:userId/access`
 - `POST /api/admin-console/users/me/activate-invite`
 - `POST /api/admin-console/companies/:companyId/users/:userId/invite`
+- `PATCH /api/admin-console/companies/:companyId/users/:userId/membership`
 - `POST /api/admin-console/companies/:companyId/users/:userId/roles`
 - `POST /api/admin-console/companies/:companyId/users/:userId/roles/bulk`
 - `POST /api/admin-console/companies/:companyId/users/:userId/roles/revoke`

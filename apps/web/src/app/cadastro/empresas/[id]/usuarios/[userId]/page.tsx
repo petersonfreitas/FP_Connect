@@ -2,12 +2,14 @@ import Link from "next/link";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { AppShell } from "@/components/app-shell";
+import { PendingSubmitButton } from "@/components/pending-submit-button";
 import { UserRolesTable } from "@/components/user-roles-table";
 import {
   bulkGrantAdminUserRoles,
   bulkRevokeAdminUserRoles,
   getAdminCompany,
-  getAdminCompanyUserAccess
+  getAdminCompanyUserAccess,
+  updateAdminCompanyUserMembership
 } from "@/lib/internal-api";
 
 export const dynamic = "force-dynamic";
@@ -38,8 +40,14 @@ export default async function UserAccessPage({ params, searchParams }: UserAcces
   const query = searchParams ? await searchParams : {};
   const accessError = getQueryValue(query.accessError);
   const accessSaved = getQueryValue(query.accessSaved);
+  const membershipError = getQueryValue(query.membershipError);
+  const membershipSaved = getQueryValue(query.membershipSaved);
   const accessSavedMessage =
     accessSaved && accessSaved !== "1" ? accessSaved : "Acessos atualizados com sucesso.";
+  const membershipSavedMessage =
+    membershipSaved && membershipSaved !== "1"
+      ? membershipSaved
+      : "Vinculo empresarial atualizado com sucesso.";
   const [companyResult, accessResult] = await Promise.all([
     getAdminCompany(id),
     getAdminCompanyUserAccess(id, userId)
@@ -48,6 +56,32 @@ export default async function UserAccessPage({ params, searchParams }: UserAcces
   const access = accessResult.data;
   const availableRoles = access?.availableRoles ?? [];
   const grants = access?.grants ?? [];
+
+  async function updateMembershipAction(formData: FormData) {
+    "use server";
+
+    const result = await updateAdminCompanyUserMembership(id, userId, {
+      isPrimaryContact: formData.get("isPrimaryContact") === "on",
+      status: normalizeMembershipStatus(readFormValue(formData, "membershipStatus"))
+    });
+
+    revalidatePath(`/cadastro/empresas/${id}`);
+    revalidatePath(`/cadastro/empresas/${id}/usuarios/${userId}`);
+
+    if (result.error || !result.data) {
+      redirect(
+        `/cadastro/empresas/${id}/usuarios/${userId}?membershipError=${encodeURIComponent(
+          result.error ?? "API interna nao retornou o vinculo atualizado."
+        )}`
+      );
+    }
+
+    redirect(
+      `/cadastro/empresas/${id}/usuarios/${userId}?membershipSaved=${encodeURIComponent(
+        `Vinculo atualizado para ${membershipStatusLabels[result.data.membershipStatus]}.`
+      )}`
+    );
+  }
 
   async function bulkGrantRolesAction(formData: FormData) {
     "use server";
@@ -162,6 +196,19 @@ export default async function UserAccessPage({ params, searchParams }: UserAcces
         </section>
       ) : null}
 
+      {membershipError ? (
+        <section className="data-alert" role="status">
+          <strong>Nao foi possivel atualizar o vinculo empresarial.</strong>
+          <span>{membershipError}</span>
+        </section>
+      ) : null}
+
+      {membershipSaved ? (
+        <section className="form-alert neutral page-feedback" role="status">
+          {membershipSavedMessage}
+        </section>
+      ) : null}
+
       {access ? (
         <>
           <section className="content-panel">
@@ -186,6 +233,55 @@ export default async function UserAccessPage({ params, searchParams }: UserAcces
                 <dd>{access.user.isPrimaryContact ? "Principal" : "Usuario vinculado"}</dd>
               </div>
             </dl>
+          </section>
+
+          <section className="content-panel stack-panel">
+            <div className="panel-heading">
+              <div>
+                <h1>Vinculo empresarial</h1>
+                <p>Altere apenas o vinculo deste usuario com a empresa atual.</p>
+              </div>
+            </div>
+
+            <form className="form-grid" action={updateMembershipAction}>
+              <label>
+                Status do vinculo
+                <select
+                  name="membershipStatus"
+                  required
+                  defaultValue={access.user.membershipStatus}
+                >
+                  {Object.entries(membershipStatusLabels).map(([value, label]) => (
+                    <option key={value} value={value}>
+                      {label}
+                    </option>
+                  ))}
+                </select>
+              </label>
+
+              <label className="checkbox-field">
+                <input
+                  defaultChecked={access.user.isPrimaryContact}
+                  name="isPrimaryContact"
+                  type="checkbox"
+                />
+                Definir como contato principal da empresa
+              </label>
+
+              <div className="form-alert neutral">
+                Esta acao nao altera o perfil central do usuario. Para bloquear o login global,
+                use a edicao do perfil.
+              </div>
+
+              <div className="form-actions">
+                <button className="secondary-action" type="reset">
+                  Restaurar
+                </button>
+                <PendingSubmitButton pendingLabel="Salvando...">
+                  Salvar vinculo
+                </PendingSubmitButton>
+              </div>
+            </form>
           </section>
 
           <section className="content-panel stack-panel">
@@ -248,4 +344,17 @@ function getQueryValue(value: string | string[] | undefined): string | null {
 
 function readFormValues(formData: FormData, key: string): string[] {
   return formData.getAll(key).flatMap((value) => (typeof value === "string" ? [value] : []));
+}
+
+function readFormValue(formData: FormData, key: string): string {
+  const value = formData.get(key);
+  return typeof value === "string" ? value.trim() : "";
+}
+
+function normalizeMembershipStatus(value: string) {
+  if (value === "active" || value === "inactive" || value === "invited") {
+    return value;
+  }
+
+  return "inactive";
 }

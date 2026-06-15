@@ -282,6 +282,11 @@ export type CreateAdminUserInput = {
   isPrimaryContact?: boolean;
 };
 
+export type UpdateAdminCompanyUserInput = {
+  status: UserStatus;
+  isPrimaryContact: boolean;
+};
+
 export type UpdateAdminUserInput = {
   fullName: string;
   email: string;

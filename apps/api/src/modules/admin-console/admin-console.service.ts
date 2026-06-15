@@ -41,6 +41,7 @@ import type {
   ResendAdminUserInviteContract,
   RevokeAdminUserRoleContract,
   RevokeAdminUserRoleInput,
+  UpdateAdminCompanyUserInput,
   UpdateAdminCompanyInput,
   UpdateAdminUserInput,
   UpdateAdminCompanyApplicationInput,
@@ -958,6 +959,85 @@ export class AdminConsoleService {
     return {
       sent: true
     };
+  }
+
+  async updateCompanyUserMembership(
+    companyId: string,
+    userId: string,
+    input: UpdateAdminCompanyUserInput,
+    context: InternalApiContext = emptyInternalApiContext
+  ): Promise<AdminCompanyUserContract> {
+    const normalizedCompanyId = normalizeUuid(companyId, "companyId");
+    const normalizedUserId = normalizeUuid(userId, "userId");
+    const currentMembership = await this.getCompanyMembership(
+      normalizedCompanyId,
+      normalizedUserId
+    );
+    const currentUser = await this.getUser(normalizedUserId);
+    const membershipInput = normalizeUpdateCompanyUserInput(input);
+
+    if (membershipInput.status === "active" && currentUser.status !== "active") {
+      throw new BadRequestException(
+        "Vinculo so pode ficar ativo quando o perfil central estiver ativo"
+      );
+    }
+
+    if (membershipInput.status === "invited" && currentMembership.status !== "invited") {
+      throw new BadRequestException("Vinculo ativo ou inativo nao pode voltar para convidado");
+    }
+
+    const { data, error } = await this.supabase.core
+      .from("company_memberships")
+      .update({
+        is_primary_contact: membershipInput.isPrimaryContact,
+        status: membershipInput.status
+      })
+      .eq("id", currentMembership.id)
+      .is("deleted_at", null)
+      .select("id,company_id,user_id,status,is_primary_contact")
+      .single();
+
+    if (error) {
+      throwSupabaseError(error);
+    }
+
+    if (membershipInput.isPrimaryContact) {
+      const { error: otherPrimaryContactsError } = await this.supabase.core
+        .from("company_memberships")
+        .update({
+          is_primary_contact: false
+        })
+        .eq("company_id", normalizedCompanyId)
+        .neq("user_id", normalizedUserId)
+        .is("deleted_at", null);
+
+      if (otherPrimaryContactsError) {
+        throwSupabaseError(otherPrimaryContactsError);
+      }
+    }
+
+    const [companyUser] = await this.hydrateCompanyUsers([data as CompanyUserRow]);
+
+    if (!companyUser) {
+      throw new NotFoundException("User profile not found");
+    }
+
+    await this.createAuditLog(
+      normalizedCompanyId,
+      "core.company_membership.updated",
+      "company_memberships",
+      currentMembership.id,
+      {
+        isPrimaryContact: companyUser.isPrimaryContact,
+        previousIsPrimaryContact: currentMembership.is_primary_contact,
+        previousStatus: currentMembership.status,
+        status: companyUser.membershipStatus,
+        userId: normalizedUserId
+      },
+      context
+    );
+
+    return companyUser;
   }
 
   async activateCurrentUserInvite(
@@ -2084,6 +2164,15 @@ function normalizeCreateUserInput(input: CreateAdminUserInput): Required<CreateA
   };
 }
 
+function normalizeUpdateCompanyUserInput(
+  input: UpdateAdminCompanyUserInput
+): UpdateAdminCompanyUserInput {
+  return {
+    isPrimaryContact: Boolean(input.isPrimaryContact),
+    status: normalizeUserStatus(input.status)
+  };
+}
+
 function normalizeUpdateUserInput(input: UpdateAdminUserInput): UpdateAdminUserInput {
   return {
     fullName: normalizeRequired(input.fullName, "fullName", 140),
@@ -2166,6 +2255,7 @@ function getAuditScopeActions(scope: AdminAuditScope): string[] | null {
 
   if (scope === "users") {
     return [
+      "core.company_membership.updated",
       "core.user.invited",
       "core.user.updated",
       "core.user_application_role.granted",

@@ -45,6 +45,7 @@ Ja foram implementados:
 - usuarios: papel de plataforma (`company_user`, `support`, `fp_admin`, `super_admin`) exposto no CRUD central;
 - vinculo usuario x empresa;
 - usuarios da empresa podem ser cadastrados diretamente pelo detalhe da empresa;
+- vinculo empresarial pode ser editado/inativado sem inativar o perfil central;
 - papeis/permissoes por usuario, empresa e modulo;
 - concessao/revogacao de papeis em lote por usuario;
 - catalogo de planos e modulos;
@@ -149,6 +150,7 @@ Status inicial:
 - menu lateral usa a navegacao retornada pelo backend.
 - CRUD central de usuarios ja permite ajustar papel de plataforma; CRUD separado por contexto ainda deve ser refinado.
 - cadastro de usuario da empresa ja nasce no detalhe da empresa, mantendo `/cadastro/usuarios` como gestao central de perfis.
+- edicao de status e contato principal do vinculo empresarial ja ocorre no contexto empresa/usuario.
 
 ### Bloco B - Shell dos modulos prioritarios
 

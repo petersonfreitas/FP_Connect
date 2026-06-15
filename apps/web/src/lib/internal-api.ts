@@ -30,6 +30,7 @@ import type {
   ResendAdminUserInviteContract,
   RevokeAdminUserRoleContract,
   RevokeAdminUserRoleInput,
+  UpdateAdminCompanyUserInput,
   UpdateAdminCompanyInput,
   UpdateAdminUserInput,
   UpdateAdminCompanyApplicationInput
@@ -211,6 +212,20 @@ export async function resendAdminUserInvite(
     `admin-console/companies/${companyId}/users/${userId}/invite`,
     {
       method: "POST"
+    }
+  );
+}
+
+export async function updateAdminCompanyUserMembership(
+  companyId: string,
+  userId: string,
+  input: UpdateAdminCompanyUserInput
+): Promise<InternalApiResult<AdminCompanyUserContract>> {
+  return fetchInternal<AdminCompanyUserContract>(
+    `admin-console/companies/${companyId}/users/${userId}/membership`,
+    {
+      body: JSON.stringify(input),
+      method: "PATCH"
     }
   );
 }
