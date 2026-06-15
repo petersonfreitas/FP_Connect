@@ -132,7 +132,7 @@ Padrao para producao com clientes reais:
 
 ## Medicao de chamadas
 
-Rotas internas que consultam Supabase devem gerar uma trilha minima de metricas. No MVP, isso pode comecar pelos logs estruturados da API; depois pode evoluir para tabela de metricas, APM ou observabilidade externa.
+Rotas internas que consultam Supabase devem gerar uma trilha minima de metricas. No MVP, isso comeca pelo `RequestMetricsMiddleware` global da API Nest; depois pode evoluir para tabela de metricas, APM ou observabilidade externa.
 
 Campos recomendados:
 
@@ -142,9 +142,18 @@ Campos recomendados:
 - `actor_user_id` quando existir;
 - `company_id` quando existir;
 - modulo ou aplicacao funcional;
-- tamanho aproximado do payload de resposta quando relevante;
 - resultado do rate limit;
 - flag de rota lenta quando ultrapassar o alvo definido para o modulo.
+
+Campos atuais no log estruturado:
+
+- `event`: sempre `api.request`;
+- `outcome`: `ok` ou `error`;
+- `method`, `path`, `module`, `statusCode` e `durationMs`;
+- `slow`: verdadeiro quando a rota ultrapassa 1000 ms;
+- `actorUserId` e `companyId` quando os headers internos existem;
+- `clientIp` para diagnostico operacional;
+- `rateLimit.limit`, `rateLimit.remaining`, `rateLimit.reset` e `rateLimit.retryAfter`.
 
 Nao registrar:
 
@@ -152,6 +161,14 @@ Nao registrar:
 - chaves de API;
 - payload sensivel;
 - dados pessoais sem necessidade operacional.
+
+Antes de criar otimizacoes, cache ou RPCs, use esses logs para descobrir:
+
+- rotas mais chamadas;
+- rotas lentas;
+- rotas com muitos 4xx/5xx;
+- rotas batendo em rate limit;
+- empresas ou fluxos que concentram consumo.
 
 ## Rate limit da API interna
 
