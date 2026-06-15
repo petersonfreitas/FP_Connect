@@ -308,7 +308,7 @@ Antes de codar, o plano recomendado e:
 3. gerar menus pelo contrato de acesso; [iniciado]
 4. separar CRUD de usuarios do Console e usuarios da empresa; [iniciado com cadastro e edicao contextual de vinculo no detalhe da empresa]
 5. modelar vinculos de suporte por empresa; [iniciado com modelo simples via `company_memberships` + papel `company-admin`]
-6. automatizar vinculo de suporte para superadmin ao cadastrar empresa;
+6. automatizar vinculo de suporte para superadmin ao cadastrar empresa; [implementado para o superadmin criador]
 7. permitir delegacao de suporte por carteira para admins do Console;
 8. manter backend/policies como fonte real de seguranca.
 

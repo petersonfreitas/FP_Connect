@@ -23,6 +23,7 @@ Ja existe base funcional para:
 - vinculo usuario x empresa;
 - cadastro contextual de usuarios dentro do detalhe da empresa;
 - vinculo de suporte administrativo por carteira de empresa;
+- vinculo automatico do superadmin criador como suporte da empresa;
 - edicao e inativacao contextual do vinculo empresarial sem inativar o perfil central;
 - envio e reenvio de convite/ativacao de usuarios por e-mail via Supabase Auth;
 - papeis/permissoes por usuario, empresa e modulo;

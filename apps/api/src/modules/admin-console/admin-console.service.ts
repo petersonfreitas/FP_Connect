@@ -829,6 +829,8 @@ export class AdminConsoleService {
       context
     );
 
+    await this.linkCreatorSuperAdminAsSupport(createdCompany.id, context);
+
     return createdCompany;
   }
 
@@ -1673,6 +1675,43 @@ export class AdminConsoleService {
     }
 
     return data as CompanyUserRow;
+  }
+
+  private async linkCreatorSuperAdminAsSupport(
+    companyId: string,
+    context: InternalApiContext
+  ): Promise<void> {
+    if (!context.actorUserId || !isUuid(context.actorUserId)) {
+      return;
+    }
+
+    const actorUserId = context.actorUserId;
+    const actor = await this.getUser(actorUserId);
+
+    if (actor.globalRole !== "super_admin" || actor.status !== "active") {
+      return;
+    }
+
+    const currentMembership = await this.getOptionalCompanyMembership(companyId, actorUserId);
+    const now = new Date().toISOString();
+    const membership = currentMembership
+      ? await this.updateSupportMembership(currentMembership, now)
+      : await this.createSupportMembership(companyId, actorUserId, now);
+
+    await this.createAuditLog(
+      companyId,
+      "core.company_support.linked",
+      "company_memberships",
+      membership.id,
+      {
+        automatic: true,
+        globalRole: actor.globalRole,
+        previousMembershipStatus: currentMembership?.status ?? null,
+        source: "company_created_by_super_admin",
+        userId: actorUserId
+      },
+      context
+    );
   }
 
   private async listCompaniesById(companyIds: string[]): Promise<Map<string, CompanyRow>> {

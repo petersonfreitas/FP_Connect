@@ -80,6 +80,7 @@ Este arquivo controla o avanco dos modulos do ecossistema.
 - [x] Edicao/inativacao contextual de vinculo empresarial
 - [ ] CRUD separado para usuarios do Console
 - [x] Vinculo simples de suporte por carteira de empresa
+- [x] Vinculo automatico do superadmin criador como suporte da empresa
 - [ ] Smoke test manual dos fluxos principais
 
 ---
