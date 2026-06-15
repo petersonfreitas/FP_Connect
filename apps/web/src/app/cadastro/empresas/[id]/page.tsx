@@ -6,6 +6,7 @@ import { CompanyModulesTable } from "@/components/company-modules-table";
 import { PendingSubmitButton } from "@/components/pending-submit-button";
 import {
   bulkUpdateAdminCompanyApplications,
+  createAdminUser,
   getAdminCompany,
   listAdminCompanyApplications,
   listAdminCompanyUsers,
@@ -40,6 +41,37 @@ export default async function CompanyDetailPage({ params, searchParams }: Compan
   const inviteSent = getQueryValue(query.inviteSent);
   const moduleError = getQueryValue(query.moduleError);
   const moduleSaved = getQueryValue(query.moduleSaved);
+  const userError = getQueryValue(query.userError);
+  const userCreated = getQueryValue(query.userCreated);
+  const userCreatedMessage =
+    userCreated && userCreated !== "1" ? userCreated : "Usuario vinculado com sucesso.";
+
+  async function createCompanyUserAction(formData: FormData) {
+    "use server";
+
+    const result = await createAdminUser({
+      companyId: id,
+      email: readFormValue(formData, "email"),
+      fullName: readFormValue(formData, "fullName"),
+      isPrimaryContact: formData.get("isPrimaryContact") === "on"
+    });
+
+    revalidatePath(`/cadastro/empresas/${id}`);
+
+    if (result.error || !result.data) {
+      redirect(
+        `/cadastro/empresas/${id}?userError=${encodeURIComponent(
+          result.error ?? "API interna nao retornou o usuario criado."
+        )}`
+      );
+    }
+
+    redirect(
+      `/cadastro/empresas/${id}?userCreated=${encodeURIComponent(
+        `${result.data.fullName} foi convidado para a empresa.`
+      )}`
+    );
+  }
 
   async function bulkUpdateModulesAction(formData: FormData) {
     "use server";
@@ -222,7 +254,7 @@ export default async function CompanyDetailPage({ params, searchParams }: Compan
             <h1>Usuarios vinculados</h1>
             <p>Perfis com vinculo ativo ou convite pendente nesta empresa.</p>
           </div>
-          <Link className="primary-action" href="/cadastro/usuarios/novo">
+          <Link className="primary-action" href="#novo-usuario">
             Novo usuario
           </Link>
         </div>
@@ -244,6 +276,19 @@ export default async function CompanyDetailPage({ params, searchParams }: Compan
         {inviteSent ? (
           <div className="form-alert neutral module-feedback" role="status">
             Convite reenviado com sucesso.
+          </div>
+        ) : null}
+
+        {userError ? (
+          <div className="data-alert inline-alert" role="status">
+            <strong>Nao foi possivel cadastrar o usuario.</strong>
+            <span>{userError}</span>
+          </div>
+        ) : null}
+
+        {userCreated ? (
+          <div className="form-alert neutral module-feedback" role="status">
+            {userCreatedMessage}
           </div>
         ) : null}
 
@@ -288,6 +333,40 @@ export default async function CompanyDetailPage({ params, searchParams }: Compan
           <div className="empty-state">Nenhum usuario vinculado a esta empresa ainda.</div>
         )}
       </section>
+
+      {company ? (
+        <section className="content-panel stack-panel" id="novo-usuario">
+          <div className="panel-heading">
+            <div>
+              <h1>Cadastrar usuario nesta empresa</h1>
+              <p>Convide uma pessoa ja vinculada ao contexto da empresa atual.</p>
+            </div>
+          </div>
+
+          <form className="form-grid" action={createCompanyUserAction}>
+            <label>
+              Nome completo
+              <input maxLength={140} name="fullName" required />
+            </label>
+
+            <label>
+              E-mail
+              <input maxLength={254} name="email" required type="email" />
+            </label>
+
+            <label className="checkbox-field">
+              <input name="isPrimaryContact" type="checkbox" />
+              Definir como contato principal da empresa
+            </label>
+
+            <div className="form-actions">
+              <PendingSubmitButton pendingLabel="Enviando convite...">
+                Enviar convite
+              </PendingSubmitButton>
+            </div>
+          </form>
+        </section>
+      ) : null}
     </AppShell>
   );
 }

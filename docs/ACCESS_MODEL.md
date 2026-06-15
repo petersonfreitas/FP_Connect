@@ -306,7 +306,7 @@ Antes de codar, o plano recomendado e:
 1. criar contrato de acesso do usuario atual; [iniciado]
 2. trocar a home global por portal contextual; [iniciado]
 3. gerar menus pelo contrato de acesso; [iniciado]
-4. separar CRUD de usuarios do Console e usuarios da empresa;
+4. separar CRUD de usuarios do Console e usuarios da empresa; [iniciado com cadastro contextual no detalhe da empresa]
 5. modelar vinculos de suporte por empresa;
 6. automatizar vinculo de suporte para superadmin ao cadastrar empresa;
 7. permitir delegacao de suporte por carteira para admins do Console;

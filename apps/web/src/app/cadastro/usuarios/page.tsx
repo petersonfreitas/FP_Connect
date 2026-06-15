@@ -39,8 +39,8 @@ export default async function UsersPage({ searchParams }: UsersPageProps) {
           <div className="eyebrow">Cadastro</div>
           <strong>Usuarios</strong>
         </div>
-        <Link className="primary-action" href="/cadastro/usuarios/novo">
-          Novo usuario
+        <Link className="secondary-action" href="/cadastro/empresas">
+          Gerenciar por empresa
         </Link>
       </header>
 

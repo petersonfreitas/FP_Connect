@@ -76,8 +76,9 @@ Este arquivo controla o avanco dos modulos do ecossistema.
 - [x] Portal inicial contextual por escopo de acesso
 - [x] Menu gerado conforme permissoes reais do usuario
 - [x] Papel de plataforma exposto no CRUD central de usuarios
+- [x] Cadastro contextual de usuarios no detalhe da empresa
 - [ ] CRUD separado para usuarios do Console
-- [ ] CRUD de usuarios da empresa no detalhe da empresa
+- [ ] Edicao/inativacao contextual de vinculo empresarial
 - [ ] Vinculo de suporte por carteira de empresa
 - [ ] Smoke test manual dos fluxos principais
 

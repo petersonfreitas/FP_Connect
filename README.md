@@ -21,6 +21,7 @@ Ja existe base funcional para:
 - cadastro, listagem e edicao de usuarios;
 - definicao de papel de plataforma no perfil central do usuario;
 - vinculo usuario x empresa;
+- cadastro contextual de usuarios dentro do detalhe da empresa;
 - envio e reenvio de convite/ativacao de usuarios por e-mail via Supabase Auth;
 - papeis/permissoes por usuario, empresa e modulo;
 - tabela de papeis por usuario com selecao e concessao/revogacao em lote;
