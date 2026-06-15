@@ -248,6 +248,8 @@ Regras obrigatorias:
 
 No estado atual, a API Nest usa `SUPABASE_SERVICE_ROLE_KEY` server-side. Portanto, guards/policies no backend sao obrigatorios antes de qualquer otimizacao em dados sensiveis; RLS permanece como defesa em profundidade e contrato para futuros clientes Supabase diretos.
 
+Rotas internas passam por rate limit global antes de consultar Supabase. O MVP usa controle em memoria por usuario/empresa/metodo ou IP/metodo, retorna headers `X-RateLimit-*` e HTTP 429 com `Retry-After` quando o limite e excedido. Quando houver multiplas instancias ou alto volume, esse contrato deve migrar para Redis/Upstash ou componente equivalente.
+
 O Admin Console exige `X-FP-Internal-Token` valido e `X-FP-Actor-User-Id` de usuario ativo antes de permitir acesso as rotas internas. `super_admin` possui bypass global. Rotas com contexto de empresa podem usar policies granulares por permissao; rotas globais continuam restritas a super-admin para evitar exposicao entre empresas.
 
 Os produtos operacionais possuem endpoints internos de acesso no formato `/api/<modulo>/access`. Esses endpoints tambem exigem `X-FP-Internal-Token`, `X-FP-Actor-User-Id` e `X-FP-Company-Id`, e passam pelo guard comum de modulo, que valida usuario ativo, empresa ativa, modulo contratado ativo e permissao do modulo. `super_admin` pode ignorar permissao granular, mas nao ignora a obrigatoriedade de modulo contratado ativo para a empresa.

@@ -31,7 +31,7 @@ Ja existe base funcional para:
 - login/logout server-side com Supabase Auth e cookies HttpOnly;
 - recuperacao de senha por e-mail via Supabase Auth;
 - refresh de sessao por refresh token HttpOnly no proxy do Next;
-- contrato de performance/seguranca para consultas Supabase;
+- contrato de performance/seguranca para consultas Supabase, custo operacional e rate limit da API interna;
 - `actor_user_id` real enviado pelo Next para a API interna em mutacoes auditadas;
 - guards/policies explicitos nas rotas do Admin Console, com rotas globais super-admin only e rotas por empresa validadas por permissao e modulo contratado;
 - bloqueio efetivo por modulo contratado nos endpoints internos de acesso dos produtos operacionais;
@@ -173,7 +173,7 @@ O banco e unico e separado por schemas de modulo, com `core` centralizando empre
 
 Para a API Nest consultar `core` via `@supabase/supabase-js`, o schema `core` precisa estar em Supabase Dashboard > Project Settings > Data API > Exposed schemas. No ambiente local, `supabase/config.toml` ja declara `core` em `[api].schemas`.
 
-Consultas devem seguir `docs/PERFORMANCE_SECURITY.md`: seguranca acima de performance, `select` explicito, escopo por empresa, soft delete, paginacao para listagens novas e indices alinhados a queries reais.
+Consultas devem seguir `docs/PERFORMANCE_SECURITY.md`: seguranca acima de performance, `select` explicito, escopo por empresa, soft delete, paginacao para listagens novas, indices alinhados a queries reais, medicao de uso e rate limit antes de chamadas ao Supabase.
 
 ### Scripts SQL operacionais
 
@@ -195,7 +195,7 @@ Fluxo recomendado para primeiro acesso:
 - `docs/ACCESS_MODEL.md`: modelo de identidade, acesso de plataforma, empresas, modulos e suporte operacional.
 - `docs/ATUALIZACOES_DOCUMENTOS_BASE_FPWEBTECH_v1.0.0.md`: plano fonte de atualizacao dos documentos-base.
 - `docs/DECISIONS.md`: decisoes arquiteturais aprovadas.
-- `docs/PERFORMANCE_SECURITY.md`: padrao de consultas Supabase com seguranca.
+- `docs/PERFORMANCE_SECURITY.md`: padrao de consultas Supabase com seguranca, custo operacional e rate limit.
 - `docs/ROADMAP.md`: plano macro e proximos passos.
 - `docs/MODULE_STATUS.md`: maturidade atual dos modulos.
 - `docs/backlog/00.indice_backlogs_pendentes_fpwebtech_v1.0.0.md`: indice dos backlogs pendentes formalizados.

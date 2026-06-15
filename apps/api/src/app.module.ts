@@ -1,4 +1,6 @@
 import { Module } from "@nestjs/common";
+import { APP_GUARD } from "@nestjs/core";
+import { RateLimitGuard } from "./auth/rate-limit.guard";
 import { AppConfigModule } from "./config/app-config.module";
 import { AdminConsoleModule } from "./modules/admin-console/admin-console.module";
 import { BillingModule } from "./modules/billing/billing.module";
@@ -24,6 +26,12 @@ import { SupabaseModule } from "./supabase/supabase.module";
     SalesModule,
     TicketsModule,
     BillingModule
+  ],
+  providers: [
+    {
+      provide: APP_GUARD,
+      useClass: RateLimitGuard
+    }
   ]
 })
 export class AppModule {}

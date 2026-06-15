@@ -100,6 +100,77 @@ Evitar neste momento:
 - cache de permissoes de usuario sem invalidacao clara;
 - cache de payload sensivel.
 
+## Custo Supabase
+
+O custo do Supabase nao deve ser tratado como "custo por clique" isolado. Uma acao do usuario pode gerar consumo em banco, compute, Auth MAU, egress, storage, logs, Realtime ou Edge Functions.
+
+Referencias oficiais para acompanhar antes de ir a producao:
+
+- Billing e quotas: https://supabase.com/docs/guides/platform/billing-on-supabase
+- Compute e disco: https://supabase.com/docs/guides/platform/compute-and-disk
+- Rate limits de Auth: https://supabase.com/docs/guides/auth/rate-limits
+- Cost control e spend cap: https://supabase.com/docs/guides/platform/cost-control
+- Otimizacao de queries: https://supabase.com/docs/guides/database/query-optimization
+
+Padrao para MVP no plano gratuito:
+
+- usar o projeto free para desenvolvimento, homologacao e pilotos pequenos;
+- manter banco, storage e egress enxutos;
+- evitar Realtime, Storage pesado e jobs recorrentes ate haver necessidade real;
+- medir rotas mais usadas antes de otimizar prematuramente;
+- manter dados seed/mock fora do projeto de producao;
+- revisar dashboard de usage do Supabase ao fim de cada ciclo de testes.
+
+Padrao para producao com clientes reais:
+
+- usar plano pago antes de operar clientes ativos;
+- separar ambiente de producao dos ambientes de teste;
+- habilitar controles de custo disponiveis no plano;
+- acompanhar CPU, memoria, conexoes, disco, egress, Auth MAU e storage;
+- testar carga em ambiente de staging quando houver fluxo novo de alto volume;
+- projetar limites por empresa, usuario e modulo contratado.
+
+## Medicao de chamadas
+
+Rotas internas que consultam Supabase devem gerar uma trilha minima de metricas. No MVP, isso pode comecar pelos logs estruturados da API; depois pode evoluir para tabela de metricas, APM ou observabilidade externa.
+
+Campos recomendados:
+
+- rota e metodo;
+- status HTTP;
+- duracao em milissegundos;
+- `actor_user_id` quando existir;
+- `company_id` quando existir;
+- modulo ou aplicacao funcional;
+- tamanho aproximado do payload de resposta quando relevante;
+- resultado do rate limit;
+- flag de rota lenta quando ultrapassar o alvo definido para o modulo.
+
+Nao registrar:
+
+- tokens;
+- chaves de API;
+- payload sensivel;
+- dados pessoais sem necessidade operacional.
+
+## Rate limit da API interna
+
+A API Nest possui `RateLimitGuard` global como primeira barreira antes de consultas ao Supabase.
+
+Configuracao atual:
+
+- health check fica fora do limite;
+- requests internos validos com `x-fp-internal-token` usam chave por `x-fp-actor-user-id`, empresa e metodo;
+- requests sem token interno valido usam chave por IP e metodo;
+- leitura autenticada: 120 requests por minuto;
+- mutacao autenticada: 20 requests por minuto;
+- leitura por IP: 60 requests por minuto;
+- mutacao por IP: 15 requests por minuto;
+- resposta bloqueada retorna HTTP 429 com `Retry-After`;
+- todas as respostas controladas recebem `X-RateLimit-Limit`, `X-RateLimit-Remaining` e `X-RateLimit-Reset`.
+
+Esta versao e intencionalmente em memoria para o MVP. Quando houver multiplas instancias, alto volume ou necessidade de limite compartilhado por ambiente, a implementacao deve migrar para Redis/Upstash ou componente equivalente, mantendo os mesmos headers e contrato de erro.
+
 ## Operacoes em lote
 
 Operacoes em lote podem comecar reaproveitando regras unitarias quando o volume for pequeno.
