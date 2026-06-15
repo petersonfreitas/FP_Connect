@@ -165,13 +165,17 @@ export class AdminConsoleController {
   }
 
   @Get("users")
-  @AdminConsoleSuperAdminOnly()
+  @AdminConsolePolicy({ platformRoles: ["fp_admin"] })
   listUsers(
     @Query("page") page?: string,
     @Query("pageSize") pageSize?: string,
-    @Query("scope") scope?: string
+    @Query("scope") scope?: string,
+    @Headers() headers?: Record<string, string | string[] | undefined>
   ) {
-    return this.adminConsole.listUsers({ page, pageSize, scope });
+    return this.adminConsole.listUsers(
+      { page, pageSize, scope },
+      readInternalApiContext(headers ?? {})
+    );
   }
 
   @Get("users/:id")

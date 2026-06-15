@@ -252,7 +252,7 @@ Superadmin:
 
 Admin do Console:
 - Portal
-- secoes permitidas conforme papel de plataforma
+- secao de usuarios do Console limitada a gestao de suporte
 - empresas de sua carteira de suporte, com acoes administrativas permitidas pelo papel de suporte
 
 Usuario de empresa:

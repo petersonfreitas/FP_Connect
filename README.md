@@ -22,6 +22,7 @@ Ja existe base funcional para:
 - definicao de papel de plataforma no perfil central do usuario;
 - cadastro direto de usuarios internos do Console por convite;
 - policy inicial para `fp_admin` convidar e vincular apenas usuarios `support`;
+- menu e telas do Console ajustados para `fp_admin` operar somente suporte;
 - vinculo usuario x empresa;
 - cadastro contextual de usuarios dentro do detalhe da empresa;
 - vinculo de suporte administrativo por carteira de empresa;

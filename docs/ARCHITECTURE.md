@@ -281,6 +281,8 @@ Menus podem ser ocultados no frontend, mas seguranca real deve estar no backend,
 
 A navegacao do frontend deve evoluir para ser derivada do acesso real do usuario atual, evitando expor menus globais para usuarios que possuem apenas vinculos empresariais ou modulos especificos.
 
+Para `fp_admin`, a navegacao do Admin Console expõe a gestao de usuarios internos apenas como gestao de suporte. A edicao/promocao global de usuarios internos permanece reservada ao superadmin.
+
 Links de navegacao devem apontar diretamente para a tela final. Rotas que existem apenas para redirecionar devem ser removidas quando nao houver mais referencias ativas.
 
 Entidades normalmente globais:

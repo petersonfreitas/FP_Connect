@@ -353,7 +353,7 @@ export class AdminConsoleService {
       isSuperAdmin,
       isPlatformUser,
       companies,
-      navigation: buildCurrentUserNavigation(isSuperAdmin, companies)
+      navigation: buildCurrentUserNavigation(profile.global_role, isSuperAdmin, companies)
     };
   }
 
@@ -563,9 +563,13 @@ export class AdminConsoleService {
     );
   }
 
-  async listUsers(options: UserListOptions = {}): Promise<PaginatedContract<AdminUserContract>> {
+  async listUsers(
+    options: UserListOptions = {},
+    context: InternalApiContext = emptyInternalApiContext
+  ): Promise<PaginatedContract<AdminUserContract>> {
     const pagination = normalizePagination(options);
     const scope = normalizeUserListScope(options.scope);
+    const actor = await this.getActorUser(context);
     const { from, to } = getPaginationRange(pagination);
     let query = this.supabase.core
       .from("profiles")
@@ -573,12 +577,18 @@ export class AdminConsoleService {
       .is("deleted_at", null)
       .order("created_at", { ascending: false });
 
-    if (scope === "platform") {
-      query = query.in("global_role", Array.from(supportAssignmentRoles));
-    }
+    if (actor.globalRole === "fp_admin") {
+      if (scope !== "platform") {
+        throw new ForbiddenException("Admin do Console so pode listar usuarios internos de suporte");
+      }
 
-    if (scope === "company") {
+      query = query.eq("global_role", "support");
+    } else if (actor.globalRole === "super_admin" && scope === "platform") {
+      query = query.in("global_role", Array.from(supportAssignmentRoles));
+    } else if (actor.globalRole === "super_admin" && scope === "company") {
       query = query.eq("global_role", "company_user");
+    } else if (actor.globalRole !== "super_admin") {
+      throw new ForbiddenException("Somente usuarios internos autorizados podem listar perfis");
     }
 
     const { count, data, error } = await query.range(from, to);
@@ -2721,6 +2731,7 @@ function getAuditScopeActions(scope: AdminAuditScope): string[] | null {
 }
 
 function buildCurrentUserNavigation(
+  globalRole: UserGlobalRole,
   isSuperAdmin: boolean,
   companies: AdminCurrentUserCompanyAccessContract[]
 ): AdminNavigationContract {
@@ -2762,6 +2773,10 @@ function buildCurrentUserNavigation(
   }
 
   const groups: AdminNavigationContract["groups"] = [];
+  const platformItems =
+    globalRole === "fp_admin"
+      ? [{ href: "/cadastro/usuarios-console", label: "Usuarios do Console" }]
+      : [];
   const companyItems = companies
     .filter((company) => company.adminPermissions.includes("admin.companies.read"))
     .map((company) => ({
@@ -2774,6 +2789,13 @@ function buildCurrentUserNavigation(
     groups.push({
       label: "Minhas empresas",
       items: companyItems
+    });
+  }
+
+  if (platformItems.length > 0) {
+    groups.push({
+      label: "Cadastro",
+      items: platformItems
     });
   }
 

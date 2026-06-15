@@ -78,6 +78,7 @@ Este arquivo controla o avanco dos modulos do ecossistema.
 - [x] Papel de plataforma exposto no CRUD central de usuarios
 - [x] Cadastro direto de usuarios internos do Console por convite
 - [x] Policy inicial para `fp_admin` convidar e vincular apenas suporte
+- [x] Menu e UI do `fp_admin` alinhados as policies de suporte
 - [x] Cadastro contextual de usuarios no detalhe da empresa
 - [x] Edicao/inativacao contextual de vinculo empresarial
 - [x] CRUD separado para usuarios do Console

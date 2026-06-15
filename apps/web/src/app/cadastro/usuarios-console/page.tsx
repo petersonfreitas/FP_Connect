@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { AppShell } from "@/components/app-shell";
 import { PaginationControls } from "@/components/pagination-controls";
-import { listAdminUsers } from "@/lib/internal-api";
+import { getCurrentAdminAccess, listAdminUsers } from "@/lib/internal-api";
 
 export const dynamic = "force-dynamic";
 const pageSize = 20;
@@ -29,9 +29,19 @@ const globalRoleLabels = {
 export default async function ConsoleUsersPage({ searchParams }: ConsoleUsersPageProps) {
   const query = searchParams ? await searchParams : {};
   const page = normalizePage(query.page);
-  const usersResult = await listAdminUsers({ page, pageSize, scope: "platform" });
+  const [accessResult, usersResult] = await Promise.all([
+    getCurrentAdminAccess(),
+    listAdminUsers({ page, pageSize, scope: "platform" })
+  ]);
+  const access = accessResult.data;
+  const isSuperAdmin = access?.isSuperAdmin === true;
+  const canInviteSupport = isSuperAdmin || access?.user.globalRole === "fp_admin";
   const pagination = usersResult.data;
   const users = pagination?.items ?? [];
+  const pageTitle = isSuperAdmin ? "Equipe interna da plataforma" : "Equipe de suporte";
+  const pageDescription = isSuperAdmin
+    ? "Superadmins, admins do Console e suporte operacional da FPWebTech."
+    : "Suportes que podem ser vinculados as empresas da sua carteira.";
 
   return (
     <AppShell activePath="/cadastro/usuarios-console">
@@ -40,10 +50,19 @@ export default async function ConsoleUsersPage({ searchParams }: ConsoleUsersPag
           <div className="eyebrow">Cadastro</div>
           <strong>Usuarios do Console</strong>
         </div>
-        <Link className="primary-action" href="/cadastro/usuarios-console/novo">
-          Novo usuario interno
-        </Link>
+        {canInviteSupport ? (
+          <Link className="primary-action" href="/cadastro/usuarios-console/novo">
+            {isSuperAdmin ? "Novo usuario interno" : "Novo suporte"}
+          </Link>
+        ) : null}
       </header>
+
+      {accessResult.error ? (
+        <section className="data-alert" role="status">
+          <strong>Nao foi possivel carregar seu acesso atual.</strong>
+          <span>{accessResult.error}</span>
+        </section>
+      ) : null}
 
       {usersResult.error ? (
         <section className="data-alert" role="status">
@@ -61,8 +80,8 @@ export default async function ConsoleUsersPage({ searchParams }: ConsoleUsersPag
       <section className="content-panel">
         <div className="panel-heading">
           <div>
-            <h1>Equipe interna da plataforma</h1>
-            <p>Superadmins, admins do Console e suporte operacional da FPWebTech.</p>
+            <h1>{pageTitle}</h1>
+            <p>{pageDescription}</p>
           </div>
           <span>{pagination?.total ?? 0} registro(s)</span>
         </div>
@@ -88,13 +107,17 @@ export default async function ConsoleUsersPage({ searchParams }: ConsoleUsersPag
                   <small>Console</small>
                 </span>
                 <span>{statusLabels[user.status]}</span>
-                <Link
-                  href={`/cadastro/usuarios/${user.id}/editar?returnTo=${encodeURIComponent(
-                    `/cadastro/usuarios-console?page=${page}`
-                  )}`}
-                >
-                  Editar
-                </Link>
+                {isSuperAdmin ? (
+                  <Link
+                    href={`/cadastro/usuarios/${user.id}/editar?returnTo=${encodeURIComponent(
+                      `/cadastro/usuarios-console?page=${page}`
+                    )}`}
+                  >
+                    Editar
+                  </Link>
+                ) : (
+                  <span>-</span>
+                )}
               </div>
             ))}
           </div>

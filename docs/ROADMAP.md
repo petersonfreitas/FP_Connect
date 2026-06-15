@@ -155,6 +155,7 @@ Status inicial:
 - ao criar uma empresa, o superadmin autenticado e vinculado automaticamente como suporte administrativo da nova empresa.
 - rotas de menu devem apontar direto para o destino final; paginas usadas apenas como redirecionamento devem ser removidas em limpeza futura.
 - policy inicial permite que `fp_admin` convide e vincule apenas usuarios `support`, enquanto `support` nao delega carteira.
+- menu e telas de usuarios do Console ja refletem essa policy para `fp_admin`, ocultando edicao/promocao global.
 
 ### Bloco B - Shell dos modulos prioritarios
 
