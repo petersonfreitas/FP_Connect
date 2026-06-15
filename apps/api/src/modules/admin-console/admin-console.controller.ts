@@ -92,8 +92,11 @@ export class AdminConsoleController {
 
   @Get("companies/:id/support-candidates")
   @AdminConsolePolicy({ companyParam: "id", permissionKey: "admin.users.manage" })
-  listCompanySupportCandidates(@Param("id") id: string) {
-    return this.adminConsole.listCompanySupportCandidates(id);
+  listCompanySupportCandidates(
+    @Param("id") id: string,
+    @Headers() headers: Record<string, string | string[] | undefined>
+  ) {
+    return this.adminConsole.listCompanySupportCandidates(id, readInternalApiContext(headers));
   }
 
   @Get("companies/:companyId/users/:userId/access")
@@ -187,7 +190,7 @@ export class AdminConsoleController {
   }
 
   @Post("users/console")
-  @AdminConsoleSuperAdminOnly()
+  @AdminConsolePolicy({ platformRoles: ["fp_admin"] })
   createConsoleUser(
     @Body() input: CreateAdminConsoleUserInput,
     @Headers() headers: Record<string, string | string[] | undefined>

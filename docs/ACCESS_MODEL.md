@@ -270,7 +270,7 @@ O backend continua sendo a camada real de seguranca. O menu permissionado melhor
 
 `super_admin` representa o dono administrativo da plataforma. Ele possui bypass global no Admin Console, pode criar empresas, criar usuarios internos, alterar papeis de plataforma, contratar modulos, consultar auditoria global e executar acoes sensiveis. Toda acao deve continuar auditada.
 
-`fp_admin` representa o administrador operacional da plataforma. Ele deve atuar por permissao e carteira, sem bypass global. Pode administrar empresas sob sua responsabilidade, apoiar configuracoes, vincular suporte quando autorizado e consultar auditoria apenas nos escopos permitidos.
+`fp_admin` representa o administrador operacional da plataforma. Ele deve atuar por permissao e carteira, sem bypass global. Pode administrar empresas sob sua responsabilidade, apoiar configuracoes, convidar usuarios `support`, vincular suporte quando autorizado e consultar auditoria apenas nos escopos permitidos. No modelo inicial, `fp_admin` nao cria nem promove `super_admin` ou outro `fp_admin`.
 
 `support` representa suporte operacional interno. Ele deve atuar apenas nas empresas em que estiver vinculado como suporte administrativo, com poder de admin dentro da empresa atendida, mas sem criar empresas, alterar papeis globais ou acessar auditoria global.
 

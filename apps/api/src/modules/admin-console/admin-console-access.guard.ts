@@ -72,6 +72,10 @@ export class AdminConsoleAccessGuard implements CanActivate {
       return true;
     }
 
+    if (policy?.platformRoles?.includes(profile.global_role as "fp_admin" | "support")) {
+      return true;
+    }
+
     if (policy?.superAdminOnly) {
       throw new ForbiddenException("Admin Console requires an active super-admin user");
     }

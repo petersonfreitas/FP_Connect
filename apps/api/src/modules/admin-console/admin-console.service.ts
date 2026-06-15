@@ -1,6 +1,7 @@
 import {
   BadRequestException,
   ConflictException,
+  ForbiddenException,
   Injectable,
   InternalServerErrorException,
   NotFoundException,
@@ -621,16 +622,20 @@ export class AdminConsoleService {
     return this.hydrateCompanyUsers(memberships);
   }
 
-  async listCompanySupportCandidates(companyId: string): Promise<AdminUserContract[]> {
+  async listCompanySupportCandidates(
+    companyId: string,
+    context: InternalApiContext = emptyInternalApiContext
+  ): Promise<AdminUserContract[]> {
     const normalizedCompanyId = normalizeUuid(companyId, "companyId");
     await this.ensureCompanyExists(normalizedCompanyId);
+    const manageableRoles = await this.getSupportAssignableRolesForActor(context);
 
     const memberships = await this.listCompanyMembershipRows(normalizedCompanyId);
     const linkedUserIds = new Set(memberships.map((membership) => membership.user_id));
     const { data, error } = await this.supabase.core
       .from("profiles")
       .select(userSelect)
-      .in("global_role", Array.from(supportAssignmentRoles))
+      .in("global_role", manageableRoles)
       .eq("status", "active")
       .is("deleted_at", null)
       .order("full_name", { ascending: true });
@@ -654,6 +659,7 @@ export class AdminConsoleService {
     await this.ensureCompanyExists(normalizedCompanyId);
 
     const user = await this.getUser(normalizedUserId);
+    await this.assertActorCanAssignSupportUser(context, user);
 
     if (!supportAssignmentRoles.has(user.globalRole)) {
       throw new BadRequestException(
@@ -1003,6 +1009,7 @@ export class AdminConsoleService {
     context: InternalApiContext = emptyInternalApiContext
   ): Promise<AdminUserContract> {
     const userInput = normalizeCreateConsoleUserInput(input);
+    await this.assertActorCanCreateConsoleUser(context, userInput.globalRole);
 
     const { data: authData, error: authError } =
       await this.supabase.admin.auth.admin.inviteUserByEmail(userInput.email, {
@@ -1808,6 +1815,68 @@ export class AdminConsoleService {
         userId: actorUserId
       },
       context
+    );
+  }
+
+  private async getActorUser(context: InternalApiContext): Promise<AdminUserContract> {
+    if (!context.actorUserId) {
+      throw new UnauthorizedException("Authenticated actor is required");
+    }
+
+    return this.getUser(normalizeUuid(context.actorUserId, "actorUserId"));
+  }
+
+  private async getSupportAssignableRolesForActor(
+    context: InternalApiContext
+  ): Promise<UserGlobalRole[]> {
+    const actor = await this.getActorUser(context);
+
+    if (actor.globalRole === "super_admin") {
+      return Array.from(supportAssignmentRoles);
+    }
+
+    if (actor.globalRole === "fp_admin") {
+      return ["support"];
+    }
+
+    throw new ForbiddenException("Somente superadmin ou admin do Console pode delegar suporte");
+  }
+
+  private async assertActorCanAssignSupportUser(
+    context: InternalApiContext,
+    targetUser: AdminUserContract
+  ): Promise<void> {
+    const actor = await this.getActorUser(context);
+
+    if (actor.globalRole === "super_admin") {
+      return;
+    }
+
+    if (actor.globalRole === "fp_admin" && targetUser.globalRole === "support") {
+      return;
+    }
+
+    throw new ForbiddenException(
+      "Admin do Console so pode vincular usuarios com papel de suporte"
+    );
+  }
+
+  private async assertActorCanCreateConsoleUser(
+    context: InternalApiContext,
+    targetRole: CreateAdminConsoleUserInput["globalRole"]
+  ): Promise<void> {
+    const actor = await this.getActorUser(context);
+
+    if (actor.globalRole === "super_admin") {
+      return;
+    }
+
+    if (actor.globalRole === "fp_admin" && targetRole === "support") {
+      return;
+    }
+
+    throw new ForbiddenException(
+      "Admin do Console so pode convidar usuarios com papel de suporte"
     );
   }
 

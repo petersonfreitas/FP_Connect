@@ -7,8 +7,11 @@ export type AdminConsolePolicy = {
   companyBody?: string;
   permissionKey?: AdminConsolePermissionKey;
   companyParam?: string;
+  platformRoles?: AdminConsolePlatformRole[];
   superAdminOnly?: boolean;
 };
+
+export type AdminConsolePlatformRole = "fp_admin" | "support";
 
 export type AdminConsolePermissionKey =
   | "admin.audit.read"

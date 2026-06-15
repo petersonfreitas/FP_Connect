@@ -60,7 +60,7 @@ Este arquivo registra decisoes arquiteturais e operacionais para evitar retrabal
 | DEC-052 | FP Router sera baixa prioridade e atuara como complemento futuro do FP Tracking, com roteirizacao inteligente e apoio logistico/fiscal. | Aprovada |
 | DEC-053 | FP Sign sera modulo futuro para aceite de propostas, contratos simples e arquivamento documental, sem assinatura digital avancada no MVP. | Aprovada |
 | DEC-054 | FP BI sera modulo futuro de indicadores e dashboards, com inicio simples e evolucao apos maturidade dos modulos transacionais. | Aprovada |
-| DEC-055 | Papeis do Console ficam separados entre `super_admin`, `fp_admin`, `support` e `company_user`; usuarios internos possuem CRUD proprio e usuarios de empresa sao administrados no contexto da empresa. | Aprovada |
+| DEC-055 | Papeis do Console ficam separados entre `super_admin`, `fp_admin`, `support` e `company_user`; usuarios internos possuem CRUD proprio, usuarios de empresa sao administrados no contexto da empresa, e `fp_admin` pode convidar/vincular apenas `support` no modelo inicial. | Aprovada |
 | DEC-056 | Menus e links devem apontar diretamente para a tela final; paginas usadas apenas como redirecionamento devem ser removidas em limpeza futura. | Aprovada |
 
 ---

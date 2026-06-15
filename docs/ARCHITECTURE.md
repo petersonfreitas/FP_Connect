@@ -264,7 +264,7 @@ Toda entidade de negocio deve ter `company_id`, salvo entidade claramente global
 
 Identidade, acesso de plataforma, vinculos empresariais e permissoes de modulo sao conceitos separados. Um usuario pode ter acesso global ao Console, estar vinculado a uma ou mais empresas e possuir permissoes diferentes por empresa/modulo.
 
-Usuarios internos do Console sao administrados em rota propria e podem ter papel `super_admin`, `fp_admin` ou `support`. Usuarios de clientes devem nascer e ser administrados no contexto da empresa, mantendo `company_user` como papel global e deixando as permissoes efetivas para vinculo, modulo e papel de aplicacao.
+Usuarios internos do Console sao administrados em rota propria e podem ter papel `super_admin`, `fp_admin` ou `support`. Usuarios de clientes devem nascer e ser administrados no contexto da empresa, mantendo `company_user` como papel global e deixando as permissoes efetivas para vinculo, modulo e papel de aplicacao. Como regra inicial, `fp_admin` pode convidar e vincular apenas usuarios `support`; criacao/promocao de `super_admin` e `fp_admin` permanece restrita ao superadmin.
 
 Superadmins e admins do Console podem ser vinculados operacionalmente como suporte de empresas especificas. Esse vinculo de suporte serve para atendimento, implantacao e futura integracao com FP Suporte, e concede poder administrativo auditavel dentro da empresa atendida. Acoes de alto risco podem exigir permissao adicional mesmo para suporte.
 
