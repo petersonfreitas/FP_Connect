@@ -263,6 +263,8 @@ export type AdminUserContract = {
   fullName: string;
   email: string | null;
   status: UserStatus;
+  globalRole: UserGlobalRole;
+  isInternalUser: boolean;
   createdAt: string;
 };
 
@@ -284,6 +286,7 @@ export type UpdateAdminUserInput = {
   fullName: string;
   email: string;
   status: UserStatus;
+  globalRole: UserGlobalRole;
 };
 
 export type UpdateAdminCompanyApplicationInput = {

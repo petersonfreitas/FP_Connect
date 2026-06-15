@@ -18,6 +18,13 @@ const statusLabels = {
   invited: "Convidado"
 };
 
+const globalRoleLabels = {
+  company_user: "Usuario da empresa",
+  fp_admin: "Admin do Console",
+  super_admin: "Superadmin",
+  support: "Suporte"
+};
+
 export default async function UsersPage({ searchParams }: UsersPageProps) {
   const query = searchParams ? await searchParams : {};
   const page = normalizePage(query.page);
@@ -48,26 +55,31 @@ export default async function UsersPage({ searchParams }: UsersPageProps) {
         <div className="panel-heading">
           <div>
             <h1>Usuarios cadastrados</h1>
-            <p>Perfis centrais do core, prontos para vinculo com empresas.</p>
+            <p>Perfis centrais do core, com papel de plataforma e vinculos empresariais.</p>
           </div>
           <span>{pagination?.total ?? 0} registro(s)</span>
         </div>
 
         {users.length > 0 ? (
           <div className="data-table" role="table" aria-label="Usuarios cadastrados">
-            <div className="data-row data-row-head" role="row">
+            <div className="data-row data-row-head users-row" role="row">
               <span>Usuario</span>
               <span>E-mail</span>
+              <span>Papel</span>
               <span>Status</span>
               <span />
             </div>
             {users.map((user) => (
-              <div className="data-row" role="row" key={user.id}>
+              <div className="data-row users-row" role="row" key={user.id}>
                 <span>
                   <strong>{user.fullName}</strong>
                   <small>{user.id}</small>
                 </span>
                 <span>{user.email ?? "Nao informado"}</span>
+                <span>
+                  <strong>{globalRoleLabels[user.globalRole]}</strong>
+                  <small>{user.isInternalUser ? "Console" : "Empresa"}</small>
+                </span>
                 <span>{statusLabels[user.status]}</span>
                 <Link href={`/cadastro/usuarios/${user.id}/editar`}>Editar</Link>
               </div>

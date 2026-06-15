@@ -115,6 +115,8 @@ type UserRow = {
   full_name: string;
   email: string | null;
   status: AdminUserContract["status"];
+  global_role: UserGlobalRole;
+  is_internal_user: boolean;
   created_at: string;
 };
 
@@ -199,7 +201,7 @@ type ContractedModuleCompanyRow = {
 
 const companySelect =
   "id,person_type,legal_name,trade_name,document,primary_email,primary_phone,primary_mobile_phone,primary_responsible_name,primary_responsible_email,address_postal_code,address_street_type,address_street,address_number,address_complement,address_district,address_city,address_state,status,basic_plan_id,implementation_notes,created_at";
-const userSelect = "id,full_name,email,status,created_at";
+const userSelect = "id,full_name,email,status,global_role,is_internal_user,created_at";
 const applicationSelect = "id,key,name,description,entry_path,status,sort_order";
 const companyApplicationSelect =
   "id,company_id,application_id,status,implementation_notes,activated_at,suspended_at,cancelled_at";
@@ -1063,6 +1065,8 @@ export class AdminConsoleService {
       .update({
         full_name: userInput.fullName,
         email: userInput.email,
+        global_role: userInput.globalRole,
+        is_internal_user: userInput.globalRole !== "company_user",
         status: userInput.status
       })
       .eq("id", userId)
@@ -1095,6 +1099,8 @@ export class AdminConsoleService {
       {
         email: updatedUser.email,
         fullName: updatedUser.fullName,
+        globalRole: updatedUser.globalRole,
+        isInternalUser: updatedUser.isInternalUser,
         membershipStatus: updatedUser.status,
         status: updatedUser.status
       },
@@ -2007,6 +2013,8 @@ function mapUser(row: UserRow): AdminUserContract {
     fullName: row.full_name,
     email: row.email,
     status: row.status,
+    globalRole: row.global_role,
+    isInternalUser: row.is_internal_user,
     createdAt: row.created_at
   };
 }
@@ -2080,8 +2088,22 @@ function normalizeUpdateUserInput(input: UpdateAdminUserInput): UpdateAdminUserI
   return {
     fullName: normalizeRequired(input.fullName, "fullName", 140),
     email: normalizeEmail(input.email),
+    globalRole: normalizeGlobalRole(input.globalRole),
     status: normalizeUserStatus(input.status)
   };
+}
+
+function normalizeGlobalRole(value: unknown): UserGlobalRole {
+  if (
+    value === "company_user" ||
+    value === "fp_admin" ||
+    value === "super_admin" ||
+    value === "support"
+  ) {
+    return value;
+  }
+
+  throw new BadRequestException("globalRole must be company_user, fp_admin, super_admin or support");
 }
 
 function normalizeUserStatus(value: unknown): UpdateAdminUserInput["status"] {

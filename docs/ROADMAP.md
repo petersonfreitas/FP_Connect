@@ -42,6 +42,7 @@ Ja foram implementados:
 - empresas: cadastro, listagem, detalhe e edicao;
 - empresas: contato, celular, documentos e endereco estruturado normalizados;
 - usuarios: cadastro, listagem e edicao;
+- usuarios: papel de plataforma (`company_user`, `support`, `fp_admin`, `super_admin`) exposto no CRUD central;
 - vinculo usuario x empresa;
 - papeis/permissoes por usuario, empresa e modulo;
 - concessao/revogacao de papeis em lote por usuario;
@@ -145,6 +146,7 @@ Status inicial:
 - contrato `GET /api/admin-console/users/me/access` criado;
 - home evita `overview` global para usuarios que nao sao superadmin;
 - menu lateral usa a navegacao retornada pelo backend.
+- CRUD central de usuarios ja permite ajustar papel de plataforma; CRUD separado por contexto ainda deve ser refinado.
 
 ### Bloco B - Shell dos modulos prioritarios
 

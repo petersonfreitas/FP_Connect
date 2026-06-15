@@ -19,6 +19,7 @@ Ja existe base funcional para:
 - cadastro, listagem, detalhe e edicao de empresas;
 - cadastro de empresas com CPF/CNPJ, telefone, celular, CEP e endereco estruturado normalizados;
 - cadastro, listagem e edicao de usuarios;
+- definicao de papel de plataforma no perfil central do usuario;
 - vinculo usuario x empresa;
 - envio e reenvio de convite/ativacao de usuarios por e-mail via Supabase Auth;
 - papeis/permissoes por usuario, empresa e modulo;

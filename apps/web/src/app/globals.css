@@ -505,6 +505,10 @@ button.primary-action {
   padding: 12px 0;
 }
 
+.users-row {
+  grid-template-columns: minmax(220px, 1.3fr) minmax(180px, 1fr) 150px 110px 90px;
+}
+
 .company-users-row {
   grid-template-columns: minmax(220px, 1.3fr) minmax(180px, 1fr) 120px 90px minmax(180px, 0.9fr);
 }

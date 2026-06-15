@@ -42,7 +42,7 @@ export default async function NewUserPage({ searchParams }: NewUserPageProps) {
       <header className="topbar">
         <div>
           <div className="eyebrow">Cadastro</div>
-          <strong>Novo usuario</strong>
+          <strong>Novo usuario da empresa</strong>
         </div>
       </header>
 
@@ -63,8 +63,11 @@ export default async function NewUserPage({ searchParams }: NewUserPageProps) {
       <section className="content-panel">
         <div className="panel-heading">
           <div>
-            <h1>Cadastrar usuario</h1>
-            <p>Envia convite pelo Supabase Auth, registra perfil no core e vincula a empresa.</p>
+            <h1>Cadastrar usuario da empresa</h1>
+            <p>
+              Envia convite pelo Supabase Auth, registra perfil como usuario da empresa e cria o
+              vinculo empresarial.
+            </p>
           </div>
         </div>
 
