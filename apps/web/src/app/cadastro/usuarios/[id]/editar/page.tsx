@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { redirect } from "next/navigation";
 import { AppShell } from "@/components/app-shell";
 import { PendingSubmitButton } from "@/components/pending-submit-button";
@@ -11,6 +12,7 @@ type EditUserPageProps = {
   }>;
   searchParams?: Promise<{
     erro?: string;
+    returnTo?: string;
   }>;
 };
 
@@ -23,6 +25,7 @@ const statusLabels = {
 export default async function EditUserPage({ params, searchParams }: EditUserPageProps) {
   const { id } = await params;
   const query = await searchParams;
+  const returnTo = getSafeReturnPath(query?.returnTo);
   const userResult = await getAdminUser(id);
   const user = userResult.data;
 
@@ -37,14 +40,16 @@ export default async function EditUserPage({ params, searchParams }: EditUserPag
     });
 
     if (result.error || !result.data) {
+      const returnSearch = returnTo ? `&returnTo=${encodeURIComponent(returnTo)}` : "";
+
       redirect(
         `/cadastro/usuarios/${id}/editar?erro=${encodeURIComponent(
           result.error ?? "API interna nao retornou o usuario atualizado."
-        )}`
+        )}${returnSearch}`
       );
     }
 
-    redirect("/cadastro/usuarios");
+    redirect(returnTo ?? "/cadastro/usuarios");
   }
 
   return (
@@ -102,9 +107,9 @@ export default async function EditUserPage({ params, searchParams }: EditUserPag
             </label>
 
             <div className="form-actions">
-              <a className="secondary-action" href="/cadastro/usuarios">
+              <Link className="secondary-action" href={returnTo ?? "/cadastro/usuarios"}>
                 Cancelar
-              </a>
+              </Link>
               <PendingSubmitButton pendingLabel="Salvando...">
                 Salvar alteracoes
               </PendingSubmitButton>
@@ -119,4 +124,12 @@ export default async function EditUserPage({ params, searchParams }: EditUserPag
 function readFormValue(formData: FormData, key: string): string {
   const value = formData.get(key);
   return typeof value === "string" ? value.trim() : "";
+}
+
+function getSafeReturnPath(value: string | undefined): string | null {
+  if (!value || !value.startsWith("/cadastro/") || value.startsWith("//")) {
+    return null;
+  }
+
+  return value;
 }

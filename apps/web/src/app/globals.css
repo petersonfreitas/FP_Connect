@@ -275,6 +275,13 @@ a {
   max-width: 1180px;
 }
 
+.topbar-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  justify-content: flex-end;
+}
+
 .status-pill {
   background: var(--accent-soft);
   border: 1px solid #c6d8df;

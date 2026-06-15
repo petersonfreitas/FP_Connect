@@ -120,9 +120,19 @@ export default async function UserAccessPage({ params, searchParams }: UserAcces
           <div className="eyebrow">Cadastro</div>
           <strong>Acessos do usuario</strong>
         </div>
-        <Link className="secondary-action" href={`/cadastro/empresas/${id}`}>
-          Voltar para empresa
-        </Link>
+        <div className="topbar-actions">
+          <Link
+            className="secondary-action"
+            href={`/cadastro/usuarios/${userId}/editar?returnTo=${encodeURIComponent(
+              `/cadastro/empresas/${id}/usuarios/${userId}`
+            )}`}
+          >
+            Editar perfil
+          </Link>
+          <Link className="secondary-action" href={`/cadastro/empresas/${id}`}>
+            Voltar para empresa
+          </Link>
+        </div>
       </header>
 
       {companyResult.error ? (
