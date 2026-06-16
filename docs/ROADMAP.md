@@ -42,7 +42,10 @@ Ja foram implementados:
 - empresas: cadastro, listagem, detalhe e edicao;
 - empresas: contato, celular, documentos e endereco estruturado normalizados;
 - usuarios: cadastro, listagem e edicao;
+- usuarios: papel de plataforma (`company_user`, `support`, `fp_admin`, `super_admin`) exposto no CRUD central;
 - vinculo usuario x empresa;
+- usuarios da empresa podem ser cadastrados diretamente pelo detalhe da empresa;
+- vinculo empresarial pode ser editado/inativado sem inativar o perfil central;
 - papeis/permissoes por usuario, empresa e modulo;
 - concessao/revogacao de papeis em lote por usuario;
 - catalogo de planos e modulos;
@@ -64,14 +67,16 @@ Ja foram implementados:
 - guard inicial do Admin Console exigindo usuario ativo;
 - policies granulares iniciais por permissao em rotas com contexto de empresa.
 - convite e reenvio de ativacao de usuarios por e-mail via Supabase Auth.
+- policies explicitas em rotas globais, empresas, usuarios, permissoes e modulos do Admin Console.
+- bloqueio efetivo por modulo contratado nos endpoints internos de acesso dos produtos operacionais.
+- inativacao operacional de empresas e usuarios pela UI administrativa.
+- paginacao nas listagens principais de empresas e usuarios.
+- bloqueio visual de botoes enquanto formularios e acoes em lote estao processando.
 
 Pendencias de fundacao antes dos modulos operacionais:
 
-- completar guards/policies em rotas globais, empresas, permissao e modulo;
-- bloqueio efetivo por modulo contratado nas rotas sensiveis;
-- soft delete/inativacao exposto na UI quando autorizado;
-- paginacao nas listagens principais;
-- smoke test manual dos fluxos principais.
+- smoke test manual dos fluxos principais, pendente enquanto o acesso ao Supabase estiver instavel.
+- refinamento do modelo de acesso do Console conforme `docs/ACCESS_MODEL.md`.
 
 ---
 
@@ -107,17 +112,56 @@ Empresa ativa
 
 Objetivo: transformar a base funcional em fundacao segura para escalar.
 
-Itens:
+Status: praticamente concluido; falta validacao manual integrada.
+
+Itens concluidos:
 
 - guards/policies nas rotas sensiveis;
 - resolucao de empresa/contexto ativo;
 - revisao de bloqueios por empresa, permissao e modulo contratado;
 - paginacao nas listagens principais;
+- bloqueio visual de botoes durante processamento.
+- contrato inicial do usuario atual para portal contextual;
+- menu gerado pelo contrato de acesso.
+
+Item pendente:
+
 - smoke test de empresas, usuarios, permissoes, modulos e auditoria.
+
+### Bloco A.1 - Modelo de acesso e UX permissionada
+
+Objetivo: separar acesso de plataforma, acesso empresarial, permissoes de modulo e carteira operacional de suporte antes de evoluir os produtos operacionais.
+
+Itens:
+
+- criar contrato server-side do usuario atual com escopos permitidos;
+- trocar a home global por portal contextual;
+- gerar menus conforme permissoes reais;
+- separar CRUD de usuarios do Console e usuarios da empresa;
+- permitir usuario vinculado a varias empresas;
+- vincular superadmin automaticamente como suporte ao cadastrar empresa;
+- permitir delegacao de suporte por carteira para admins do Console;
+- preparar o modelo para futura referencia no FP Suporte.
+
+Status inicial:
+
+- contrato `GET /api/admin-console/users/me/access` criado;
+- home evita `overview` global para usuarios que nao sao superadmin;
+- menu lateral usa a navegacao retornada pelo backend.
+- CRUD de usuarios do Console possui rota propria para listagem, convite e edicao de perfis internos.
+- cadastro de usuario da empresa ja nasce no detalhe da empresa, mantendo `/cadastro/usuarios` como gestao central de perfis.
+- edicao de status e contato principal do vinculo empresarial ja ocorre no contexto empresa/usuario.
+- vinculo simples de suporte por carteira usa `company_memberships` e concede o papel `company-admin` do Admin Console para usuarios `super_admin`, `fp_admin` ou `support` ativos.
+- ao criar uma empresa, o superadmin autenticado e vinculado automaticamente como suporte administrativo da nova empresa.
+- rotas de menu apontam direto para o destino final; rotas de cadastro usadas apenas como redirecionamento foram removidas.
+- policy inicial permite que `fp_admin` convide e vincule apenas usuarios `support`, enquanto `support` nao delega carteira.
+- menu e telas de usuarios do Console ja refletem essa policy para `fp_admin`, ocultando edicao/promocao global.
 
 ### Bloco B - Shell dos modulos prioritarios
 
 Objetivo: criar estrutura visual e de navegacao para os modulos.
+
+Status: iniciado com o shell V0 do FP Robots.
 
 Modulos:
 
@@ -137,6 +181,10 @@ Cada shell deve ter:
 - estado vazio;
 - estrutura inicial de pastas/componentes.
 
+Para o FP Robots, o shell V0 deve nascer preparado para a separacao futura com o FP Gateway: Robots orquestra eventos, regras e execucoes; Gateway, quando definido, encapsula provedores externos e canais como WhatsApp, Instagram, Facebook, Ads e pagamentos.
+
+FP Robots V0 ja possui rota `/robots`, entrada no menu, visao inicial, secoes planejadas, estado vazio e nota visual sobre a fronteira futura com o FP Gateway.
+
 ### Bloco C - Robots minimo
 
 Objetivo: preparar o registro de eventos do ecossistema.
@@ -152,6 +200,8 @@ Itens:
 - status;
 - erro/log basico;
 - listagem e detalhe simples.
+
+O Robots minimo deve evitar acoplamento direto com APIs externas especificas. Acoes destinadas a provedores externos devem ser modeladas como comandos padronizados, deixando credenciais, chamadas externas, normalizacao de resposta e detalhes do provedor para o futuro FP Gateway quando ele for detalhado.
 
 ### Bloco D - Food ate pedido funcional
 
@@ -210,19 +260,21 @@ Pedido criado no Food
 
 Depois da base Admin Console + Robots + Food + Tracking, integrar progressivamente:
 
-1. **FP Billing**
-   - planos;
-   - modulos contratados;
-   - cobrancas;
-   - pagamentos;
-   - inadimplencia;
-   - suspensao/reativacao.
+### Fase 2 - Integracoes e expansao operacional
 
-2. **FP Tickets**
-   - suporte;
-   - implantacao/onboarding;
-   - chamados;
-   - vinculo com empresa, cliente e modulo.
+1. **FP Gateway**
+   - integracoes externas;
+   - credenciais e OAuth por empresa;
+   - Mercado Pago e futuros provedores de pagamento;
+   - WhatsApp e Meta;
+   - execucao de chamadas externas solicitadas por automacoes do FP Robots;
+   - normalizacao de respostas e status operacionais.
+
+2. **FP Fiscal**
+   - configuracao fiscal por empresa;
+   - emissao, controle e historico fiscal;
+   - foco inicial na evolucao fiscal do FP Food;
+   - integracao futura com provedores fiscais quando aprovado.
 
 3. **FP Sales**
    - clientes;
@@ -236,7 +288,44 @@ Depois da base Admin Console + Robots + Food + Tracking, integrar progressivamen
    - qualificacao;
    - conversao para Sales.
 
-5. **FP Monitor**
+5. **FP Tickets**
+   - suporte;
+   - implantacao/onboarding;
+   - chamados;
+   - vinculo com empresa, cliente e modulo.
+
+6. **FP Billing**
+   - planos;
+   - modulos contratados;
+   - cobrancas;
+   - pagamentos;
+   - inadimplencia;
+   - suspensao/reativacao.
+
+### Fase 3 - Formalizacao, analise e evolucao logistica
+
+7. **FP Sign**
+   - aceite simples de propostas;
+   - contratos simples;
+   - arquivamento documental;
+   - evidencias basicas de aceite;
+   - sem assinatura digital avancada no MVP.
+
+8. **FP BI**
+   - indicadores;
+   - dashboards;
+   - relatorios;
+   - leitura analitica cross-module quando houver dados suficientes.
+
+9. **FP Router**
+   - planejamento de rotas;
+   - roteirizacao inteligente;
+   - aprovacao humana de planos;
+   - apoio logistico/fiscal;
+   - complemento futuro do FP Tracking;
+   - absorve o antigo conceito EixoGuard.
+
+10. **FP Monitor**
    - disponibilidade de APIs internas;
    - latencia e falhas por modulo;
    - checks de saude e incidentes;
@@ -252,3 +341,9 @@ O FP Monitor fica planejado para o final do projeto. Pode ser antecipado apenas 
 Gateway de pagamento, nota fiscal, integracoes externas, BI avancado e recursos complexos nao sao proibidos.
 
 Devem ser implementados no momento adequado, quando estiverem no backlog da etapa atual ou quando houver autorizacao explicita.
+
+O FP Gateway deve ser priorizado antes de integracoes automaticas de pagamento, WhatsApp e Meta. LinkedIn e gov.br ficam fora do escopo inicial.
+
+O FP Router fica em baixa prioridade e absorve o antigo EixoGuard. Sua implementacao deve ocorrer apenas apos maturidade minima do FP Tracking e necessidade real de roteirizacao inteligente.
+
+O site institucional da FPWebTech sera tratado como projeto isolado e nao entra no roadmap operacional dos modulos SaaS.

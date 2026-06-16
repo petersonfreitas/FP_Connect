@@ -28,6 +28,7 @@ Isso significa:
 - `super_admin` possui bypass global;
 - rotas com contexto de empresa podem usar policies granulares por permissao;
 - rotas globais continuam restritas a super-admin;
+- endpoints internos de acesso dos produtos operacionais exigem empresa ativa, modulo contratado ativo e permissao do modulo; `super_admin` ignora permissao granular, mas nao ignora modulo contratado;
 - toda mutacao auditavel deve receber contexto de usuario autenticado.
 
 Quando houver cliente Supabase no navegador, a decisao deve ser explicita e a seguranca deve depender de RLS, escopo por empresa e permissoes.
@@ -41,7 +42,8 @@ Toda query nova deve seguir estes pontos:
 - aplicar escopo por `company_id` em entidades de negocio;
 - validar acesso antes de consultar dados sensiveis;
 - usar `limit` em listagens;
-- preferir paginacao por cursor/keyset quando houver ordenacao por data ou id;
+- usar paginacao com limite maximo definido pelo backend;
+- preferir cursor/keyset quando houver volume alto, ordenacao temporal intensa ou necessidade de evitar saltos em dados mutaveis;
 - evitar N+1; buscar ids em lote com `in(...)` quando apropriado;
 - retornar payload enxuto para listagens e detalhe separado para dados pesados;
 - usar `Promise.all` apenas para consultas independentes;
@@ -67,11 +69,17 @@ Listagens novas devem nascer paginadas.
 
 Padrao recomendado:
 
-- `limit` padrao entre 25 e 50;
+- `page` e `pageSize` sao aceitaveis para listagens administrativas de volume moderado;
+- `pageSize` padrao entre 20 e 50;
 - `limit` maximo definido pelo backend;
 - cursor por `created_at` e `id` quando a ordenacao for temporal;
 - filtros permitidos explicitamente no contrato;
-- retorno com `items` e `nextCursor`.
+- retorno com `items` e metadados de paginacao, como `page`, `pageSize`, `total` e `totalPages`, ou `nextCursor` em listagens por cursor.
+
+Estado atual:
+
+- empresas e usuarios do Admin Console usam `page`, `pageSize`, `total` e `totalPages`;
+- auditoria e modulos contratados ainda usam limite fixo/listagem simples e devem ser os proximos candidatos a paginacao quando o volume exigir.
 
 Listagens pequenas de catalogo global podem continuar sem paginacao enquanto tiverem volume controlado.
 
@@ -91,6 +99,94 @@ Evitar neste momento:
 - cache de dados por empresa;
 - cache de permissoes de usuario sem invalidacao clara;
 - cache de payload sensivel.
+
+## Custo Supabase
+
+O custo do Supabase nao deve ser tratado como "custo por clique" isolado. Uma acao do usuario pode gerar consumo em banco, compute, Auth MAU, egress, storage, logs, Realtime ou Edge Functions.
+
+Referencias oficiais para acompanhar antes de ir a producao:
+
+- Billing e quotas: https://supabase.com/docs/guides/platform/billing-on-supabase
+- Compute e disco: https://supabase.com/docs/guides/platform/compute-and-disk
+- Rate limits de Auth: https://supabase.com/docs/guides/auth/rate-limits
+- Cost control e spend cap: https://supabase.com/docs/guides/platform/cost-control
+- Otimizacao de queries: https://supabase.com/docs/guides/database/query-optimization
+
+Padrao para MVP no plano gratuito:
+
+- usar o projeto free para desenvolvimento, homologacao e pilotos pequenos;
+- manter banco, storage e egress enxutos;
+- evitar Realtime, Storage pesado e jobs recorrentes ate haver necessidade real;
+- medir rotas mais usadas antes de otimizar prematuramente;
+- manter dados seed/mock fora do projeto de producao;
+- revisar dashboard de usage do Supabase ao fim de cada ciclo de testes.
+
+Padrao para producao com clientes reais:
+
+- usar plano pago antes de operar clientes ativos;
+- separar ambiente de producao dos ambientes de teste;
+- habilitar controles de custo disponiveis no plano;
+- acompanhar CPU, memoria, conexoes, disco, egress, Auth MAU e storage;
+- testar carga em ambiente de staging quando houver fluxo novo de alto volume;
+- projetar limites por empresa, usuario e modulo contratado.
+
+## Medicao de chamadas
+
+Rotas internas que consultam Supabase devem gerar uma trilha minima de metricas. No MVP, isso comeca pelo `RequestMetricsMiddleware` global da API Nest; depois pode evoluir para tabela de metricas, APM ou observabilidade externa.
+
+Campos recomendados:
+
+- rota e metodo;
+- status HTTP;
+- duracao em milissegundos;
+- `actor_user_id` quando existir;
+- `company_id` quando existir;
+- modulo ou aplicacao funcional;
+- resultado do rate limit;
+- flag de rota lenta quando ultrapassar o alvo definido para o modulo.
+
+Campos atuais no log estruturado:
+
+- `event`: sempre `api.request`;
+- `outcome`: `ok` ou `error`;
+- `method`, `path`, `module`, `statusCode` e `durationMs`;
+- `slow`: verdadeiro quando a rota ultrapassa 1000 ms;
+- `actorUserId` e `companyId` quando os headers internos existem;
+- `clientIp` para diagnostico operacional;
+- `rateLimit.limit`, `rateLimit.remaining`, `rateLimit.reset` e `rateLimit.retryAfter`.
+
+Nao registrar:
+
+- tokens;
+- chaves de API;
+- payload sensivel;
+- dados pessoais sem necessidade operacional.
+
+Antes de criar otimizacoes, cache ou RPCs, use esses logs para descobrir:
+
+- rotas mais chamadas;
+- rotas lentas;
+- rotas com muitos 4xx/5xx;
+- rotas batendo em rate limit;
+- empresas ou fluxos que concentram consumo.
+
+## Rate limit da API interna
+
+A API Nest possui `RateLimitGuard` global como primeira barreira antes de consultas ao Supabase.
+
+Configuracao atual:
+
+- health check fica fora do limite;
+- requests internos validos com `x-fp-internal-token` usam chave por `x-fp-actor-user-id`, empresa e metodo;
+- requests sem token interno valido usam chave por IP e metodo;
+- leitura autenticada: 120 requests por minuto;
+- mutacao autenticada: 20 requests por minuto;
+- leitura por IP: 60 requests por minuto;
+- mutacao por IP: 15 requests por minuto;
+- resposta bloqueada retorna HTTP 429 com `Retry-After`;
+- todas as respostas controladas recebem `X-RateLimit-Limit`, `X-RateLimit-Remaining` e `X-RateLimit-Reset`.
+
+Esta versao e intencionalmente em memoria para o MVP. Quando houver multiplas instancias, alto volume ou necessidade de limite compartilhado por ambiente, a implementacao deve migrar para Redis/Upstash ou componente equivalente, mantendo os mesmos headers e contrato de erro.
 
 ## Operacoes em lote
 
@@ -116,3 +212,14 @@ Antes de concluir uma entidade nova em qualquer schema de modulo:
 - [ ] listagens sao paginadas ou justificadamente pequenas;
 - [ ] API valida autenticacao, empresa, vinculo, permissao e modulo contratado;
 - [ ] frontend nao recebe segredos nem depende de regra critica visual.
+
+## UX de processamento
+
+Formularios e acoes que disparam chamadas server-side devem bloquear novo envio enquanto a solicitacao esta pendente.
+
+Padrao atual:
+
+- usar componente de submit com estado pendente quando a acao usa Server Action;
+- alterar o texto do botao para indicar processamento;
+- desabilitar botoes em acoes em lote quando nao houver selecao ou enquanto a acao estiver pendente;
+- usar modal/overlay apenas para operacoes longas, criticas ou com progresso real conhecido.

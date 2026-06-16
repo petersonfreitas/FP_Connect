@@ -50,7 +50,8 @@ export default async function EditCompanyPage({ params, searchParams }: EditComp
       addressCity: readOptionalFormValue(formData, "addressCity"),
       addressState: readOptionalFormValue(formData, "addressState"),
       basicPlanId: readOptionalFormValue(formData, "basicPlanId"),
-      implementationNotes: readOptionalFormValue(formData, "implementationNotes")
+      implementationNotes: readOptionalFormValue(formData, "implementationNotes"),
+      status: normalizeCompanyStatus(readFormValue(formData, "status"))
     });
 
     if (result.error || !result.data) {
@@ -124,4 +125,17 @@ function readFormValue(formData: FormData, key: string): string {
 function readOptionalFormValue(formData: FormData, key: string): string | null {
   const value = readFormValue(formData, key);
   return value || null;
+}
+
+function normalizeCompanyStatus(value: string) {
+  if (
+    value === "active" ||
+    value === "cancelled" ||
+    value === "implementation" ||
+    value === "suspended"
+  ) {
+    return value;
+  }
+
+  return "implementation";
 }

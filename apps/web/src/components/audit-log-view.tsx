@@ -14,6 +14,8 @@ const actionLabels: Record<string, string> = {
   "core.company.created": "Empresa criada",
   "core.company.updated": "Empresa atualizada",
   "core.company_application.updated": "Modulo atualizado",
+  "core.company_membership.updated": "Vinculo empresarial atualizado",
+  "core.company_support.linked": "Suporte vinculado a empresa",
   "core.user.invite_accepted": "Convite aceito",
   "core.user.invite_resent": "Convite reenviado",
   "core.user.invited": "Usuario convidado",

@@ -3,10 +3,14 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { AppShell } from "@/components/app-shell";
 import { CompanyModulesTable } from "@/components/company-modules-table";
+import { PendingSubmitButton } from "@/components/pending-submit-button";
 import {
   bulkUpdateAdminCompanyApplications,
+  createAdminUser,
   getAdminCompany,
+  linkAdminCompanySupport,
   listAdminCompanyApplications,
+  listAdminCompanySupportCandidates,
   listAdminCompanyUsers,
   resendAdminUserInvite
 } from "@/lib/internal-api";
@@ -32,6 +36,13 @@ const personTypeLabels = {
   legal_entity: "Pessoa Juridica"
 };
 
+const globalRoleLabels = {
+  company_user: "Usuario da empresa",
+  fp_admin: "Admin do Console",
+  super_admin: "Superadmin",
+  support: "Suporte"
+};
+
 export default async function CompanyDetailPage({ params, searchParams }: CompanyDetailPageProps) {
   const { id } = await params;
   const query = searchParams ? await searchParams : {};
@@ -39,6 +50,39 @@ export default async function CompanyDetailPage({ params, searchParams }: Compan
   const inviteSent = getQueryValue(query.inviteSent);
   const moduleError = getQueryValue(query.moduleError);
   const moduleSaved = getQueryValue(query.moduleSaved);
+  const supportError = getQueryValue(query.supportError);
+  const supportLinked = getQueryValue(query.supportLinked);
+  const userError = getQueryValue(query.userError);
+  const userCreated = getQueryValue(query.userCreated);
+  const userCreatedMessage =
+    userCreated && userCreated !== "1" ? userCreated : "Usuario vinculado com sucesso.";
+
+  async function createCompanyUserAction(formData: FormData) {
+    "use server";
+
+    const result = await createAdminUser({
+      companyId: id,
+      email: readFormValue(formData, "email"),
+      fullName: readFormValue(formData, "fullName"),
+      isPrimaryContact: formData.get("isPrimaryContact") === "on"
+    });
+
+    revalidatePath(`/cadastro/empresas/${id}`);
+
+    if (result.error || !result.data) {
+      redirect(
+        `/cadastro/empresas/${id}?userError=${encodeURIComponent(
+          result.error ?? "API interna nao retornou o usuario criado."
+        )}`
+      );
+    }
+
+    redirect(
+      `/cadastro/empresas/${id}?userCreated=${encodeURIComponent(
+        `${result.data.fullName} foi convidado para a empresa.`
+      )}`
+    );
+  }
 
   async function bulkUpdateModulesAction(formData: FormData) {
     "use server";
@@ -84,13 +128,44 @@ export default async function CompanyDetailPage({ params, searchParams }: Compan
     redirect(`/cadastro/empresas/${id}?inviteSent=1`);
   }
 
-  const [companyResult, usersResult, applicationsResult] = await Promise.all([
-    getAdminCompany(id),
-    listAdminCompanyUsers(id),
-    listAdminCompanyApplications(id)
-  ]);
+  async function linkSupportAction(formData: FormData) {
+    "use server";
+
+    const userId = readFormValue(formData, "userId");
+    const result = await linkAdminCompanySupport(id, {
+      userId
+    });
+
+    revalidatePath(`/cadastro/empresas/${id}`);
+
+    if (result.error || !result.data) {
+      redirect(
+        `/cadastro/empresas/${id}?supportError=${encodeURIComponent(
+          result.error ?? "API interna nao retornou o suporte vinculado."
+        )}`
+      );
+    }
+
+    redirect(
+      `/cadastro/empresas/${id}?supportLinked=${encodeURIComponent(
+        `${result.data.fullName} foi vinculado como suporte administrativo.`
+      )}`
+    );
+  }
+
+  const [companyResult, usersResult, supportCandidatesResult, applicationsResult] =
+    await Promise.all([
+      getAdminCompany(id),
+      listAdminCompanyUsers(id),
+      listAdminCompanySupportCandidates(id),
+      listAdminCompanyApplications(id)
+    ]);
   const company = companyResult.data;
   const users = usersResult.data ?? [];
+  const supportCandidates = supportCandidatesResult.data ?? [];
+  const supportUsers = users.filter(
+    (user) => user.globalRole !== "company_user" || user.isInternalUser
+  );
   const applications = applicationsResult.data ?? [];
 
   return (
@@ -221,7 +296,7 @@ export default async function CompanyDetailPage({ params, searchParams }: Compan
             <h1>Usuarios vinculados</h1>
             <p>Perfis com vinculo ativo ou convite pendente nesta empresa.</p>
           </div>
-          <Link className="primary-action" href="/cadastro/usuarios/novo">
+          <Link className="primary-action" href="#novo-usuario">
             Novo usuario
           </Link>
         </div>
@@ -246,6 +321,19 @@ export default async function CompanyDetailPage({ params, searchParams }: Compan
           </div>
         ) : null}
 
+        {userError ? (
+          <div className="data-alert inline-alert" role="status">
+            <strong>Nao foi possivel cadastrar o usuario.</strong>
+            <span>{userError}</span>
+          </div>
+        ) : null}
+
+        {userCreated ? (
+          <div className="form-alert neutral module-feedback" role="status">
+            {userCreatedMessage}
+          </div>
+        ) : null}
+
         {users.length > 0 ? (
           <div className="data-table" role="table" aria-label="Usuarios vinculados">
             <div className="data-row data-row-head company-users-row" role="row">
@@ -260,6 +348,9 @@ export default async function CompanyDetailPage({ params, searchParams }: Compan
                 <span>
                   <strong>{user.fullName}</strong>
                   <small>{user.id}</small>
+                  {user.globalRole !== "company_user" || user.isInternalUser ? (
+                    <small>{globalRoleLabels[user.globalRole]}</small>
+                  ) : null}
                 </span>
                 <span>{user.email ?? "Nao informado"}</span>
                 <span>{user.membershipStatus}</span>
@@ -271,9 +362,12 @@ export default async function CompanyDetailPage({ params, searchParams }: Compan
                   {user.status === "invited" && user.membershipStatus === "invited" ? (
                     <form action={resendInviteAction}>
                       <input name="userId" type="hidden" value={user.id} />
-                      <button className="secondary-action compact-action" type="submit">
+                      <PendingSubmitButton
+                        className="secondary-action compact-action"
+                        pendingLabel="Reenviando..."
+                      >
                         Reenviar convite
-                      </button>
+                      </PendingSubmitButton>
                     </form>
                   ) : null}
                 </span>
@@ -284,6 +378,123 @@ export default async function CompanyDetailPage({ params, searchParams }: Compan
           <div className="empty-state">Nenhum usuario vinculado a esta empresa ainda.</div>
         )}
       </section>
+
+      {company ? (
+        <section className="content-panel stack-panel">
+          <div className="panel-heading">
+            <div>
+              <h1>Carteira de suporte</h1>
+              <p>Vincule operadores internos com poder administrativo nesta empresa.</p>
+            </div>
+            <span>{supportUsers.length} suporte(s)</span>
+          </div>
+
+          {supportCandidatesResult.error ? (
+            <div className="data-alert inline-alert" role="status">
+              <strong>Nao foi possivel carregar candidatos de suporte.</strong>
+              <span>{supportCandidatesResult.error}</span>
+            </div>
+          ) : null}
+
+          {supportError ? (
+            <div className="data-alert inline-alert" role="status">
+              <strong>Nao foi possivel vincular suporte.</strong>
+              <span>{supportError}</span>
+            </div>
+          ) : null}
+
+          {supportLinked ? (
+            <div className="form-alert neutral module-feedback" role="status">
+              {supportLinked}
+            </div>
+          ) : null}
+
+          {supportUsers.length > 0 ? (
+            <div className="data-table" role="table" aria-label="Carteira de suporte">
+              <div className="data-row data-row-head company-users-row" role="row">
+                <span>Suporte</span>
+                <span>E-mail</span>
+                <span>Status</span>
+                <span>Papel</span>
+                <span>Acoes</span>
+              </div>
+              {supportUsers.map((user) => (
+                <div className="data-row company-users-row" role="row" key={user.membershipId}>
+                  <span>
+                    <strong>{user.fullName}</strong>
+                    <small>{user.id}</small>
+                  </span>
+                  <span>{user.email ?? "Nao informado"}</span>
+                  <span>{user.membershipStatus}</span>
+                  <span>{globalRoleLabels[user.globalRole]}</span>
+                  <span className="row-actions">
+                    <Link href={`/cadastro/empresas/${id}/usuarios/${user.id}`}>Acessos</Link>
+                  </span>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="empty-state">Nenhum suporte administrativo vinculado ainda.</div>
+          )}
+
+          <form className="form-grid" action={linkSupportAction}>
+            <label>
+              Usuario interno
+              <select name="userId" required>
+                <option value="">Selecione um usuario ativo do Console</option>
+                {supportCandidates.map((user) => (
+                  <option key={user.id} value={user.id}>
+                    {user.fullName} - {globalRoleLabels[user.globalRole]}
+                  </option>
+                ))}
+              </select>
+            </label>
+
+            <div className="form-actions">
+              <PendingSubmitButton
+                disabled={supportCandidates.length === 0}
+                pendingLabel="Vinculando suporte..."
+              >
+                Vincular suporte
+              </PendingSubmitButton>
+            </div>
+          </form>
+        </section>
+      ) : null}
+
+      {company ? (
+        <section className="content-panel stack-panel" id="novo-usuario">
+          <div className="panel-heading">
+            <div>
+              <h1>Cadastrar usuario nesta empresa</h1>
+              <p>Convide uma pessoa ja vinculada ao contexto da empresa atual.</p>
+            </div>
+          </div>
+
+          <form className="form-grid" action={createCompanyUserAction}>
+            <label>
+              Nome completo
+              <input maxLength={140} name="fullName" required />
+            </label>
+
+            <label>
+              E-mail
+              <input maxLength={254} name="email" required type="email" />
+            </label>
+
+            <label className="checkbox-field">
+              <input name="isPrimaryContact" type="checkbox" />
+              Definir como contato principal da empresa
+            </label>
+
+            <div className="form-actions">
+              <PendingSubmitButton pendingLabel="Enviando convite...">
+                Enviar convite
+              </PendingSubmitButton>
+            </div>
+          </form>
+        </section>
+      ) : null}
     </AppShell>
   );
 }

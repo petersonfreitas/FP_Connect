@@ -5,11 +5,13 @@ import { dirname, join } from "node:path";
 import { cwd, loadEnvFile } from "node:process";
 import { AppModule } from "./app.module";
 import { AppConfigService } from "./config/app-config.service";
+import { requestMetricsMiddleware } from "./observability/request-metrics.middleware";
 
 loadLocalEnv();
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
+  app.use(requestMetricsMiddleware);
   app.setGlobalPrefix("api");
 
   const config = app.get(AppConfigService);

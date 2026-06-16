@@ -1,5 +1,7 @@
+import Link from "next/link";
 import { redirect } from "next/navigation";
 import { AppShell } from "@/components/app-shell";
+import { PendingSubmitButton } from "@/components/pending-submit-button";
 import { getAdminUser, updateAdminUser } from "@/lib/internal-api";
 
 export const dynamic = "force-dynamic";
@@ -10,6 +12,7 @@ type EditUserPageProps = {
   }>;
   searchParams?: Promise<{
     erro?: string;
+    returnTo?: string;
   }>;
 };
 
@@ -19,9 +22,20 @@ const statusLabels = {
   invited: "Convidado"
 };
 
+const globalRoleLabels = {
+  company_user: "Usuario da empresa",
+  fp_admin: "Admin do Console",
+  super_admin: "Superadmin",
+  support: "Suporte"
+};
+
 export default async function EditUserPage({ params, searchParams }: EditUserPageProps) {
   const { id } = await params;
   const query = await searchParams;
+  const returnTo = getSafeReturnPath(query?.returnTo);
+  const activePath = returnTo?.startsWith("/cadastro/usuarios-console")
+    ? "/cadastro/usuarios-console"
+    : "/cadastro/usuarios";
   const userResult = await getAdminUser(id);
   const user = userResult.data;
 
@@ -32,22 +46,25 @@ export default async function EditUserPage({ params, searchParams }: EditUserPag
     const result = await updateAdminUser(id, {
       fullName: readFormValue(formData, "fullName"),
       email: readFormValue(formData, "email"),
+      globalRole: normalizeGlobalRole(readFormValue(formData, "globalRole")),
       status: status === "active" || status === "inactive" || status === "invited" ? status : "invited"
     });
 
     if (result.error || !result.data) {
+      const returnSearch = returnTo ? `&returnTo=${encodeURIComponent(returnTo)}` : "";
+
       redirect(
         `/cadastro/usuarios/${id}/editar?erro=${encodeURIComponent(
           result.error ?? "API interna nao retornou o usuario atualizado."
-        )}`
+        )}${returnSearch}`
       );
     }
 
-    redirect("/cadastro/usuarios");
+    redirect(returnTo ?? "/cadastro/usuarios");
   }
 
   return (
-    <AppShell activePath="/cadastro/usuarios">
+    <AppShell activePath={activePath}>
       <header className="topbar">
         <div>
           <div className="eyebrow">Cadastro</div>
@@ -76,6 +93,7 @@ export default async function EditUserPage({ params, searchParams }: EditUserPag
               <h1>{user.fullName}</h1>
               <p>Atualize os dados administrativos do perfil central.</p>
             </div>
+            <span>{user.isInternalUser ? "Usuario do Console" : "Usuario da empresa"}</span>
           </div>
 
           <form className="form-grid" action={updateUserAction}>
@@ -100,13 +118,30 @@ export default async function EditUserPage({ params, searchParams }: EditUserPag
               </select>
             </label>
 
+            <label>
+              Papel de plataforma
+              <select name="globalRole" required defaultValue={user.globalRole}>
+                {Object.entries(globalRoleLabels).map(([value, label]) => (
+                  <option key={value} value={value}>
+                    {label}
+                  </option>
+                ))}
+              </select>
+            </label>
+
+            <div className="form-alert neutral">
+              Usuarios com papel Superadmin, Admin do Console ou Suporte sao tratados como usuarios
+              internos da plataforma. Usuarios da empresa continuam com acesso definido pelos
+              vinculos e permissoes por modulo.
+            </div>
+
             <div className="form-actions">
-              <a className="secondary-action" href="/cadastro/usuarios">
+              <Link className="secondary-action" href={returnTo ?? "/cadastro/usuarios"}>
                 Cancelar
-              </a>
-              <button className="primary-action" type="submit">
+              </Link>
+              <PendingSubmitButton pendingLabel="Salvando...">
                 Salvar alteracoes
-              </button>
+              </PendingSubmitButton>
             </div>
           </form>
         </section>
@@ -118,4 +153,25 @@ export default async function EditUserPage({ params, searchParams }: EditUserPag
 function readFormValue(formData: FormData, key: string): string {
   const value = formData.get(key);
   return typeof value === "string" ? value.trim() : "";
+}
+
+function normalizeGlobalRole(value: string) {
+  if (
+    value === "company_user" ||
+    value === "fp_admin" ||
+    value === "super_admin" ||
+    value === "support"
+  ) {
+    return value;
+  }
+
+  return "company_user";
+}
+
+function getSafeReturnPath(value: string | undefined): string | null {
+  if (!value || !value.startsWith("/cadastro/") || value.startsWith("//")) {
+    return null;
+  }
+
+  return value;
 }

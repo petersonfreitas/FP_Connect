@@ -2,6 +2,7 @@
 
 import type { AdminRoleContract, AdminUserApplicationRoleContract } from "@fp/types";
 import { useMemo, useState } from "react";
+import { PendingSubmitButton } from "@/components/pending-submit-button";
 
 type UserRolesTableProps = {
   availableRoles: AdminRoleContract[];
@@ -64,9 +65,9 @@ export function UserRolesTable({
         <div className="bulk-action-bar role-action-bar">
           <strong>{selectedRoleIds.length} selecionado(s)</strong>
           <span>Disponiveis para concessao</span>
-          <button className="primary-action" disabled={selectedRoleIds.length === 0} type="submit">
+          <PendingSubmitButton disabled={selectedRoleIds.length === 0} pendingLabel="Concedendo...">
             Conceder em lote
-          </button>
+          </PendingSubmitButton>
         </div>
 
         {grantableRoles.length > 0 ? (
@@ -135,13 +136,13 @@ export function UserRolesTable({
         <div className="bulk-action-bar role-action-bar">
           <strong>{selectedGrantIds.length} selecionado(s)</strong>
           <span>Papeis concedidos</span>
-          <button
+          <PendingSubmitButton
             className="secondary-action"
             disabled={selectedGrantIds.length === 0}
-            type="submit"
+            pendingLabel="Revogando..."
           >
             Revogar em lote
-          </button>
+          </PendingSubmitButton>
         </div>
 
         {grants.length > 0 ? (

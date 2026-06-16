@@ -18,14 +18,21 @@ import type {
   AdminConsoleOverviewContract,
   AdminCatalogContract,
   AdminContractedModuleContract,
+  AdminCurrentUserAccessContract,
   AdminUserApplicationRoleContract,
   AdminUserContract,
   CreateAdminCompanyInput,
+  CreateAdminConsoleUserInput,
   CreateAdminUserInput,
   GrantAdminUserRoleInput,
+  LinkAdminCompanySupportInput,
+  ModuleAccessContract,
+  ModuleApplicationKey,
+  PaginatedContract,
   ResendAdminUserInviteContract,
   RevokeAdminUserRoleContract,
   RevokeAdminUserRoleInput,
+  UpdateAdminCompanyUserInput,
   UpdateAdminCompanyInput,
   UpdateAdminUserInput,
   UpdateAdminCompanyApplicationInput
@@ -51,8 +58,24 @@ export async function getAdminConsoleOverview(): Promise<
   return fetchInternal<AdminConsoleOverviewContract>("admin-console/overview");
 }
 
-export async function listAdminCompanies(): Promise<InternalApiResult<AdminCompanyContract[]>> {
-  return fetchInternal<AdminCompanyContract[]>("admin-console/companies");
+export async function getCurrentAdminAccess(): Promise<
+  InternalApiResult<AdminCurrentUserAccessContract>
+> {
+  return fetchInternal<AdminCurrentUserAccessContract>("admin-console/users/me/access");
+}
+
+type PaginationParams = {
+  page?: number;
+  pageSize?: number;
+  scope?: "all" | "company" | "platform";
+};
+
+export async function listAdminCompanies(
+  pagination: PaginationParams = {}
+): Promise<InternalApiResult<PaginatedContract<AdminCompanyContract>>> {
+  return fetchInternal<PaginatedContract<AdminCompanyContract>>(
+    `admin-console/companies${formatPaginationSearch(pagination)}`
+  );
 }
 
 export async function getAdminCompany(
@@ -65,6 +88,14 @@ export async function listAdminCompanyUsers(
   companyId: string
 ): Promise<InternalApiResult<AdminCompanyUserContract[]>> {
   return fetchInternal<AdminCompanyUserContract[]>(`admin-console/companies/${companyId}/users`);
+}
+
+export async function listAdminCompanySupportCandidates(
+  companyId: string
+): Promise<InternalApiResult<AdminUserContract[]>> {
+  return fetchInternal<AdminUserContract[]>(
+    `admin-console/companies/${companyId}/support-candidates`
+  );
 }
 
 export async function listAdminCompanyApplications(
@@ -145,6 +176,17 @@ export async function listAdminContractedModules(): Promise<
   return fetchInternal<AdminContractedModuleContract[]>("admin-console/contracted-modules");
 }
 
+export async function getModuleAccess(
+  applicationKey: ModuleApplicationKey,
+  companyId: string
+): Promise<InternalApiResult<ModuleAccessContract>> {
+  return fetchInternal<ModuleAccessContract>(`${applicationKey}/access`, {
+    headers: {
+      "X-FP-Company-Id": companyId
+    }
+  });
+}
+
 export async function listAdminAuditLogs(
   scope: AdminAuditScope = "all"
 ): Promise<InternalApiResult<AdminAuditLogContract[]>> {
@@ -152,8 +194,12 @@ export async function listAdminAuditLogs(
   return fetchInternal<AdminAuditLogContract[]>(`admin-console/audit-logs${search}`);
 }
 
-export async function listAdminUsers(): Promise<InternalApiResult<AdminUserContract[]>> {
-  return fetchInternal<AdminUserContract[]>("admin-console/users");
+export async function listAdminUsers(
+  pagination: PaginationParams = {}
+): Promise<InternalApiResult<PaginatedContract<AdminUserContract>>> {
+  return fetchInternal<PaginatedContract<AdminUserContract>>(
+    `admin-console/users${formatPaginationSearch(pagination)}`
+  );
 }
 
 export async function getAdminUser(id: string): Promise<InternalApiResult<AdminUserContract>> {
@@ -169,6 +215,15 @@ export async function createAdminUser(
   });
 }
 
+export async function createAdminConsoleUser(
+  input: CreateAdminConsoleUserInput
+): Promise<InternalApiResult<AdminUserContract>> {
+  return fetchInternal<AdminUserContract>("admin-console/users/console", {
+    body: JSON.stringify(input),
+    method: "POST"
+  });
+}
+
 export async function resendAdminUserInvite(
   companyId: string,
   userId: string
@@ -179,6 +234,30 @@ export async function resendAdminUserInvite(
       method: "POST"
     }
   );
+}
+
+export async function updateAdminCompanyUserMembership(
+  companyId: string,
+  userId: string,
+  input: UpdateAdminCompanyUserInput
+): Promise<InternalApiResult<AdminCompanyUserContract>> {
+  return fetchInternal<AdminCompanyUserContract>(
+    `admin-console/companies/${companyId}/users/${userId}/membership`,
+    {
+      body: JSON.stringify(input),
+      method: "PATCH"
+    }
+  );
+}
+
+export async function linkAdminCompanySupport(
+  companyId: string,
+  input: LinkAdminCompanySupportInput
+): Promise<InternalApiResult<AdminCompanyUserContract>> {
+  return fetchInternal<AdminCompanyUserContract>(`admin-console/companies/${companyId}/support`, {
+    body: JSON.stringify(input),
+    method: "POST"
+  });
 }
 
 export async function activateCurrentUserInvite(): Promise<
@@ -311,6 +390,25 @@ async function fetchInternal<T>(
 function getInternalApiBaseUrl(): string {
   const value = process.env.FP_API_INTERNAL_URL?.trim() || DEFAULT_INTERNAL_API_BASE_URL;
   return value.replace(/\/$/, "");
+}
+
+function formatPaginationSearch({ page, pageSize, scope }: PaginationParams): string {
+  const params = new URLSearchParams();
+
+  if (page) {
+    params.set("page", String(page));
+  }
+
+  if (pageSize) {
+    params.set("pageSize", String(pageSize));
+  }
+
+  if (scope && scope !== "all") {
+    params.set("scope", scope);
+  }
+
+  const search = params.toString();
+  return search ? `?${search}` : "";
 }
 
 async function readErrorDetail(response: Response): Promise<string | undefined> {

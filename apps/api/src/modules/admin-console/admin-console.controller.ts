@@ -7,15 +7,22 @@ import type {
   BulkRevokeAdminUserRolesInput,
   BulkUpdateAdminCompanyApplicationsInput,
   CreateAdminCompanyInput,
+  CreateAdminConsoleUserInput,
   CreateAdminUserInput,
   GrantAdminUserRoleInput,
+  LinkAdminCompanySupportInput,
   RevokeAdminUserRoleInput,
+  UpdateAdminCompanyUserInput,
   UpdateAdminCompanyInput,
   UpdateAdminUserInput,
   UpdateAdminCompanyApplicationInput
 } from "./admin-console.contracts";
 import { AdminConsoleAccessGuard } from "./admin-console-access.guard";
-import { AdminConsolePolicy } from "./admin-console-policy.decorator";
+import {
+  AdminConsoleAuthenticatedOnly,
+  AdminConsolePolicy,
+  AdminConsoleSuperAdminOnly
+} from "./admin-console-policy.decorator";
 import { AdminConsoleService } from "./admin-console.service";
 
 @Controller("admin-console")
@@ -23,39 +30,52 @@ import { AdminConsoleService } from "./admin-console.service";
 export class AdminConsoleController {
   constructor(private readonly adminConsole: AdminConsoleService) {}
 
+  @Get("users/me/access")
+  @AdminConsoleAuthenticatedOnly()
+  getCurrentUserAccess(@Headers() headers: Record<string, string | string[] | undefined>) {
+    return this.adminConsole.getCurrentUserAccess(readInternalApiContext(headers));
+  }
+
   @Get("overview")
+  @AdminConsoleSuperAdminOnly()
   getOverview() {
     return this.adminConsole.getOverview();
   }
 
   @Get("applications")
+  @AdminConsoleSuperAdminOnly()
   listApplications() {
     return this.adminConsole.listApplications();
   }
 
   @Get("basic-plans")
+  @AdminConsoleSuperAdminOnly()
   listBasicPlans() {
     return this.adminConsole.listBasicPlans();
   }
 
   @Get("catalog")
+  @AdminConsoleSuperAdminOnly()
   getCatalog() {
     return this.adminConsole.getCatalog();
   }
 
   @Get("contracted-modules")
+  @AdminConsoleSuperAdminOnly()
   listContractedModules() {
     return this.adminConsole.listContractedModules();
   }
 
   @Get("audit-logs")
+  @AdminConsoleSuperAdminOnly()
   listAuditLogs(@Query("scope") scope?: AdminAuditScope) {
     return this.adminConsole.listAuditLogs(scope);
   }
 
   @Get("companies")
-  listCompanies() {
-    return this.adminConsole.listCompanies();
+  @AdminConsoleSuperAdminOnly()
+  listCompanies(@Query("page") page?: string, @Query("pageSize") pageSize?: string) {
+    return this.adminConsole.listCompanies({ page, pageSize });
   }
 
   @Get("companies/:id")
@@ -68,6 +88,15 @@ export class AdminConsoleController {
   @AdminConsolePolicy({ companyParam: "id", permissionKey: "admin.users.manage" })
   listCompanyUsers(@Param("id") id: string) {
     return this.adminConsole.listCompanyUsers(id);
+  }
+
+  @Get("companies/:id/support-candidates")
+  @AdminConsolePolicy({ companyParam: "id", permissionKey: "admin.users.manage" })
+  listCompanySupportCandidates(
+    @Param("id") id: string,
+    @Headers() headers: Record<string, string | string[] | undefined>
+  ) {
+    return this.adminConsole.listCompanySupportCandidates(id, readInternalApiContext(headers));
   }
 
   @Get("companies/:companyId/users/:userId/access")
@@ -83,6 +112,7 @@ export class AdminConsoleController {
   }
 
   @Post("companies")
+  @AdminConsoleSuperAdminOnly()
   createCompany(
     @Body() input: CreateAdminCompanyInput,
     @Headers() headers: Record<string, string | string[] | undefined>
@@ -124,12 +154,32 @@ export class AdminConsoleController {
     );
   }
 
+  @Post("companies/:id/support")
+  @AdminConsolePolicy({ companyParam: "id", permissionKey: "admin.users.manage" })
+  linkCompanySupport(
+    @Param("id") id: string,
+    @Body() input: LinkAdminCompanySupportInput,
+    @Headers() headers: Record<string, string | string[] | undefined>
+  ) {
+    return this.adminConsole.linkCompanySupport(id, input, readInternalApiContext(headers));
+  }
+
   @Get("users")
-  listUsers() {
-    return this.adminConsole.listUsers();
+  @AdminConsolePolicy({ platformRoles: ["fp_admin"] })
+  listUsers(
+    @Query("page") page?: string,
+    @Query("pageSize") pageSize?: string,
+    @Query("scope") scope?: string,
+    @Headers() headers?: Record<string, string | string[] | undefined>
+  ) {
+    return this.adminConsole.listUsers(
+      { page, pageSize, scope },
+      readInternalApiContext(headers ?? {})
+    );
   }
 
   @Get("users/:id")
+  @AdminConsoleSuperAdminOnly()
   getUser(@Param("id") id: string) {
     return this.adminConsole.getUser(id);
   }
@@ -143,6 +193,15 @@ export class AdminConsoleController {
     return this.adminConsole.createUser(input, readInternalApiContext(headers));
   }
 
+  @Post("users/console")
+  @AdminConsolePolicy({ platformRoles: ["fp_admin"] })
+  createConsoleUser(
+    @Body() input: CreateAdminConsoleUserInput,
+    @Headers() headers: Record<string, string | string[] | undefined>
+  ) {
+    return this.adminConsole.createConsoleUser(input, readInternalApiContext(headers));
+  }
+
   @Post("companies/:companyId/users/:userId/invite")
   @AdminConsolePolicy({ companyParam: "companyId", permissionKey: "admin.users.manage" })
   resendUserInvite(
@@ -153,7 +212,24 @@ export class AdminConsoleController {
     return this.adminConsole.resendUserInvite(companyId, userId, readInternalApiContext(headers));
   }
 
+  @Patch("companies/:companyId/users/:userId/membership")
+  @AdminConsolePolicy({ companyParam: "companyId", permissionKey: "admin.users.manage" })
+  updateCompanyUserMembership(
+    @Param("companyId") companyId: string,
+    @Param("userId") userId: string,
+    @Body() input: UpdateAdminCompanyUserInput,
+    @Headers() headers: Record<string, string | string[] | undefined>
+  ) {
+    return this.adminConsole.updateCompanyUserMembership(
+      companyId,
+      userId,
+      input,
+      readInternalApiContext(headers)
+    );
+  }
+
   @Patch("users/:id")
+  @AdminConsoleSuperAdminOnly()
   updateUser(
     @Param("id") id: string,
     @Body() input: UpdateAdminUserInput,

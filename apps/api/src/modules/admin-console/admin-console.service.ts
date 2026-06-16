@@ -1,6 +1,7 @@
 import {
   BadRequestException,
   ConflictException,
+  ForbiddenException,
   Injectable,
   InternalServerErrorException,
   NotFoundException,
@@ -26,19 +27,28 @@ import type {
   AdminCompanyContract,
   AdminConsoleOverviewContract,
   AdminContractedModuleContract,
+  AdminCurrentUserAccessContract,
+  AdminCurrentUserCompanyAccessContract,
+  AdminCurrentUserModuleAccessContract,
+  AdminNavigationContract,
   AdminPermissionContract,
+  PaginatedContract,
   AdminRoleContract,
   AdminUserContract,
   AdminUserApplicationRoleContract,
   CreateAdminCompanyInput,
+  CreateAdminConsoleUserInput,
   CreateAdminUserInput,
   GrantAdminUserRoleInput,
+  LinkAdminCompanySupportInput,
   ResendAdminUserInviteContract,
   RevokeAdminUserRoleContract,
   RevokeAdminUserRoleInput,
+  UpdateAdminCompanyUserInput,
   UpdateAdminCompanyInput,
   UpdateAdminUserInput,
-  UpdateAdminCompanyApplicationInput
+  UpdateAdminCompanyApplicationInput,
+  UserGlobalRole
 } from "./admin-console.contracts";
 import {
   emptyInternalApiContext,
@@ -49,6 +59,17 @@ import { SupabaseService } from "../../supabase/supabase.service";
 
 type SupabaseFailure = {
   message: string;
+};
+
+type PaginationOptions = {
+  page?: string;
+  pageSize?: string;
+};
+
+type UserListScope = "all" | "company" | "platform";
+
+type UserListOptions = PaginationOptions & {
+  scope?: string;
 };
 
 type ApplicationRow = {
@@ -104,7 +125,14 @@ type UserRow = {
   full_name: string;
   email: string | null;
   status: AdminUserContract["status"];
+  global_role: UserGlobalRole;
+  is_internal_user: boolean;
   created_at: string;
+};
+
+type CurrentUserProfileRow = UserRow & {
+  global_role: UserGlobalRole;
+  is_internal_user: boolean;
 };
 
 type CompanyUserRow = {
@@ -183,7 +211,7 @@ type ContractedModuleCompanyRow = {
 
 const companySelect =
   "id,person_type,legal_name,trade_name,document,primary_email,primary_phone,primary_mobile_phone,primary_responsible_name,primary_responsible_email,address_postal_code,address_street_type,address_street,address_number,address_complement,address_district,address_city,address_state,status,basic_plan_id,implementation_notes,created_at";
-const userSelect = "id,full_name,email,status,created_at";
+const userSelect = "id,full_name,email,status,global_role,is_internal_user,created_at";
 const applicationSelect = "id,key,name,description,entry_path,status,sort_order";
 const companyApplicationSelect =
   "id,company_id,application_id,status,implementation_notes,activated_at,suspended_at,cancelled_at";
@@ -196,6 +224,10 @@ const userApplicationRoleSelect = "id,company_id,user_id,application_id,role_id,
 const auditLogSelect =
   "id,company_id,actor_user_id,action,entity_schema,entity_table,entity_id,metadata,created_at";
 const basicPlanApplicationSelect = "basic_plan_id,application_id";
+const defaultPage = 1;
+const defaultPageSize = 20;
+const maxPageSize = 100;
+const supportAssignmentRoles = new Set<UserGlobalRole>(["super_admin", "fp_admin", "support"]);
 
 @Injectable()
 export class AdminConsoleService {
@@ -204,17 +236,138 @@ export class AdminConsoleService {
     private readonly supabase: SupabaseService
   ) {}
 
+  async getCurrentUserAccess(
+    context: InternalApiContext = emptyInternalApiContext
+  ): Promise<AdminCurrentUserAccessContract> {
+    if (!context.actorUserId) {
+      throw new UnauthorizedException("Authenticated actor is required");
+    }
+
+    const actorUserId = normalizeUuid(context.actorUserId, "actorUserId");
+    const profile = await this.getCurrentUserProfile(actorUserId);
+    const isSuperAdmin = profile.global_role === "super_admin";
+    const isPlatformUser =
+      isSuperAdmin ||
+      profile.global_role === "fp_admin" ||
+      profile.global_role === "support" ||
+      profile.is_internal_user;
+    const memberships = await this.listUserMembershipRows(actorUserId);
+    const companyIds = unique(memberships.map((membership) => membership.company_id));
+    const [companiesById, grantRows, companyApplicationRows] = await Promise.all([
+      this.listCompaniesById(companyIds),
+      this.listUserApplicationRoleRowsByUserId(actorUserId, companyIds),
+      this.listCompanyApplicationRowsByCompanyIds(companyIds)
+    ]);
+    const applicationIds = unique([
+      ...grantRows.map((grant) => grant.application_id),
+      ...companyApplicationRows.map((companyApplication) => companyApplication.application_id)
+    ]);
+    const [applicationsById, roleRows] = await Promise.all([
+      this.listApplicationsById(applicationIds),
+      this.listRoleRowsByApplicationIds(unique(grantRows.map((grant) => grant.application_id)))
+    ]);
+    const rolePermissionsByRoleId = await this.listPermissionsByRoleId(roleRows);
+    const rolesById = new Map(roleRows.map((role) => [role.id, role]));
+    const companyApplicationsByCompanyAndApplication = new Map(
+      companyApplicationRows.map((row) => [
+        `${row.company_id}:${row.application_id}`,
+        row
+      ])
+    );
+    const grantsByCompanyId = new Map<string, UserApplicationRoleRow[]>();
+
+    for (const grant of grantRows) {
+      const grants = grantsByCompanyId.get(grant.company_id) ?? [];
+      grants.push(grant);
+      grantsByCompanyId.set(grant.company_id, grants);
+    }
+
+    const companies = memberships.flatMap((membership): AdminCurrentUserCompanyAccessContract[] => {
+      const company = companiesById.get(membership.company_id);
+
+      if (!company) {
+        return [];
+      }
+
+      const grants = grantsByCompanyId.get(membership.company_id) ?? [];
+      const adminPermissions = new Set<string>();
+      const modulesByCompanyAndApplication = new Map<string, AdminCurrentUserModuleAccessContract>();
+
+      for (const grant of grants) {
+        const application = applicationsById.get(grant.application_id);
+        const role = rolesById.get(grant.role_id);
+
+        if (!application || !role || application.status !== "active") {
+          continue;
+        }
+
+        const permissions = rolePermissionsByRoleId.get(role.id) ?? [];
+        const permissionKeys = permissions.map((permission) => permission.key);
+        const companyApplication = companyApplicationsByCompanyAndApplication.get(
+          `${membership.company_id}:${grant.application_id}`
+        );
+        const isActiveContractedModule = companyApplication?.status === "active";
+
+        if (application.key === "admin-console" && isActiveContractedModule) {
+          for (const permissionKey of permissionKeys) {
+            adminPermissions.add(permissionKey);
+          }
+          continue;
+        }
+
+        if (!isActiveContractedModule || permissionKeys.length === 0) {
+          continue;
+        }
+
+        modulesByCompanyAndApplication.set(`${membership.company_id}:${application.id}`, {
+          applicationId: application.id,
+          applicationKey: application.key,
+          applicationName: application.name,
+          companyId: membership.company_id,
+          companyName: getCompanyDisplayName(company),
+          entryPath: application.entry_path,
+          permissions: permissionKeys
+        });
+      }
+
+      return [
+        {
+          company: mapCompany(company),
+          membershipId: membership.id,
+          membershipStatus: membership.status,
+          isPrimaryContact: membership.is_primary_contact,
+          adminPermissions: Array.from(adminPermissions).sort(),
+          modules: Array.from(modulesByCompanyAndApplication.values()).sort((first, second) =>
+            first.applicationName.localeCompare(second.applicationName, "pt-BR")
+          )
+        }
+      ];
+    });
+
+    return {
+      user: {
+        ...mapUser(profile),
+        globalRole: profile.global_role,
+        isInternalUser: profile.is_internal_user
+      },
+      isSuperAdmin,
+      isPlatformUser,
+      companies,
+      navigation: buildCurrentUserNavigation(profile.global_role, isSuperAdmin, companies)
+    };
+  }
+
   async getOverview(): Promise<AdminConsoleOverviewContract> {
-    const [applications, basicPlans, companies] = await Promise.all([
+    const [applications, basicPlans, companiesPage] = await Promise.all([
       this.listApplications(),
       this.listBasicPlans(),
-      this.listCompanies()
+      this.listCompanies({ page: "1", pageSize: "1000" })
     ]);
 
     return {
       applications,
       basicPlans,
-      companies
+      companies: companiesPage.items
     };
   }
 
@@ -389,32 +542,66 @@ export class AdminConsoleService {
     return rows.map((row) => mapAuditLog(row, companiesById.get(row.company_id ?? "")));
   }
 
-  async listCompanies(): Promise<AdminCompanyContract[]> {
-    const { data, error } = await this.supabase.core
+  async listCompanies(options: PaginationOptions = {}): Promise<PaginatedContract<AdminCompanyContract>> {
+    const pagination = normalizePagination(options);
+    const { from, to } = getPaginationRange(pagination);
+    const { count, data, error } = await this.supabase.core
       .from("companies")
-      .select(companySelect)
+      .select(companySelect, { count: "exact" })
       .is("deleted_at", null)
-      .order("created_at", { ascending: false });
+      .order("created_at", { ascending: false })
+      .range(from, to);
 
     if (error) {
       throwSupabaseError(error);
     }
 
-    return ((data ?? []) as CompanyRow[]).map(mapCompany);
+    return mapPaginatedResult(
+      ((data ?? []) as CompanyRow[]).map(mapCompany),
+      count,
+      pagination
+    );
   }
 
-  async listUsers(): Promise<AdminUserContract[]> {
-    const { data, error } = await this.supabase.core
+  async listUsers(
+    options: UserListOptions = {},
+    context: InternalApiContext = emptyInternalApiContext
+  ): Promise<PaginatedContract<AdminUserContract>> {
+    const pagination = normalizePagination(options);
+    const scope = normalizeUserListScope(options.scope);
+    const actor = await this.getActorUser(context);
+    const { from, to } = getPaginationRange(pagination);
+    let query = this.supabase.core
       .from("profiles")
-      .select(userSelect)
+      .select(userSelect, { count: "exact" })
       .is("deleted_at", null)
       .order("created_at", { ascending: false });
+
+    if (actor.globalRole === "fp_admin") {
+      if (scope !== "platform") {
+        throw new ForbiddenException("Admin do Console so pode listar usuarios internos de suporte");
+      }
+
+      query = query.eq("global_role", "support");
+    } else if (actor.globalRole === "super_admin" && scope === "platform") {
+      query = query.in("global_role", Array.from(supportAssignmentRoles));
+    } else if (actor.globalRole === "super_admin" && scope === "company") {
+      query = query.eq("global_role", "company_user");
+    } else if (actor.globalRole !== "super_admin") {
+      throw new ForbiddenException("Somente usuarios internos autorizados podem listar perfis");
+    }
+
+    const { count, data, error } = await query.range(from, to);
 
     if (error) {
       throwSupabaseError(error);
     }
 
-    return ((data ?? []) as UserRow[]).map(mapUser);
+    return mapPaginatedResult(
+      ((data ?? []) as UserRow[]).map(mapUser),
+      count,
+      pagination
+    );
   }
 
   async getUser(id: string): Promise<AdminUserContract> {
@@ -439,22 +626,111 @@ export class AdminConsoleService {
   }
 
   async listCompanyUsers(companyId: string): Promise<AdminCompanyUserContract[]> {
-    if (!isUuid(companyId)) {
-      throw new BadRequestException("Invalid company id");
-    }
+    const normalizedCompanyId = normalizeUuid(companyId, "companyId");
+    const memberships = await this.listCompanyMembershipRows(normalizedCompanyId);
 
+    return this.hydrateCompanyUsers(memberships);
+  }
+
+  async listCompanySupportCandidates(
+    companyId: string,
+    context: InternalApiContext = emptyInternalApiContext
+  ): Promise<AdminUserContract[]> {
+    const normalizedCompanyId = normalizeUuid(companyId, "companyId");
+    await this.ensureCompanyExists(normalizedCompanyId);
+    const manageableRoles = await this.getSupportAssignableRolesForActor(context);
+
+    const memberships = await this.listCompanyMembershipRows(normalizedCompanyId);
+    const linkedUserIds = new Set(memberships.map((membership) => membership.user_id));
     const { data, error } = await this.supabase.core
-      .from("company_memberships")
-      .select("id,company_id,user_id,status,is_primary_contact")
-      .eq("company_id", companyId)
+      .from("profiles")
+      .select(userSelect)
+      .in("global_role", manageableRoles)
+      .eq("status", "active")
       .is("deleted_at", null)
-      .order("created_at", { ascending: false });
+      .order("full_name", { ascending: true });
 
     if (error) {
       throwSupabaseError(error);
     }
 
-    return this.hydrateCompanyUsers((data ?? []) as CompanyUserRow[]);
+    return ((data ?? []) as UserRow[])
+      .map(mapUser)
+      .filter((user) => !linkedUserIds.has(user.id));
+  }
+
+  async linkCompanySupport(
+    companyId: string,
+    input: LinkAdminCompanySupportInput,
+    context: InternalApiContext = emptyInternalApiContext
+  ): Promise<AdminCompanyUserContract> {
+    const normalizedCompanyId = normalizeUuid(companyId, "companyId");
+    const normalizedUserId = normalizeUuid(input.userId, "userId");
+    await this.ensureCompanyExists(normalizedCompanyId);
+
+    const user = await this.getUser(normalizedUserId);
+    await this.assertActorCanAssignSupportUser(context, user);
+
+    if (!supportAssignmentRoles.has(user.globalRole)) {
+      throw new BadRequestException(
+        "Usuario precisa ter papel super_admin, fp_admin ou support para virar suporte da empresa"
+      );
+    }
+
+    if (user.status !== "active") {
+      throw new BadRequestException("Usuario de suporte precisa estar ativo");
+    }
+
+    const companyAdminRole = await this.getRoleByApplicationKey("admin-console", "company-admin");
+    const companyApplication = await this.getCurrentCompanyApplication(
+      normalizedCompanyId,
+      companyAdminRole.application_id
+    );
+
+    if (!companyApplication || !isGrantableCompanyApplicationStatus(companyApplication.status)) {
+      throw new BadRequestException(
+        "Admin Console precisa estar contratado e em implantacao ou ativo para vincular suporte administrativo"
+      );
+    }
+
+    const currentMembership = await this.getOptionalCompanyMembership(
+      normalizedCompanyId,
+      normalizedUserId
+    );
+    const now = new Date().toISOString();
+    const membership = currentMembership
+      ? await this.updateSupportMembership(currentMembership, now)
+      : await this.createSupportMembership(normalizedCompanyId, normalizedUserId, now);
+
+    await this.grantUserRole(
+      normalizedCompanyId,
+      normalizedUserId,
+      {
+        roleId: companyAdminRole.id
+      },
+      context
+    );
+
+    const [companyUser] = await this.hydrateCompanyUsers([membership]);
+
+    if (!companyUser) {
+      throw new NotFoundException("User profile not found");
+    }
+
+    await this.createAuditLog(
+      normalizedCompanyId,
+      "core.company_support.linked",
+      "company_memberships",
+      membership.id,
+      {
+        globalRole: user.globalRole,
+        previousMembershipStatus: currentMembership?.status ?? null,
+        userId: normalizedUserId
+      },
+      context
+    );
+
+    return companyUser;
   }
 
   async getCompanyUserAccess(
@@ -586,6 +862,8 @@ export class AdminConsoleService {
       context
     );
 
+    await this.linkCreatorSuperAdminAsSupport(createdCompany.id, context);
+
     return createdCompany;
   }
 
@@ -595,8 +873,8 @@ export class AdminConsoleService {
     context: InternalApiContext = emptyInternalApiContext
   ): Promise<AdminCompanyContract> {
     const normalizedCompanyId = normalizeUuid(companyId, "companyId");
-    await this.ensureCompanyExists(normalizedCompanyId);
-    const company = normalizeCreateCompanyInput(input);
+    const currentCompany = await this.getCompany(normalizedCompanyId);
+    const company = normalizeUpdateCompanyInput(input, currentCompany.status);
 
     const { data, error } = await this.supabase.core
       .from("companies")
@@ -619,7 +897,8 @@ export class AdminConsoleService {
         address_city: company.addressCity,
         address_state: company.addressState,
         basic_plan_id: company.basicPlanId,
-        implementation_notes: company.implementationNotes
+        implementation_notes: company.implementationNotes,
+        status: company.status
       })
       .eq("id", normalizedCompanyId)
       .is("deleted_at", null)
@@ -735,6 +1014,87 @@ export class AdminConsoleService {
     }
   }
 
+  async createConsoleUser(
+    input: CreateAdminConsoleUserInput,
+    context: InternalApiContext = emptyInternalApiContext
+  ): Promise<AdminUserContract> {
+    const userInput = normalizeCreateConsoleUserInput(input);
+    await this.assertActorCanCreateConsoleUser(context, userInput.globalRole);
+
+    const { data: authData, error: authError } =
+      await this.supabase.admin.auth.admin.inviteUserByEmail(userInput.email, {
+        redirectTo: this.getPasswordRedirectUrl(),
+        data: {
+          full_name: userInput.fullName
+        }
+      });
+
+    if (authError) {
+      if (authError.message.toLowerCase().includes("already")) {
+        throw new ConflictException("Usuario ja existe no Supabase Auth");
+      }
+
+      throw new InternalServerErrorException({
+        message: "Supabase auth invitation failed",
+        detail: authError.message
+      });
+    }
+
+    const userId = authData.user?.id;
+
+    if (!userId) {
+      throw new InternalServerErrorException("Supabase Auth did not return a user id");
+    }
+
+    try {
+      const { data, error } = await this.supabase.core
+        .from("profiles")
+        .insert({
+          email: userInput.email,
+          full_name: userInput.fullName,
+          global_role: userInput.globalRole,
+          id: userId,
+          is_internal_user: true,
+          status: "invited"
+        })
+        .select(userSelect)
+        .single();
+
+      if (error) {
+        throw error;
+      }
+
+      const createdUser = mapUser(data as UserRow);
+
+      await this.createAuditLog(
+        null,
+        "core.user.invited",
+        "profiles",
+        userId,
+        {
+          email: userInput.email,
+          fullName: userInput.fullName,
+          globalRole: userInput.globalRole,
+          source: "console_user"
+        },
+        context
+      );
+
+      return createdUser;
+    } catch (error) {
+      await this.supabase.admin.auth.admin.deleteUser(userId).catch(() => undefined);
+
+      if (error instanceof Error) {
+        throw new InternalServerErrorException({
+          message: "Core console user creation failed",
+          detail: error.message
+        });
+      }
+
+      throw new InternalServerErrorException("Core console user creation failed");
+    }
+  }
+
   async resendUserInvite(
     companyId: string,
     userId: string,
@@ -801,6 +1161,85 @@ export class AdminConsoleService {
     return {
       sent: true
     };
+  }
+
+  async updateCompanyUserMembership(
+    companyId: string,
+    userId: string,
+    input: UpdateAdminCompanyUserInput,
+    context: InternalApiContext = emptyInternalApiContext
+  ): Promise<AdminCompanyUserContract> {
+    const normalizedCompanyId = normalizeUuid(companyId, "companyId");
+    const normalizedUserId = normalizeUuid(userId, "userId");
+    const currentMembership = await this.getCompanyMembership(
+      normalizedCompanyId,
+      normalizedUserId
+    );
+    const currentUser = await this.getUser(normalizedUserId);
+    const membershipInput = normalizeUpdateCompanyUserInput(input);
+
+    if (membershipInput.status === "active" && currentUser.status !== "active") {
+      throw new BadRequestException(
+        "Vinculo so pode ficar ativo quando o perfil central estiver ativo"
+      );
+    }
+
+    if (membershipInput.status === "invited" && currentMembership.status !== "invited") {
+      throw new BadRequestException("Vinculo ativo ou inativo nao pode voltar para convidado");
+    }
+
+    const { data, error } = await this.supabase.core
+      .from("company_memberships")
+      .update({
+        is_primary_contact: membershipInput.isPrimaryContact,
+        status: membershipInput.status
+      })
+      .eq("id", currentMembership.id)
+      .is("deleted_at", null)
+      .select("id,company_id,user_id,status,is_primary_contact")
+      .single();
+
+    if (error) {
+      throwSupabaseError(error);
+    }
+
+    if (membershipInput.isPrimaryContact) {
+      const { error: otherPrimaryContactsError } = await this.supabase.core
+        .from("company_memberships")
+        .update({
+          is_primary_contact: false
+        })
+        .eq("company_id", normalizedCompanyId)
+        .neq("user_id", normalizedUserId)
+        .is("deleted_at", null);
+
+      if (otherPrimaryContactsError) {
+        throwSupabaseError(otherPrimaryContactsError);
+      }
+    }
+
+    const [companyUser] = await this.hydrateCompanyUsers([data as CompanyUserRow]);
+
+    if (!companyUser) {
+      throw new NotFoundException("User profile not found");
+    }
+
+    await this.createAuditLog(
+      normalizedCompanyId,
+      "core.company_membership.updated",
+      "company_memberships",
+      currentMembership.id,
+      {
+        isPrimaryContact: companyUser.isPrimaryContact,
+        previousIsPrimaryContact: currentMembership.is_primary_contact,
+        previousStatus: currentMembership.status,
+        status: companyUser.membershipStatus,
+        userId: normalizedUserId
+      },
+      context
+    );
+
+    return companyUser;
   }
 
   async activateCurrentUserInvite(
@@ -908,6 +1347,8 @@ export class AdminConsoleService {
       .update({
         full_name: userInput.fullName,
         email: userInput.email,
+        global_role: userInput.globalRole,
+        is_internal_user: userInput.globalRole !== "company_user",
         status: userInput.status
       })
       .eq("id", userId)
@@ -920,6 +1361,18 @@ export class AdminConsoleService {
     }
 
     const updatedUser = mapUser(data as UserRow);
+    const { error: membershipError } = await this.supabase.core
+      .from("company_memberships")
+      .update({
+        status: updatedUser.status
+      })
+      .eq("user_id", userId)
+      .is("deleted_at", null);
+
+    if (membershipError) {
+      throwSupabaseError(membershipError);
+    }
+
     await this.createAuditLog(
       null,
       "core.user.updated",
@@ -928,6 +1381,9 @@ export class AdminConsoleService {
       {
         email: updatedUser.email,
         fullName: updatedUser.fullName,
+        globalRole: updatedUser.globalRole,
+        isInternalUser: updatedUser.isInternalUser,
+        membershipStatus: updatedUser.status,
         status: updatedUser.status
       },
       context
@@ -1200,6 +1656,55 @@ export class AdminConsoleService {
     await this.getCompany(companyId);
   }
 
+  private async getCurrentUserProfile(userId: string): Promise<CurrentUserProfileRow> {
+    const { data, error } = await this.supabase.core
+      .from("profiles")
+      .select("id,full_name,email,status,created_at,global_role,is_internal_user")
+      .eq("id", userId)
+      .is("deleted_at", null)
+      .maybeSingle();
+
+    if (error) {
+      throwSupabaseError(error);
+    }
+
+    if (!data) {
+      throw new NotFoundException("User profile not found");
+    }
+
+    return data as CurrentUserProfileRow;
+  }
+
+  private async listUserMembershipRows(userId: string): Promise<CompanyUserRow[]> {
+    const { data, error } = await this.supabase.core
+      .from("company_memberships")
+      .select("id,company_id,user_id,status,is_primary_contact")
+      .eq("user_id", userId)
+      .is("deleted_at", null)
+      .order("created_at", { ascending: false });
+
+    if (error) {
+      throwSupabaseError(error);
+    }
+
+    return (data ?? []) as CompanyUserRow[];
+  }
+
+  private async listCompanyMembershipRows(companyId: string): Promise<CompanyUserRow[]> {
+    const { data, error } = await this.supabase.core
+      .from("company_memberships")
+      .select("id,company_id,user_id,status,is_primary_contact")
+      .eq("company_id", companyId)
+      .is("deleted_at", null)
+      .order("created_at", { ascending: false });
+
+    if (error) {
+      throwSupabaseError(error);
+    }
+
+    return (data ?? []) as CompanyUserRow[];
+  }
+
   private async getCompanyMembership(companyId: string, userId: string): Promise<CompanyUserRow> {
     const { data, error } = await this.supabase.core
       .from("company_memberships")
@@ -1218,6 +1723,189 @@ export class AdminConsoleService {
     }
 
     return data as CompanyUserRow;
+  }
+
+  private async getOptionalCompanyMembership(
+    companyId: string,
+    userId: string
+  ): Promise<CompanyUserRow | null> {
+    const { data, error } = await this.supabase.core
+      .from("company_memberships")
+      .select("id,company_id,user_id,status,is_primary_contact")
+      .eq("company_id", companyId)
+      .eq("user_id", userId)
+      .is("deleted_at", null)
+      .maybeSingle();
+
+    if (error) {
+      throwSupabaseError(error);
+    }
+
+    return (data as CompanyUserRow | null) ?? null;
+  }
+
+  private async createSupportMembership(
+    companyId: string,
+    userId: string,
+    now: string
+  ): Promise<CompanyUserRow> {
+    const { data, error } = await this.supabase.core
+      .from("company_memberships")
+      .insert({
+        accepted_at: now,
+        company_id: companyId,
+        is_primary_contact: false,
+        status: "active",
+        user_id: userId
+      })
+      .select("id,company_id,user_id,status,is_primary_contact")
+      .single();
+
+    if (error) {
+      throwSupabaseError(error);
+    }
+
+    return data as CompanyUserRow;
+  }
+
+  private async updateSupportMembership(
+    membership: CompanyUserRow,
+    now: string
+  ): Promise<CompanyUserRow> {
+    const { data, error } = await this.supabase.core
+      .from("company_memberships")
+      .update({
+        accepted_at: now,
+        is_primary_contact: false,
+        status: "active"
+      })
+      .eq("id", membership.id)
+      .is("deleted_at", null)
+      .select("id,company_id,user_id,status,is_primary_contact")
+      .single();
+
+    if (error) {
+      throwSupabaseError(error);
+    }
+
+    return data as CompanyUserRow;
+  }
+
+  private async linkCreatorSuperAdminAsSupport(
+    companyId: string,
+    context: InternalApiContext
+  ): Promise<void> {
+    if (!context.actorUserId || !isUuid(context.actorUserId)) {
+      return;
+    }
+
+    const actorUserId = context.actorUserId;
+    const actor = await this.getUser(actorUserId);
+
+    if (actor.globalRole !== "super_admin" || actor.status !== "active") {
+      return;
+    }
+
+    const currentMembership = await this.getOptionalCompanyMembership(companyId, actorUserId);
+    const now = new Date().toISOString();
+    const membership = currentMembership
+      ? await this.updateSupportMembership(currentMembership, now)
+      : await this.createSupportMembership(companyId, actorUserId, now);
+
+    await this.createAuditLog(
+      companyId,
+      "core.company_support.linked",
+      "company_memberships",
+      membership.id,
+      {
+        automatic: true,
+        globalRole: actor.globalRole,
+        previousMembershipStatus: currentMembership?.status ?? null,
+        source: "company_created_by_super_admin",
+        userId: actorUserId
+      },
+      context
+    );
+  }
+
+  private async getActorUser(context: InternalApiContext): Promise<AdminUserContract> {
+    if (!context.actorUserId) {
+      throw new UnauthorizedException("Authenticated actor is required");
+    }
+
+    return this.getUser(normalizeUuid(context.actorUserId, "actorUserId"));
+  }
+
+  private async getSupportAssignableRolesForActor(
+    context: InternalApiContext
+  ): Promise<UserGlobalRole[]> {
+    const actor = await this.getActorUser(context);
+
+    if (actor.globalRole === "super_admin") {
+      return Array.from(supportAssignmentRoles);
+    }
+
+    if (actor.globalRole === "fp_admin") {
+      return ["support"];
+    }
+
+    throw new ForbiddenException("Somente superadmin ou admin do Console pode delegar suporte");
+  }
+
+  private async assertActorCanAssignSupportUser(
+    context: InternalApiContext,
+    targetUser: AdminUserContract
+  ): Promise<void> {
+    const actor = await this.getActorUser(context);
+
+    if (actor.globalRole === "super_admin") {
+      return;
+    }
+
+    if (actor.globalRole === "fp_admin" && targetUser.globalRole === "support") {
+      return;
+    }
+
+    throw new ForbiddenException(
+      "Admin do Console so pode vincular usuarios com papel de suporte"
+    );
+  }
+
+  private async assertActorCanCreateConsoleUser(
+    context: InternalApiContext,
+    targetRole: CreateAdminConsoleUserInput["globalRole"]
+  ): Promise<void> {
+    const actor = await this.getActorUser(context);
+
+    if (actor.globalRole === "super_admin") {
+      return;
+    }
+
+    if (actor.globalRole === "fp_admin" && targetRole === "support") {
+      return;
+    }
+
+    throw new ForbiddenException(
+      "Admin do Console so pode convidar usuarios com papel de suporte"
+    );
+  }
+
+  private async listCompaniesById(companyIds: string[]): Promise<Map<string, CompanyRow>> {
+    if (companyIds.length === 0) {
+      return new Map();
+    }
+
+    const { data, error } = await this.supabase.core
+      .from("companies")
+      .select(companySelect)
+      .in("id", companyIds)
+      .is("deleted_at", null);
+
+    if (error) {
+      throwSupabaseError(error);
+    }
+
+    return new Map(((data ?? []) as CompanyRow[]).map((company) => [company.id, company]));
   }
 
   private async listAuditCompaniesById(companyIds: string[]): Promise<Map<string, AuditCompanyRow>> {
@@ -1277,6 +1965,25 @@ export class AdminConsoleService {
     return data as ApplicationRow;
   }
 
+  private async getApplicationByKey(applicationKey: string): Promise<ApplicationRow> {
+    const { data, error } = await this.supabase.core
+      .from("applications")
+      .select(applicationSelect)
+      .eq("key", applicationKey)
+      .is("deleted_at", null)
+      .maybeSingle();
+
+    if (error) {
+      throwSupabaseError(error);
+    }
+
+    if (!data) {
+      throw new NotFoundException("Application not found");
+    }
+
+    return data as ApplicationRow;
+  }
+
   private async listApplicationsById(applicationIds: string[]): Promise<Map<string, ApplicationRow>> {
     if (applicationIds.length === 0) {
       return new Map();
@@ -1319,6 +2026,30 @@ export class AdminConsoleService {
       .from("roles")
       .select(roleSelect)
       .eq("id", roleId)
+      .is("deleted_at", null)
+      .maybeSingle();
+
+    if (error) {
+      throwSupabaseError(error);
+    }
+
+    if (!data) {
+      throw new NotFoundException("Role not found");
+    }
+
+    return data as RoleRow;
+  }
+
+  private async getRoleByApplicationKey(
+    applicationKey: string,
+    roleKey: string
+  ): Promise<RoleRow> {
+    const application = await this.getApplicationByKey(applicationKey);
+    const { data, error } = await this.supabase.core
+      .from("roles")
+      .select(roleSelect)
+      .eq("application_id", application.id)
+      .eq("key", roleKey)
       .is("deleted_at", null)
       .maybeSingle();
 
@@ -1423,6 +2154,49 @@ export class AdminConsoleService {
     return (data ?? []) as UserApplicationRoleRow[];
   }
 
+  private async listUserApplicationRoleRowsByUserId(
+    userId: string,
+    companyIds: string[]
+  ): Promise<UserApplicationRoleRow[]> {
+    if (companyIds.length === 0) {
+      return [];
+    }
+
+    const { data, error } = await this.supabase.core
+      .from("user_application_roles")
+      .select(userApplicationRoleSelect)
+      .eq("user_id", userId)
+      .in("company_id", companyIds)
+      .is("deleted_at", null)
+      .order("created_at", { ascending: false });
+
+    if (error) {
+      throwSupabaseError(error);
+    }
+
+    return (data ?? []) as UserApplicationRoleRow[];
+  }
+
+  private async listCompanyApplicationRowsByCompanyIds(
+    companyIds: string[]
+  ): Promise<CompanyApplicationRow[]> {
+    if (companyIds.length === 0) {
+      return [];
+    }
+
+    const { data, error } = await this.supabase.core
+      .from("company_applications")
+      .select(companyApplicationSelect)
+      .in("company_id", companyIds)
+      .is("deleted_at", null);
+
+    if (error) {
+      throwSupabaseError(error);
+    }
+
+    return (data ?? []) as CompanyApplicationRow[];
+  }
+
   private async getCurrentUserApplicationRole(
     companyId: string,
     userId: string,
@@ -1521,6 +2295,63 @@ function throwSupabaseError(error: SupabaseFailure): never {
     message: "Supabase query failed",
     detail: error.message
   });
+}
+
+function normalizePagination(options: PaginationOptions): Required<PaginationOptions> {
+  const page = normalizePositiveInteger(options.page, defaultPage);
+  const requestedPageSize = normalizePositiveInteger(options.pageSize, defaultPageSize);
+
+  return {
+    page: String(page),
+    pageSize: String(Math.min(requestedPageSize, maxPageSize))
+  };
+}
+
+function normalizePositiveInteger(value: string | undefined, fallback: number): number {
+  const parsed = Number(value);
+
+  if (!Number.isInteger(parsed) || parsed < 1) {
+    return fallback;
+  }
+
+  return parsed;
+}
+
+function normalizeUserListScope(value: string | undefined): UserListScope {
+  if (value === "company" || value === "platform") {
+    return value;
+  }
+
+  return "all";
+}
+
+function getPaginationRange(pagination: Required<PaginationOptions>): { from: number; to: number } {
+  const page = Number(pagination.page);
+  const pageSize = Number(pagination.pageSize);
+  const from = (page - 1) * pageSize;
+
+  return {
+    from,
+    to: from + pageSize - 1
+  };
+}
+
+function mapPaginatedResult<T>(
+  items: T[],
+  count: number | null,
+  pagination: Required<PaginationOptions>
+): PaginatedContract<T> {
+  const total = count ?? items.length;
+  const page = Number(pagination.page);
+  const pageSize = Number(pagination.pageSize);
+
+  return {
+    items,
+    page,
+    pageSize,
+    total,
+    totalPages: Math.max(1, Math.ceil(total / pageSize))
+  };
 }
 
 function mapApplication(row: ApplicationRow): AdminApplicationContract {
@@ -1658,6 +2489,10 @@ function mapBasicPlanCatalog(
   };
 }
 
+function getCompanyDisplayName(row: CompanyRow): string {
+  return row.trade_name ?? row.legal_name;
+}
+
 function mapCompany(row: CompanyRow): AdminCompanyContract {
   return {
     id: row.id,
@@ -1691,6 +2526,8 @@ function mapUser(row: UserRow): AdminUserContract {
     fullName: row.full_name,
     email: row.email,
     status: row.status,
+    globalRole: row.global_role,
+    isInternalUser: row.is_internal_user,
     createdAt: row.created_at
   };
 }
@@ -1741,6 +2578,16 @@ function normalizeCreateCompanyInput(input: CreateAdminCompanyInput): CreateAdmi
   };
 }
 
+function normalizeUpdateCompanyInput(
+  input: UpdateAdminCompanyInput,
+  fallbackStatus: UpdateAdminCompanyInput["status"]
+): UpdateAdminCompanyInput {
+  return {
+    ...normalizeCreateCompanyInput(input),
+    status: normalizeCompanyStatus(input.status ?? fallbackStatus)
+  };
+}
+
 function normalizeCreateUserInput(input: CreateAdminUserInput): Required<CreateAdminUserInput> {
   return {
     companyId: normalizeUuid(input.companyId, "companyId"),
@@ -1750,12 +2597,53 @@ function normalizeCreateUserInput(input: CreateAdminUserInput): Required<CreateA
   };
 }
 
+function normalizeCreateConsoleUserInput(
+  input: CreateAdminConsoleUserInput
+): CreateAdminConsoleUserInput {
+  return {
+    fullName: normalizeRequired(input.fullName, "fullName", 140),
+    email: normalizeEmail(input.email),
+    globalRole: normalizePlatformGlobalRole(input.globalRole)
+  };
+}
+
+function normalizeUpdateCompanyUserInput(
+  input: UpdateAdminCompanyUserInput
+): UpdateAdminCompanyUserInput {
+  return {
+    isPrimaryContact: Boolean(input.isPrimaryContact),
+    status: normalizeUserStatus(input.status)
+  };
+}
+
 function normalizeUpdateUserInput(input: UpdateAdminUserInput): UpdateAdminUserInput {
   return {
     fullName: normalizeRequired(input.fullName, "fullName", 140),
     email: normalizeEmail(input.email),
+    globalRole: normalizeGlobalRole(input.globalRole),
     status: normalizeUserStatus(input.status)
   };
+}
+
+function normalizeGlobalRole(value: unknown): UserGlobalRole {
+  if (
+    value === "company_user" ||
+    value === "fp_admin" ||
+    value === "super_admin" ||
+    value === "support"
+  ) {
+    return value;
+  }
+
+  throw new BadRequestException("globalRole must be company_user, fp_admin, super_admin or support");
+}
+
+function normalizePlatformGlobalRole(value: unknown): CreateAdminConsoleUserInput["globalRole"] {
+  if (value === "fp_admin" || value === "super_admin" || value === "support") {
+    return value;
+  }
+
+  throw new BadRequestException("globalRole must be fp_admin, super_admin or support");
 }
 
 function normalizeUserStatus(value: unknown): UpdateAdminUserInput["status"] {
@@ -1818,6 +2706,8 @@ function getAuditScopeActions(scope: AdminAuditScope): string[] | null {
 
   if (scope === "users") {
     return [
+      "core.company_support.linked",
+      "core.company_membership.updated",
       "core.user.invited",
       "core.user.updated",
       "core.user_application_role.granted",
@@ -1838,6 +2728,112 @@ function getAuditScopeActions(scope: AdminAuditScope): string[] | null {
   }
 
   return null;
+}
+
+function buildCurrentUserNavigation(
+  globalRole: UserGlobalRole,
+  isSuperAdmin: boolean,
+  companies: AdminCurrentUserCompanyAccessContract[]
+): AdminNavigationContract {
+  const primary = [{ href: "/", label: "Portal" }];
+
+  if (isSuperAdmin) {
+    return {
+      primary,
+      groups: [
+        {
+          label: "Cadastro",
+          items: [
+            { href: "/cadastro/empresas", label: "Empresas" },
+            { href: "/cadastro/usuarios-console", label: "Usuarios do Console" },
+            { href: "/cadastro/planos", label: "Planos" },
+            { href: "/cadastro/modulos", label: "Modulos" }
+          ]
+        },
+        {
+          label: "Movimentacao",
+          items: [{ href: "/movimentacao/modulos-contratados", label: "Modulos contratados" }]
+        },
+        {
+          label: "Sistemas",
+          items: [{ href: "/robots", label: "FP Robots" }]
+        },
+        {
+          label: "Auditoria",
+          items: [
+            { href: "/auditoria", label: "Visao geral" },
+            { href: "/auditoria/empresas", label: "Empresas" },
+            { href: "/auditoria/usuarios", label: "Usuarios" },
+            { href: "/auditoria/modulos", label: "Modulos e permissoes" },
+            { href: "/auditoria/sistema", label: "Sistema" }
+          ]
+        }
+      ]
+    };
+  }
+
+  const groups: AdminNavigationContract["groups"] = [];
+  const platformItems =
+    globalRole === "fp_admin"
+      ? [{ href: "/cadastro/usuarios-console", label: "Usuarios do Console" }]
+      : [];
+  const companyItems = companies
+    .filter((company) => company.adminPermissions.includes("admin.companies.read"))
+    .map((company) => ({
+      href: `/cadastro/empresas/${company.company.id}`,
+      label: company.company.tradeName ?? company.company.legalName
+    }));
+  const moduleItems = buildModuleNavigationItems(companies);
+
+  if (companyItems.length > 0) {
+    groups.push({
+      label: "Minhas empresas",
+      items: companyItems
+    });
+  }
+
+  if (platformItems.length > 0) {
+    groups.push({
+      label: "Cadastro",
+      items: platformItems
+    });
+  }
+
+  if (moduleItems.length > 0) {
+    groups.push({
+      label: "Sistemas",
+      items: moduleItems
+    });
+  }
+
+  return {
+    primary,
+    groups
+  };
+}
+
+function buildModuleNavigationItems(companies: AdminCurrentUserCompanyAccessContract[]) {
+  const modules = companies.flatMap((company) =>
+    company.modules.filter((module) => module.entryPath)
+  );
+  const pathCounts = new Map<string, number>();
+
+  for (const module of modules) {
+    const path = module.entryPath ?? "";
+    pathCounts.set(path, (pathCounts.get(path) ?? 0) + 1);
+  }
+
+  return modules.map((module) => {
+    const path = module.entryPath ?? "/";
+    const shouldShowCompany = (pathCounts.get(path) ?? 0) > 1;
+
+    return {
+      href: path,
+      label: shouldShowCompany
+        ? `${module.applicationName} - ${module.companyName}`
+        : module.applicationName
+    };
+  });
 }
 
 function isGrantableCompanyApplication(application: AdminCompanyApplicationContract): boolean {
@@ -1916,6 +2912,19 @@ function normalizePersonType(value: unknown): CreateAdminCompanyInput["personTyp
   }
 
   throw new BadRequestException("personType must be individual or legal_entity");
+}
+
+function normalizeCompanyStatus(value: unknown): UpdateAdminCompanyInput["status"] {
+  if (
+    value === "implementation" ||
+    value === "active" ||
+    value === "suspended" ||
+    value === "cancelled"
+  ) {
+    return value;
+  }
+
+  throw new BadRequestException("status must be implementation, active, suspended or cancelled");
 }
 
 function normalizeDocument(

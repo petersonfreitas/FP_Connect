@@ -45,6 +45,23 @@ Este arquivo registra decisoes arquiteturais e operacionais para evitar retrabal
 | DEC-037 | Resets operacionais devem preservar catalogos nativos do sistema, como modulos, planos, roles, permissions e vinculos role-permission. | Aprovada |
 | DEC-038 | Otimizacoes de consulta devem preservar seguranca acima de performance, mantendo autorizacao no backend/banco, escopo por empresa, soft delete, `select` explicito, paginacao em listagens novas e indices alinhados a queries reais. | Aprovada |
 | DEC-039 | Convites de usuarios do Admin Console devem ser enviados server-side pelo Nest com Supabase Auth `inviteUserByEmail`, usando `FP_WEB_URL` para redirecionar a `/login/atualizar-senha`; ao definir senha, o servidor ativa perfil e vinculos pendentes no `core`; reenvio so e permitido para usuarios pendentes. | Aprovada |
+| DEC-040 | Rotas do Admin Console devem declarar policy explicitamente: rotas globais como `super-admin only` e rotas por empresa com permissao granular e contexto de empresa. | Aprovada |
+| DEC-041 | Endpoints internos dos produtos operacionais devem usar guard comum de modulo, validando usuario ativo, empresa ativa, modulo contratado ativo e permissao; `super_admin` nao ignora modulo contratado. | Aprovada |
+| DEC-042 | Listagens administrativas principais podem usar paginacao `page`/`pageSize` com totalizador; cursor/keyset fica reservado para listagens de alto volume ou ordenacao temporal sensivel. | Aprovada |
+| DEC-043 | Formularios e acoes em lote devem bloquear novo submit enquanto processam, usando feedback visual simples no botao; modal/overlay fica reservado para operacoes longas ou criticas. | Aprovada |
+| DEC-044 | FP Robots deve orquestrar eventos, regras e execucoes; o futuro FP Gateway deve encapsular provedores externos como WhatsApp, Instagram, Facebook, Ads, Mercado Pago, PagSeguro e canais equivalentes. | Aprovada |
+| DEC-045 | O acesso do usuario deve separar identidade, acesso de plataforma, vinculos empresariais, permissoes de modulo e carteira operacional de suporte; usuarios podem atuar em varias empresas e operadores do Console podem ser vinculados como suporte com poder administrativo auditavel na empresa atendida. | Aprovada |
+| DEC-046 | O site institucional FPWebTech sera tratado como projeto isolado, fora do escopo operacional dos modulos SaaS do ecossistema. | Aprovada |
+| DEC-047 | Portal ou Area do Cliente externo sera desconsiderado por enquanto, sem backlog proprio nesta fase; o Portal atual do FP Console continua como entrada autenticada do ecossistema. | Aprovada |
+| DEC-048 | EixoGuard deixa de existir como modulo independente e sera absorvido pelo futuro FP Router. | Aprovada |
+| DEC-049 | FP Gateway sera o modulo oficial para integracoes externas, credenciais, OAuth, pagamentos, Mercado Pago, futuros provedores de pagamento, WhatsApp e Meta. | Aprovada |
+| DEC-050 | LinkedIn e gov.br ficam fora do escopo inicial do FP Gateway. | Aprovada |
+| DEC-051 | FP Fiscal sera modulo proprio, com prioridade funcional voltada inicialmente ao FP Food. | Aprovada |
+| DEC-052 | FP Router sera baixa prioridade e atuara como complemento futuro do FP Tracking, com roteirizacao inteligente e apoio logistico/fiscal. | Aprovada |
+| DEC-053 | FP Sign sera modulo futuro para aceite de propostas, contratos simples e arquivamento documental, sem assinatura digital avancada no MVP. | Aprovada |
+| DEC-054 | FP BI sera modulo futuro de indicadores e dashboards, com inicio simples e evolucao apos maturidade dos modulos transacionais. | Aprovada |
+| DEC-055 | Papeis do Console ficam separados entre `super_admin`, `fp_admin`, `support` e `company_user`; usuarios internos possuem CRUD proprio, usuarios de empresa sao administrados no contexto da empresa, e `fp_admin` pode convidar/vincular apenas `support` no modelo inicial. | Aprovada |
+| DEC-056 | Menus e links devem apontar diretamente para a tela final; paginas usadas apenas como redirecionamento devem ser removidas em limpeza futura. | Aprovada |
 
 ---
 
