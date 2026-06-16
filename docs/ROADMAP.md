@@ -153,7 +153,7 @@ Status inicial:
 - edicao de status e contato principal do vinculo empresarial ja ocorre no contexto empresa/usuario.
 - vinculo simples de suporte por carteira usa `company_memberships` e concede o papel `company-admin` do Admin Console para usuarios `super_admin`, `fp_admin` ou `support` ativos.
 - ao criar uma empresa, o superadmin autenticado e vinculado automaticamente como suporte administrativo da nova empresa.
-- rotas de menu devem apontar direto para o destino final; paginas usadas apenas como redirecionamento devem ser removidas em limpeza futura.
+- rotas de menu apontam direto para o destino final; rotas de cadastro usadas apenas como redirecionamento foram removidas.
 - policy inicial permite que `fp_admin` convide e vincule apenas usuarios `support`, enquanto `support` nao delega carteira.
 - menu e telas de usuarios do Console ja refletem essa policy para `fp_admin`, ocultando edicao/promocao global.
 

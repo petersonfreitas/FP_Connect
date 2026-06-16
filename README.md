@@ -48,15 +48,16 @@ Ja existe base funcional para:
 - bloqueio visual de botoes enquanto formularios e acoes em lote estao processando;
 - contrato de acesso do usuario atual para portal contextual e menu permissionado;
 - home contextual que evita carregar overview global para usuarios sem perfil superadmin;
+- CRUD separado para usuarios do Console e usuarios da empresa;
+- carteira de suporte por empresa;
+- remocao de rotas de cadastro usadas apenas como redirecionamento;
 - API Nest interna consumida pelo Next server-side.
 
 Ainda precisam ser amadurecidos antes de entrar pesado nos modulos operacionais:
 
 - smoke tests manuais dos fluxos principais, pendentes enquanto o acesso ao Supabase estiver instavel;
-- CRUD separado para usuarios do Console e usuarios da empresa;
-- carteira de suporte por empresa;
 - shell dos modulos Food e Tracking;
-- separacao conceitual entre FP Robots e o futuro FP Gateway.
+- persistencia funcional do FP Robots.
 
 O shell V0 do FP Robots ja possui rota `/robots`, entrada no menu, tela inicial, secoes planejadas e estado vazio sem persistencia nova.
 

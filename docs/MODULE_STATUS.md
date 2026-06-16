@@ -84,6 +84,7 @@ Este arquivo controla o avanco dos modulos do ecossistema.
 - [x] CRUD separado para usuarios do Console
 - [x] Vinculo simples de suporte por carteira de empresa
 - [x] Vinculo automatico do superadmin criador como suporte da empresa
+- [x] Remocao das rotas de cadastro usadas apenas como redirecionamento
 - [ ] Smoke test manual dos fluxos principais
 
 ---
