@@ -306,16 +306,18 @@ export class AdminConsoleService {
         const companyApplication = companyApplicationsByCompanyAndApplication.get(
           `${membership.company_id}:${grant.application_id}`
         );
-        const isActiveContractedModule = companyApplication?.status === "active";
+        const isAccessibleContractedModule = isGrantableCompanyApplicationStatus(
+          companyApplication?.status ?? null
+        );
 
-        if (application.key === "admin-console" && isActiveContractedModule) {
+        if (application.key === "admin-console" && isAccessibleContractedModule) {
           for (const permissionKey of permissionKeys) {
             adminPermissions.add(permissionKey);
           }
           continue;
         }
 
-        if (!isActiveContractedModule || permissionKeys.length === 0) {
+        if (!isAccessibleContractedModule || permissionKeys.length === 0) {
           continue;
         }
 
@@ -2826,9 +2828,12 @@ function buildModuleNavigationItems(companies: AdminCurrentUserCompanyAccessCont
   return modules.map((module) => {
     const path = module.entryPath ?? "/";
     const shouldShowCompany = (pathCounts.get(path) ?? 0) > 1;
+    const href = path.includes("?")
+      ? `${path}&companyId=${module.companyId}`
+      : `${path}?companyId=${module.companyId}`;
 
     return {
-      href: path,
+      href,
       label: shouldShowCompany
         ? `${module.applicationName} - ${module.companyName}`
         : module.applicationName

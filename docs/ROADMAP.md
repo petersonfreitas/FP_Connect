@@ -1,349 +1,179 @@
-# ROADMAP.md - FP WebTech Ecosystem
+# ROADMAP.md - Sequencia do ecossistema FP WebTech
 
-## 1. Objetivo
+Este arquivo define a ordem de evolucao do produto. Ele nao deve repetir status detalhado, decisoes ou regras de acesso.
 
-Este roadmap orienta a construcao inicial do ecossistema SaaS da FP WebTech com foco em produtividade, seguranca e integracao progressiva entre modulos.
+Fontes complementares:
 
-A regra central e:
+- `docs/MODULE_STATUS.md`: status atual por modulo.
+- `docs/ACCESS_MODEL.md`: papeis, vinculos e permissoes.
+- `docs/ARCHITECTURE.md`: arquitetura tecnica.
+- `docs/DECISIONS.md`: decisoes aprovadas.
+- `docs/backlog/`: escopo funcional completo.
 
-```text
-Backlogs orientam a prioridade.
-Fluxos reais orientam a implementacao.
-Dependencias autorizam transicao.
-Transicao exige base minima coerente.
-Implementacao deve ir so ate o ponto necessario.
-Depois retorna ao fluxo original.
-```
+## Objetivo
 
----
+Construir o ecossistema SaaS FP WebTech com base comum multiempresa, Admin Console central, modulos operacionais independentes e integracoes externas controladas.
 
-## 2. Foco atual
+O crescimento deve ser incremental:
 
-Prioridade atual:
+1. consolidar a fundacao;
+2. liberar o menor fluxo util por modulo;
+3. validar com dados reais;
+4. evoluir automacoes, integracoes e analises somente quando o fluxo base estiver estavel.
 
-1. fechar a fundacao do **FP Connect Admin Console**;
-2. preparar o shell e contratos iniciais do **FP Robots**;
-3. iniciar **FP Food** como primeiro produto operacional;
-4. iniciar **FP Tracking** como complemento operacional do Food.
+## Estado atual
 
-Food e Tracking podem nascer com frontends separados, mas sempre usando o mesmo banco Supabase/PostgreSQL, o mesmo Supabase Auth e o controle central do schema `core`.
+O Admin Console esta no fim da fase de fundacao:
 
----
+- autenticacao server-side com Supabase Auth;
+- acesso separado entre usuarios do Console e usuarios de empresas;
+- menus permissionados;
+- CRUD de usuarios internos do Console;
+- usuarios de empresa administrados no contexto da empresa;
+- suporte administrativo vinculado por empresa;
+- superadmin vinculado automaticamente como suporte ao criar empresa;
+- rotas redirecionadas antigas removidas;
+- rate limit, metricas basicas e bloqueio de duplo submit implementados.
 
-## 3. Estagio atual
+Pendencia operacional principal:
 
-O Admin Console esta em **Nivel 2 - Base funcional**.
+- smoke test manual com Supabase ativo para confirmar fluxos de acesso, empresa, usuarios, vinculos, modulos contratados e menus.
 
-Ja foram implementados:
+O FP Robots ja possui a primeira base funcional:
 
-- API Nest interna com Supabase server-side;
-- consumo server-side pelo Next;
-- painel principal com dados reais do `core`;
-- empresas: cadastro, listagem, detalhe e edicao;
-- empresas: contato, celular, documentos e endereco estruturado normalizados;
-- usuarios: cadastro, listagem e edicao;
-- usuarios: papel de plataforma (`company_user`, `support`, `fp_admin`, `super_admin`) exposto no CRUD central;
-- vinculo usuario x empresa;
-- usuarios da empresa podem ser cadastrados diretamente pelo detalhe da empresa;
-- vinculo empresarial pode ser editado/inativado sem inativar o perfil central;
-- papeis/permissoes por usuario, empresa e modulo;
-- concessao/revogacao de papeis em lote por usuario;
-- catalogo de planos e modulos;
-- modulos contratados por empresa;
-- acao em lote para modulos contratados por empresa;
-- auditoria administrativa com categoria propria;
-- menu administrativo em `Cadastro`, `Movimentacao` e `Auditoria`;
-- login/logout server-side com Supabase Auth e cookies HttpOnly;
-- recuperacao de senha por e-mail;
-- refresh de sessao por refresh token HttpOnly no proxy do Next;
-- seed inicial de super-admin a partir de Auth manual;
-- reset SQL de dados operacionais preservando catalogos nativos;
-- propagacao do usuario autenticado para a API interna;
-- auditoria com `actor_user_id` real em mutacoes do Admin Console;
-- validacoes de formulario alinhadas ao banco em pontos ja implementados;
-- regra documentada para API interna, API publica futura e variaveis server-side.
-- contrato de performance/seguranca para consultas Supabase;
-- indices complementares do `core` para listagens, auditoria e relacoes atuais.
-- guard inicial do Admin Console exigindo usuario ativo;
-- policies granulares iniciais por permissao em rotas com contexto de empresa.
-- convite e reenvio de ativacao de usuarios por e-mail via Supabase Auth.
-- policies explicitas em rotas globais, empresas, usuarios, permissoes e modulos do Admin Console.
-- bloqueio efetivo por modulo contratado nos endpoints internos de acesso dos produtos operacionais.
-- inativacao operacional de empresas e usuarios pela UI administrativa.
-- paginacao nas listagens principais de empresas e usuarios.
-- bloqueio visual de botoes enquanto formularios e acoes em lote estao processando.
+- schema `robots`;
+- catalogo inicial de eventos;
+- event log por empresa;
+- regras simples `evento -> acao`;
+- execucoes por regra ativa;
+- falha simulada e reprocessamento basico;
+- API interna para registrar/listar/detalhar eventos;
+- tela `/robots` com contexto empresarial;
+- detalhe de evento com payload mascarado.
+- botao de evento de teste no Console.
 
-Pendencias de fundacao antes dos modulos operacionais:
+O FP Food foi iniciado como frontend separado:
 
-- smoke test manual dos fluxos principais, pendente enquanto o acesso ao Supabase estiver instavel.
-- refinamento do modelo de acesso do Console conforme `docs/ACCESS_MODEL.md`.
+- app `apps/food`;
+- login compartilhado com Supabase Auth e cookies HttpOnly do ecossistema;
+- uso da API interna central `apps/api`;
+- schema `food` com configuracao inicial de loja;
+- evento `food.store.configured` publicado para o FP Robots.
 
----
+## Sequencia recomendada
 
-## 4. Macrofluxo desejado
+### Bloco 1 - Fechamento do Admin Console
 
-```text
-Admin Console
--> libera empresa, usuarios, permissoes e modulos contratados
--> Food permite loja/cardapio/pedido
--> Tracking permite entrega/rastreamento
--> Robots registra eventos e prepara automacoes
-```
-
-Primeiro fluxo operacional integrado:
-
-```text
-Empresa ativa
--> modulo Food contratado
--> loja configurada
--> cliente faz pedido
--> pedido e aceito
--> entrega e criada no Tracking
--> status da entrega evolui
--> eventos sao registrados no Robots
--> cliente acompanha rastreamento publico
-```
-
----
-
-## 5. Proximos blocos recomendados
-
-### Bloco A - Hardening final do Admin Console
-
-Objetivo: transformar a base funcional em fundacao segura para escalar.
-
-Status: praticamente concluido; falta validacao manual integrada.
-
-Itens concluidos:
-
-- guards/policies nas rotas sensiveis;
-- resolucao de empresa/contexto ativo;
-- revisao de bloqueios por empresa, permissao e modulo contratado;
-- paginacao nas listagens principais;
-- bloqueio visual de botoes durante processamento.
-- contrato inicial do usuario atual para portal contextual;
-- menu gerado pelo contrato de acesso.
-
-Item pendente:
-
-- smoke test de empresas, usuarios, permissoes, modulos e auditoria.
-
-### Bloco A.1 - Modelo de acesso e UX permissionada
-
-Objetivo: separar acesso de plataforma, acesso empresarial, permissoes de modulo e carteira operacional de suporte antes de evoluir os produtos operacionais.
+Objetivo: encerrar a fundacao antes de abrir modulos operacionais.
 
 Itens:
 
-- criar contrato server-side do usuario atual com escopos permitidos;
-- trocar a home global por portal contextual;
-- gerar menus conforme permissoes reais;
-- separar CRUD de usuarios do Console e usuarios da empresa;
-- permitir usuario vinculado a varias empresas;
-- vincular superadmin automaticamente como suporte ao cadastrar empresa;
-- permitir delegacao de suporte por carteira para admins do Console;
-- preparar o modelo para futura referencia no FP Suporte.
+- executar smoke test manual do Admin Console;
+- corrigir eventuais 403/404 de fluxo real;
+- validar edicao e inativacao de vinculos empresariais;
+- validar carteira de suporte;
+- revisar logs de rate limit e metricas;
+- confirmar que menus ocultam tudo que nao pertence ao usuario.
 
-Status inicial:
+Criterio de saida:
 
-- contrato `GET /api/admin-console/users/me/access` criado;
-- home evita `overview` global para usuarios que nao sao superadmin;
-- menu lateral usa a navegacao retornada pelo backend.
-- CRUD de usuarios do Console possui rota propria para listagem, convite e edicao de perfis internos.
-- cadastro de usuario da empresa ja nasce no detalhe da empresa, mantendo `/cadastro/usuarios` como gestao central de perfis.
-- edicao de status e contato principal do vinculo empresarial ja ocorre no contexto empresa/usuario.
-- vinculo simples de suporte por carteira usa `company_memberships` e concede o papel `company-admin` do Admin Console para usuarios `super_admin`, `fp_admin` ou `support` ativos.
-- ao criar uma empresa, o superadmin autenticado e vinculado automaticamente como suporte administrativo da nova empresa.
-- rotas de menu apontam direto para o destino final; rotas de cadastro usadas apenas como redirecionamento foram removidas.
-- policy inicial permite que `fp_admin` convide e vincule apenas usuarios `support`, enquanto `support` nao delega carteira.
-- menu e telas de usuarios do Console ja refletem essa policy para `fp_admin`, ocultando edicao/promocao global.
+- superadmin, fp_admin, support e company_user entram no portal correto, veem apenas o que podem usar e executam as acoes permitidas.
 
-### Bloco B - Shell dos modulos prioritarios
+### Bloco 2 - FP Robots V0
 
-Objetivo: criar estrutura visual e de navegacao para os modulos.
+Objetivo: concluir a primeira camada operacional para eventos e automacoes internas.
 
-Status: iniciado com o shell V0 do FP Robots.
+Escopo inicial:
 
-Modulos:
+- aplicar e validar migration do event log;
+- publicar evento interno de teste;
+- validar regras simples `evento -> acao`;
+- criar execucoes por regra ativa;
+- registrar falha basica;
+- reprocessar falha manualmente;
+- nenhuma integracao externa real no V0.
 
-- Admin Console;
-- Robots;
-- Food;
-- Tracking.
+Diretriz:
 
-Cada shell deve ter:
+- FP Robots orquestra eventos e execucoes.
+- FP Gateway, modulo futuro, encapsulara provedores externos como WhatsApp, Meta, pagamentos e canais equivalentes.
 
-- rota;
-- menu;
-- pagina inicial;
-- protecao por login;
-- protecao por empresa;
-- protecao por modulo contratado;
-- estado vazio;
-- estrutura inicial de pastas/componentes.
+Criterio de saida:
 
-Para o FP Robots, o shell V0 deve nascer preparado para a separacao futura com o FP Gateway: Robots orquestra eventos, regras e execucoes; Gateway, quando definido, encapsula provedores externos e canais como WhatsApp, Instagram, Facebook, Ads e pagamentos.
+- um modulo consegue registrar um evento interno e acompanhar seu processamento basico.
 
-FP Robots V0 ja possui rota `/robots`, entrada no menu, visao inicial, secoes planejadas, estado vazio e nota visual sobre a fronteira futura com o FP Gateway.
+### Bloco 3 - FP Food MVP
 
-### Bloco C - Robots minimo
+Objetivo: primeiro produto operacional do ecossistema.
 
-Objetivo: preparar o registro de eventos do ecossistema.
+Base criada:
 
-Itens:
+- frontend separado para operacao do Food;
+- empresa com modulo Food contratado;
+- configuracao inicial da loja;
+- primeiro evento de integracao com FP Robots.
 
-- schema/tabelas do modulo Robots;
-- event log ou outbox;
-- evento com `company_id`;
-- modulo de origem;
-- tipo e id do recurso de origem;
-- payload;
-- status;
-- erro/log basico;
-- listagem e detalhe simples.
+Proximo escopo:
 
-O Robots minimo deve evitar acoplamento direto com APIs externas especificas. Acoes destinadas a provedores externos devem ser modeladas como comandos padronizados, deixando credenciais, chamadas externas, normalizacao de resposta e detalhes do provedor para o futuro FP Gateway quando ele for detalhado.
-
-### Bloco D - Food ate pedido funcional
-
-Objetivo: criar o primeiro produto operacional.
-
-Itens:
-
-- frontend Food separado quando iniciar;
-- configuracao basica da loja;
 - categorias;
 - produtos;
 - cardapio;
-- vitrine publica;
-- criacao de pedido;
-- painel de pedidos;
-- status do pedido;
-- eventos necessarios para Robots.
+- pedido funcional simples;
+- status basico de pedido;
+- auditoria minima;
+- eventos publicados para FP Robots quando fizer sentido.
 
-### Bloco E - Tracking ate entrega funcional
+Criterio de saida:
 
-Objetivo: criar a base minima para atender o fluxo de entrega do Food.
+- uma empresa consegue operar um pedido simples com isolamento por empresa.
 
-Itens:
+### Bloco 4 - FP Tracking MVP
 
-- frontend Tracking separado quando iniciar;
-- entregadores;
-- veiculos, se previsto;
-- entregas;
+Objetivo: complementar o Food com acompanhamento logistico.
+
+Escopo inicial:
+
+- entrega associada a pedido ou origem operacional;
 - status de entrega;
-- vinculo com pedido de origem;
-- criacao de entrega a partir de pedido;
-- tela basica de entregas;
-- tela/PWA inicial do entregador, se previsto;
-- link publico de rastreamento;
-- eventos necessarios para Robots.
+- eventos de andamento;
+- consulta por empresa;
+- base para futura roteirizacao.
 
-### Bloco F - Integracao Food -> Tracking -> Robots
+Criterio de saida:
 
-Objetivo: validar o primeiro fluxo integrado do ecossistema.
+- um pedido ou entrega possui rastreamento operacional simples.
 
-```text
-Pedido criado no Food
--> evento registrado no Robots
--> pedido aceito no Food
--> entrega criada no Tracking
--> evento registrado no Robots
--> entregador altera status
--> Tracking atualiza entrega
--> Food consulta/enxerga status da entrega
--> cliente acompanha link publico
-```
+### Bloco 5 - Integracao Food -> Tracking -> Robots
 
----
+Objetivo: validar o ecossistema funcionando em cadeia.
 
-## 6. Modulos futuros
+Fluxo esperado:
 
-Depois da base Admin Console + Robots + Food + Tracking, integrar progressivamente:
+1. Food cria pedido.
+2. Tracking recebe ou acompanha entrega.
+3. Robots registra eventos operacionais.
+4. Console observa status, logs e permissoes.
 
-### Fase 2 - Integracoes e expansao operacional
+Criterio de saida:
 
-1. **FP Gateway**
-   - integracoes externas;
-   - credenciais e OAuth por empresa;
-   - Mercado Pago e futuros provedores de pagamento;
-   - WhatsApp e Meta;
-   - execucao de chamadas externas solicitadas por automacoes do FP Robots;
-   - normalizacao de respostas e status operacionais.
+- fluxo multiempresa ponta a ponta sem automacao externa obrigatoria.
 
-2. **FP Fiscal**
-   - configuracao fiscal por empresa;
-   - emissao, controle e historico fiscal;
-   - foco inicial na evolucao fiscal do FP Food;
-   - integracao futura com provedores fiscais quando aprovado.
+## Modulos futuros
 
-3. **FP Sales**
-   - clientes;
-   - oportunidades;
-   - propostas;
-   - visao 360.
+Os modulos abaixo orientam arquitetura, mas nao devem virar implementacao sem autorizacao ou dependencia real:
 
-4. **FP Marketing**
-   - campanhas;
-   - leads;
-   - qualificacao;
-   - conversao para Sales.
+- FP Gateway: integracoes externas, credenciais, OAuth, WhatsApp, Meta, pagamentos e provedores equivalentes.
+- FP Fiscal: emissao e gestao fiscal, inicialmente conectado ao Food quando o fluxo exigir.
+- FP Router: roteirizacao e apoio logistico futuro do Tracking.
+- FP Sign: aceite de propostas e documentos simples.
+- FP BI: indicadores e dashboards apos maturidade dos modulos transacionais.
+- FP Marketing, Sales, Tickets e Billing: modulos planejados conforme backlogs.
 
-5. **FP Tickets**
-   - suporte;
-   - implantacao/onboarding;
-   - chamados;
-   - vinculo com empresa, cliente e modulo.
+## Regras de evolucao
 
-6. **FP Billing**
-   - planos;
-   - modulos contratados;
-   - cobrancas;
-   - pagamentos;
-   - inadimplencia;
-   - suspensao/reativacao.
-
-### Fase 3 - Formalizacao, analise e evolucao logistica
-
-7. **FP Sign**
-   - aceite simples de propostas;
-   - contratos simples;
-   - arquivamento documental;
-   - evidencias basicas de aceite;
-   - sem assinatura digital avancada no MVP.
-
-8. **FP BI**
-   - indicadores;
-   - dashboards;
-   - relatorios;
-   - leitura analitica cross-module quando houver dados suficientes.
-
-9. **FP Router**
-   - planejamento de rotas;
-   - roteirizacao inteligente;
-   - aprovacao humana de planos;
-   - apoio logistico/fiscal;
-   - complemento futuro do FP Tracking;
-   - absorve o antigo conceito EixoGuard.
-
-10. **FP Monitor**
-   - disponibilidade de APIs internas;
-   - latencia e falhas por modulo;
-   - checks de saude e incidentes;
-   - observabilidade de integracoes externas quando existirem;
-   - visual inicial dentro do Admin Console.
-
-O FP Monitor fica planejado para o final do projeto. Pode ser antecipado apenas se a operacao exigir visibilidade de saude das APIs antes da conclusao dos modulos principais.
-
----
-
-## 7. Funcionalidades sensiveis
-
-Gateway de pagamento, nota fiscal, integracoes externas, BI avancado e recursos complexos nao sao proibidos.
-
-Devem ser implementados no momento adequado, quando estiverem no backlog da etapa atual ou quando houver autorizacao explicita.
-
-O FP Gateway deve ser priorizado antes de integracoes automaticas de pagamento, WhatsApp e Meta. LinkedIn e gov.br ficam fora do escopo inicial.
-
-O FP Router fica em baixa prioridade e absorve o antigo EixoGuard. Sua implementacao deve ocorrer apenas apos maturidade minima do FP Tracking e necessidade real de roteirizacao inteligente.
-
-O site institucional da FPWebTech sera tratado como projeto isolado e nao entra no roadmap operacional dos modulos SaaS.
+- Backlogs definem escopo.
+- Fluxos reais definem prioridade.
+- Nao criar integracao externa antes do FP Gateway.
+- Nao duplicar identidade, empresa ou permissao fora do `core`.
+- Nao transformar backlog futuro em implementacao atual sem autorizacao.
+- Cada bloco deve terminar com validacao objetiva antes do proximo.

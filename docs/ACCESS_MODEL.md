@@ -1,338 +1,153 @@
 # ACCESS_MODEL.md - Modelo de acesso FP WebTech
 
-Este documento define o modelo conceitual de acesso do ecossistema FP WebTech.
+Este documento define o modelo ativo de identidade, papeis, vinculos empresariais e permissoes. Status de implementacao fica em `docs/MODULE_STATUS.md`.
 
-Ele orienta a evolucao do FP Connect Admin Console antes das proximas alteracoes de CRUD, menus e autorizacao visual.
+## Principio central
 
----
+Um usuario possui uma identidade unica, mas pode ter acessos diferentes conforme o contexto.
 
-## 1. Principio central
+O sistema separa:
 
-O ecossistema deve usar identidade unica.
+- identidade: quem e o usuario;
+- acesso de plataforma: papel no FP Console;
+- acesso empresarial: empresas em que o usuario atua;
+- acesso a modulos: o que a empresa contratou e o que o usuario pode executar;
+- carteira de suporte: quais empresas um operador interno pode atender.
 
-Um usuario existe uma unica vez no Supabase Auth e no `core.profiles`.
-
-O que muda entre usuarios nao e o login, mas os acessos vinculados a essa identidade:
-
-- acesso de plataforma;
-- acesso empresarial;
-- acesso a modulos;
-- vinculo operacional de suporte.
-
----
-
-## 2. Conceitos
+## Entidades conceituais
 
 ### Identidade
 
-Representa a pessoa autenticada.
+Representa a pessoa autenticada pelo Supabase Auth e pelo perfil interno do `core`.
 
-Origem:
+Regras:
 
-- Supabase Auth;
-- `core.profiles`.
-
-Uma identidade pode ter varios acessos simultaneos.
+- o mesmo e-mail nao deve criar identidades duplicadas;
+- perfil inativo nao acessa o Console;
+- convite pendente so vira acesso ativo apos aceite e ativacao.
 
 ### Acesso de plataforma
 
-Representa permissoes globais no FP Connect Admin Console.
+Define se o usuario pertence ao FP Console.
 
-Exemplos:
+Papeis atuais:
 
-- superadmin;
-- admin do console;
-- suporte do console;
-- implantacao;
-- financeiro;
-- comercial.
-
-Esses acessos permitem atuar em funcoes internas da plataforma, conforme permissao.
-
-O acesso de plataforma nao substitui vinculo empresarial. Ele define o que a pessoa pode fazer no Console como operador interno.
+- `super_admin`: controle total da plataforma;
+- `fp_admin`: administrador interno delegado;
+- `support`: suporte interno vinculado a empresas especificas;
+- `company_user`: usuario de empresa, sem administracao global do Console.
 
 ### Acesso empresarial
 
-Representa o vinculo de uma identidade com uma empresa.
+Define em quais empresas o usuario atua.
 
-Origem atual:
+Regras:
 
-- `core.company_memberships`.
-
-Um usuario pode estar vinculado a varias empresas ao mesmo tempo.
-
-Exemplo:
-
-```text
-Usuario: Joao
-Empresas:
-- Matriz
-- Filial SP
-- Filial RJ
-```
-
-Cada vinculo empresarial deve ter status e permissoes proprias.
+- um usuario pode estar em varias empresas;
+- o papel pode variar por empresa;
+- vinculo empresarial pode ser ativo, pendente ou inativo;
+- usuarios de empresa sao administrados no cadastro da empresa.
 
 ### Acesso a modulos
 
-Representa o que o usuario pode fazer dentro de um modulo contratado por uma empresa.
+Depende de:
 
-Origem atual:
+- empresa ativa;
+- modulo contratado ativo;
+- permissao do usuario no contexto da empresa;
+- policy backend/banco coerente com o modulo.
 
-- papeis;
-- permissoes;
-- modulos contratados;
-- vinculos usuario x empresa x modulo.
+`super_admin` ignora permissoes granulares globais, mas produtos operacionais devem continuar respeitando modulo contratado quando o fluxo depende de contratacao real.
 
-Exemplos:
+### Carteira de suporte
 
-- administrar Food na Empresa A;
-- operar Tracking na Filial SP;
-- consultar Robots na Matriz.
+Permite que operadores internos atendam empresas especificas.
 
-### Vinculo operacional de suporte
+Regras:
 
-Representa a relacao entre um usuario interno da plataforma e uma empresa atendida.
+- `super_admin`, `fp_admin` e `support` podem ser vinculados como suporte administrativo;
+- suporte possui poder administrativo dentro da empresa atendida;
+- esse poder deve ser auditavel e restrito a empresas da carteira;
+- ao criar empresa, o `super_admin` criador deve ser vinculado automaticamente como suporte.
 
-Esse vinculo existe para permitir suporte, implantacao, acompanhamento de carteira e futura integracao com o modulo FP Suporte.
+## Matriz de acesso do Console
 
-Ele concede poder administrativo dentro da empresa atendida para que o suporte consiga executar ajustes necessarios.
+| Papel | Escopo | Pode gerir usuarios do Console | Pode gerir empresas | Pode atuar como suporte |
+|---|---|---:|---:|---:|
+| `super_admin` | Plataforma inteira | Sim | Sim | Sim |
+| `fp_admin` | Plataforma delegada | Apenas `support` | Empresas permitidas | Sim |
+| `support` | Empresas da carteira | Nao | Apenas empresas vinculadas | Sim |
+| `company_user` | Empresa vinculada | Nao | Nao no Console global | Nao |
 
-Esse poder deve ser auditavel e identificado como suporte, nao como usuario comum da empresa.
-
-Exemplos:
-
-```text
-Usuario: Maria
-Acesso de plataforma: admin_console
-Vinculo operacional:
-- Suporte da Empresa A
-- Suporte da Empresa B
-```
-
----
-
-## 3. Regras aprovadas
-
-### Usuario pode estar em varias empresas
-
-Permitido.
-
-O modelo deve aceitar que a mesma identidade atue em matriz, filiais ou empresas relacionadas.
-
-Cada empresa deve ter seu proprio vinculo, status e permissoes.
-
-### Superadmin pode participar de empresas
-
-Permitido.
-
-O superadmin possui acesso total de plataforma, mas tambem pode ter vinculos empresariais operacionais.
-
-Ao cadastrar uma empresa, o superadmin deve entrar automaticamente como suporte dessa empresa.
-
-Esse vinculo automatico serve para garantir acompanhamento inicial, implantacao e rastreabilidade de atendimento.
-
-### Admin do Console pode participar de empresas
-
-Permitido.
-
-O superadmin pode cadastrar ou promover um admin do Console e vincula-lo como suporte de empresas especificas.
-
-Esse desenho permite distribuir carteiras de suporte por cliente.
-
-No futuro, o FP Suporte podera usar esses vinculos para direcionar chamados, filas, SLA, implantacao e relacionamento com a empresa.
-
-### Suporte da empresa tem poder administrativo
-
-O papel de suporte representa atendimento interno da plataforma.
-
-Ele deve permitir atuar nos ajustes necessarios da empresa atendida, incluindo:
-
-- ajustar dados cadastrais;
-- apoiar gestao de usuarios;
-- revisar permissoes;
-- apoiar configuracao de modulos contratados;
-- consultar informacoes necessarias para atendimento.
-
-Esse acesso deve continuar passando por policy especifica, auditoria e contexto de atuacao `support`.
-
-Quando houver risco operacional alto, como cancelamento de modulo, exclusao logica sensivel, mudanca financeira ou acesso a dados operacionais sensiveis, a policy pode exigir permissao adicional mesmo para suporte.
-
----
-
-## 4. Tipos de usuario na UI
-
-O cadastro de usuarios deve ser separado por contexto.
+## Cadastro de usuarios
 
 ### Usuarios do Console
 
-CRUD previsto no Admin Console para usuarios internos da plataforma.
+Devem ter CRUD proprio no Admin Console.
 
-Exemplos:
+Uso:
 
-- superadmin;
-- admin do console;
-- suporte;
-- implantacao;
-- financeiro;
-- comercial.
+- criar ou convidar operadores internos;
+- definir papel de plataforma;
+- ativar/inativar acesso;
+- vincular `fp_admin` ou `support` a carteiras de empresa;
+- auditar delegacoes.
 
-Esse CRUD deve permitir:
+Restricao inicial:
 
-- cadastrar usuario interno;
-- definir acesso de plataforma;
-- vincular ou remover empresas da carteira de suporte;
-- inativar usuario interno;
-- auditar alteracoes.
+- `fp_admin` pode convidar/vincular apenas usuarios `support`.
 
-### Usuarios da empresa
+### Usuarios de empresa
 
-CRUD previsto dentro do detalhe da empresa.
+Devem ser geridos dentro do cadastro da empresa.
 
-Exemplos:
+Uso:
 
-- admin da empresa;
-- operador da empresa;
-- usuario de modulo;
-- gestor de filial.
+- vincular usuario a empresa;
+- definir papel dentro da empresa;
+- ativar, inativar ou ajustar permissoes do vinculo;
+- liberar acesso a modulos contratados conforme papel/permissao.
 
-Esse CRUD deve permitir:
+## Portal e menu
 
-- cadastrar usuario vinculado a empresa atual;
-- vincular usuario existente a empresa atual;
-- definir papel/permissao por modulo;
-- remover ou inativar vinculo empresarial;
-- auditar alteracoes.
+Ao entrar, o usuario deve receber um contexto inicial valido.
 
----
+Regras:
 
-## 5. Contexto ativo
+- `super_admin`: ve a plataforma inteira;
+- `fp_admin`: ve areas delegadas e empresas permitidas;
+- `support`: ve apenas empresas da carteira;
+- `company_user`: ve apenas funcionalidades pertinentes a suas empresas e modulos.
 
-A interface deve diferenciar o contexto em que o usuario esta atuando.
+Menus devem vir de regras do backend ou contrato derivado delas. Tela sem permissao nao deve aparecer como opcao navegavel.
 
-Contextos previstos:
+## Auditoria
 
-- plataforma;
-- empresa;
-- modulo.
+Acoes sensiveis devem registrar:
 
-Exemplos:
+- usuario executor;
+- papel usado;
+- empresa afetada, quando houver;
+- usuario alvo, quando houver;
+- acao executada;
+- data/hora;
+- origem operacional.
 
-```text
-Modo plataforma: Admin Console
-Modo empresa: Empresa A
-Modo modulo: FP Robots / Empresa A
-```
+Prioridade de auditoria:
 
-O contexto ativo deve orientar:
+- convite e ativacao de usuario;
+- alteracao de papel;
+- vinculo e inativacao empresarial;
+- liberacao de modulo;
+- atribuicao ou remocao de suporte;
+- acoes administrativas dentro de empresa atendida.
 
-- menus visiveis;
-- chamadas de API;
-- escopo de auditoria;
-- bloqueio visual;
-- mensagens de erro.
+## Regras obrigatorias
 
----
-
-## 6. Menu e portal inicial
-
-Menus nao devem ser estaticos para todos os usuarios autenticados.
-
-O frontend deve montar a navegacao a partir de um resumo server-side de acesso.
-
-Exemplos de comportamento:
-
-```text
-Superadmin:
-- Portal
-- Cadastro
-- Movimentacao
-- Auditoria
-- Sistemas
-
-Admin do Console:
-- Portal
-- secao de usuarios do Console limitada a gestao de suporte
-- empresas de sua carteira de suporte, com acoes administrativas permitidas pelo papel de suporte
-
-Usuario de empresa:
-- Portal
-- empresas vinculadas
-- modulos contratados e permitidos
-
-Usuario sem acesso liberado:
-- Portal com aviso de acesso pendente
-```
-
-O backend continua sendo a camada real de seguranca. O menu permissionado melhora experiencia e reduz exposicao visual desnecessaria.
-
-### Matriz inicial de papeis do Console
-
-`super_admin` representa o dono administrativo da plataforma. Ele possui bypass global no Admin Console, pode criar empresas, criar usuarios internos, alterar papeis de plataforma, contratar modulos, consultar auditoria global e executar acoes sensiveis. Toda acao deve continuar auditada.
-
-`fp_admin` representa o administrador operacional da plataforma. Ele deve atuar por permissao e carteira, sem bypass global. Pode administrar empresas sob sua responsabilidade, apoiar configuracoes, convidar usuarios `support`, vincular suporte quando autorizado e consultar auditoria apenas nos escopos permitidos. No modelo inicial, `fp_admin` nao cria nem promove `super_admin` ou outro `fp_admin`.
-
-`support` representa suporte operacional interno. Ele deve atuar apenas nas empresas em que estiver vinculado como suporte administrativo, com poder de admin dentro da empresa atendida, mas sem criar empresas, alterar papeis globais ou acessar auditoria global.
-
-`company_user` representa usuario do cliente. Ele nasce e deve ser administrado no contexto da empresa, com acesso definido por vinculo empresarial, modulo contratado e papel/permissao do modulo.
-
-Rotas de menu devem apontar diretamente para a tela final. Paginas que existem apenas para redirecionar devem ser removidas em uma limpeza futura, depois que todos os links ativos ja estiverem apontando para as rotas definitivas.
-
----
-
-## 7. Auditoria
-
-Toda acao deve registrar quem agiu e em qual contexto.
-
-Campos conceituais recomendados:
-
-```text
-actor_user_id
-acting_context
-company_id
-application_key
-target_user_id
-source
-```
-
-Exemplos de `acting_context`:
-
-- `platform`;
-- `company`;
-- `module`;
-- `support`.
-
-Exemplos de `source`:
-
-- `platform_role`;
-- `company_membership`;
-- `support_assignment`;
-- `system_auto_assignment`.
-
----
-
-## 8. Implicacoes para implementacao
-
-Antes de codar, o plano recomendado e:
-
-1. criar contrato de acesso do usuario atual; [iniciado]
-2. trocar a home global por portal contextual; [iniciado]
-3. gerar menus pelo contrato de acesso; [iniciado]
-4. separar CRUD de usuarios do Console e usuarios da empresa; [implementado com rota propria para usuarios internos e cadastro contextual na empresa]
-5. modelar vinculos de suporte por empresa; [iniciado com modelo simples via `company_memberships` + papel `company-admin`]
-6. automatizar vinculo de suporte para superadmin ao cadastrar empresa; [implementado para o superadmin criador]
-7. permitir delegacao de suporte por carteira para admins do Console;
-8. manter backend/policies como fonte real de seguranca.
-
----
-
-## 9. Pendencias de modelagem
-
-Pontos ainda a detalhar antes da migration definitiva:
-
-- nome final da tabela de acesso de plataforma;
-- nome final da tabela ou atributo definitivo para carteira de suporte;
-- se suporte permanecera como tipo operacional de `company_membership` ou evoluira para uma tabela propria de atribuicao;
-- quais papeis globais entram no MVP do Console;
-- quais acoes de alto risco exigem permissao adicional mesmo para suporte;
-- como o futuro FP Suporte consumira a carteira de atendimento.
+- Nao confiar em `company_id` enviado livremente pelo frontend.
+- Validar usuario ativo antes de qualquer rota sensivel.
+- Validar empresa ativa e vinculo antes de dados empresariais.
+- Validar modulo contratado antes de endpoint operacional.
+- Validar permissao granular quando a acao exigir.
+- Manter regra critica no backend, banco ou ambos.
+- Ocultar menus sem permissao e bloquear acesso direto por rota/API.

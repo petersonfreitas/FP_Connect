@@ -1,6 +1,17 @@
 project_id = "fp_ecosystem"
 
 [api]
-schemas = ["public", "graphql_public", "core"]
+schemas = [
+  "public",
+  "graphql_public",
+  "core",
+  "robots",
+  "food",
+  "tracking",
+  "marketing",
+  "sales",
+  "tickets",
+  "billing"
+]
 extra_search_path = ["public", "extensions"]
 max_rows = 1000

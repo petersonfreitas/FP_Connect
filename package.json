@@ -5,10 +5,12 @@
   "scripts": {
     "dev": "turbo dev",
     "dev:web": "pnpm --filter @fp/web dev",
+    "dev:food": "pnpm --filter @fp/food dev",
     "dev:api": "pnpm --filter @fp/api dev",
     "dev:stack": "turbo dev --filter=@fp/web --filter=@fp/api",
     "build": "turbo build",
     "build:web": "pnpm --filter @fp/web build",
+    "build:food": "pnpm --filter @fp/food build",
     "build:api": "pnpm --filter @fp/api build",
     "lint": "turbo lint",
     "typecheck": "turbo typecheck",

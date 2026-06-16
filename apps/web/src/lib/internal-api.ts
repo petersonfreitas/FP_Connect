@@ -29,6 +29,15 @@ import type {
   ModuleAccessContract,
   ModuleApplicationKey,
   PaginatedContract,
+  CreateRobotsEventContract,
+  CreateRobotsEventInput,
+  CreateRobotsTestEventContract,
+  CreateRobotsTestFailureContract,
+  ReprocessRobotsExecutionContract,
+  RobotsEventCatalogContract,
+  RobotsEventContract,
+  RobotsExecutionContract,
+  RobotsRuleContract,
   ResendAdminUserInviteContract,
   RevokeAdminUserRoleContract,
   RevokeAdminUserRoleInput,
@@ -185,6 +194,107 @@ export async function getModuleAccess(
       "X-FP-Company-Id": companyId
     }
   });
+}
+
+export async function listRobotsEventCatalog(
+  companyId: string
+): Promise<InternalApiResult<RobotsEventCatalogContract[]>> {
+  return fetchInternal<RobotsEventCatalogContract[]>("robots/events/catalog", {
+    headers: {
+      "X-FP-Company-Id": companyId
+    }
+  });
+}
+
+export async function listRobotsEvents(
+  companyId: string
+): Promise<InternalApiResult<RobotsEventContract[]>> {
+  return fetchInternal<RobotsEventContract[]>("robots/events", {
+    headers: {
+      "X-FP-Company-Id": companyId
+    }
+  });
+}
+
+export async function listRobotsRules(
+  companyId: string
+): Promise<InternalApiResult<RobotsRuleContract[]>> {
+  return fetchInternal<RobotsRuleContract[]>("robots/rules", {
+    headers: {
+      "X-FP-Company-Id": companyId
+    }
+  });
+}
+
+export async function listRobotsExecutions(
+  companyId: string
+): Promise<InternalApiResult<RobotsExecutionContract[]>> {
+  return fetchInternal<RobotsExecutionContract[]>("robots/executions", {
+    headers: {
+      "X-FP-Company-Id": companyId
+    }
+  });
+}
+
+export async function getRobotsEvent(
+  companyId: string,
+  eventId: string
+): Promise<InternalApiResult<RobotsEventContract>> {
+  return fetchInternal<RobotsEventContract>(`robots/events/${eventId}`, {
+    headers: {
+      "X-FP-Company-Id": companyId
+    }
+  });
+}
+
+export async function createRobotsEvent(
+  companyId: string,
+  input: CreateRobotsEventInput
+): Promise<InternalApiResult<CreateRobotsEventContract>> {
+  return fetchInternal<CreateRobotsEventContract>("robots/events", {
+    body: JSON.stringify(input),
+    headers: {
+      "X-FP-Company-Id": companyId
+    },
+    method: "POST"
+  });
+}
+
+export async function createRobotsTestEvent(
+  companyId: string
+): Promise<InternalApiResult<CreateRobotsTestEventContract>> {
+  return fetchInternal<CreateRobotsTestEventContract>("robots/test-event", {
+    headers: {
+      "X-FP-Company-Id": companyId
+    },
+    method: "POST"
+  });
+}
+
+export async function createRobotsTestFailure(
+  companyId: string
+): Promise<InternalApiResult<CreateRobotsTestFailureContract>> {
+  return fetchInternal<CreateRobotsTestFailureContract>("robots/test-failure", {
+    headers: {
+      "X-FP-Company-Id": companyId
+    },
+    method: "POST"
+  });
+}
+
+export async function reprocessRobotsExecution(
+  companyId: string,
+  executionId: string
+): Promise<InternalApiResult<ReprocessRobotsExecutionContract>> {
+  return fetchInternal<ReprocessRobotsExecutionContract>(
+    `robots/executions/${executionId}/reprocess`,
+    {
+      headers: {
+        "X-FP-Company-Id": companyId
+      },
+      method: "POST"
+    }
+  );
 }
 
 export async function listAdminAuditLogs(

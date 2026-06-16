@@ -227,7 +227,7 @@ function ContextualPortal({ access }: { access: AdminCurrentUserAccessContract }
                 ) : null}
                 {companyAccess.modules.map((module) =>
                   module.entryPath ? (
-                    <Link className="tag" href={module.entryPath} key={module.applicationId}>
+                    <Link className="tag" href={getModuleHref(module)} key={module.applicationId}>
                       {module.applicationName}
                     </Link>
                   ) : (
@@ -250,6 +250,13 @@ function ContextualPortal({ access }: { access: AdminCurrentUserAccessContract }
       )}
     </AppShell>
   );
+}
+
+function getModuleHref(module: { companyId: string; entryPath: string | null }): string {
+  const path = module.entryPath ?? "/";
+  return path.includes("?")
+    ? `${path}&companyId=${module.companyId}`
+    : `${path}?companyId=${module.companyId}`;
 }
 
 function getRoleLabel(role: AdminCurrentUserAccessContract["user"]["globalRole"]): string {

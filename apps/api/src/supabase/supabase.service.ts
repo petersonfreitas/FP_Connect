@@ -28,4 +28,12 @@ export class SupabaseService {
   get core() {
     return this.client.schema("core");
   }
+
+  get robots() {
+    return this.client.schema("robots");
+  }
+
+  get food() {
+    return this.client.schema("food");
+  }
 }

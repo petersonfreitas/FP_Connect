@@ -19,8 +19,8 @@ Este arquivo controla o avanco dos modulos do ecossistema.
 | Modulo | Prioridade atual | Nivel | Status | Observacao |
 |---|---:|---:|---|---|
 | FP Connect Admin Console | Alta | 2 | Base funcional estabilizada | Empresas, usuarios, papel de plataforma, permissoes, modulos contratados, suporte por carteira, catalogo, auditoria, guards, bloqueios, paginacao inicial e inativacao operacional ja possuem API e telas principais. |
-| FP Robots | Alta | 1 | Shell criado | Rota `/robots`, menu, layout inicial e fronteira conceitual com FP Gateway criados; falta dominio funcional e persistencia. |
-| FP Food | Alta | 0 | Fundacao de acesso preparada | Endpoint interno `/api/food/access` ja valida empresa, modulo contratado e permissao; deve nascer como frontend separado quando entrar em desenvolvimento. |
+| FP Robots | Alta | 2 | Base funcional em evolucao | Schema `robots`, catalogo de eventos, event log, regras simples `evento -> acao`, execucoes, falha simulada, reprocessamento basico, API interna e tela inicial no Console criados. |
+| FP Food | Alta | 2 | Base funcional iniciada | Frontend separado `apps/food`, endpoint interno de acesso, configuracao inicial da loja, schema `food` e evento `food.store.configured` para Robots criados. |
 | FP Tracking | Alta | 0 | Fundacao de acesso preparada | Endpoint interno `/api/tracking/access` ja valida empresa, modulo contratado e permissao; deve nascer como frontend separado quando entrar em desenvolvimento. |
 | FP Billing | Futura | 0 | Fundacao de acesso preparada | Endpoint interno `/api/billing/access` ja valida empresa, modulo contratado e permissao; entrara apos base operacional. |
 | FP Tickets | Futura | 0 | Fundacao de acesso preparada | Endpoint interno `/api/tickets/access` ja valida empresa, modulo contratado e permissao; entrara apos base operacional. |
@@ -68,6 +68,7 @@ Este arquivo controla o avanco dos modulos do ecossistema.
 - [x] Ativacao de perfil e vinculos pendentes apos definicao de senha
 - [x] Policies explicitas em rotas globais, empresas, permissoes e modulos do Admin Console
 - [x] Bloqueio efetivo por modulo contratado nos endpoints internos de acesso dos produtos operacionais
+- [x] Acesso operacional aceita modulo contratado em implantacao ou ativo, bloqueando suspenso/cancelado
 - [x] Inativacao operacional de empresas e usuarios exposta na UI administrativa
 - [x] Paginacao nas listagens principais de empresas e usuarios
 - [x] Bloqueio visual de botoes enquanto formularios e acoes em lote processam
@@ -93,23 +94,33 @@ Este arquivo controla o avanco dos modulos do ecossistema.
 
 - [x] Shell visual V0
 - [x] Separacao conceitual entre orquestracao do Robots e provedores externos via futuro FP Gateway
-- [ ] Estrutura do modulo
-- [ ] Registro de eventos
-- [ ] Outbox/event log
-- [ ] Payload
-- [ ] Status do processamento
-- [ ] Logs de erro
-- [ ] Listagem de eventos
-- [ ] Detalhe de evento
-- [ ] Reprocessamento basico
-- [ ] Integracao inicial com Food/Tracking
+- [x] Estrutura do modulo
+- [x] Catalogo inicial de eventos
+- [x] Registro de eventos
+- [x] Event log
+- [x] Payload mascarado para consulta operacional
+- [x] Status inicial de recebimento
+- [x] Logs de erro em execucoes falhadas
+- [x] Listagem de eventos
+- [x] Detalhe de evento
+- [x] Regras simples `evento -> acao`
+- [x] Acao `internal_log` para teste controlado
+- [x] Execucoes geradas por regras ativas
+- [x] Botao de evento de teste no Console
+- [x] Botao de falha simulada no Console
+- [x] Reprocessamento basico
+- [x] Integracao inicial com Food
+- [ ] Integracao inicial com Tracking
 
 ---
 
 ## Checklist - FP Food
 
-- [ ] Frontend separado quando iniciar o modulo
-- [ ] Configuracao da loja
+- [x] Frontend separado quando iniciar o modulo
+- [x] Schema `food`
+- [x] Endpoint interno de acesso
+- [x] Configuracao da loja
+- [x] Evento `food.store.configured` para Robots
 - [ ] Categorias
 - [ ] Produtos
 - [ ] Cardapio
@@ -118,7 +129,7 @@ Este arquivo controla o avanco dos modulos do ecossistema.
 - [ ] Painel de pedidos
 - [ ] Status do pedido
 - [ ] Pagamento manual, se previsto
-- [ ] Eventos para Robots
+- [ ] Eventos de pedido para Robots
 - [ ] Integracao com Tracking
 
 ---
@@ -143,11 +154,15 @@ Este arquivo controla o avanco dos modulos do ecossistema.
 
 ## Proximo marco recomendado
 
-Antes de abrir implementacao pesada em Robots, Food e Tracking, concluir a validacao final da fundacao:
+Validar o primeiro ciclo funcional do FP Food:
 
-1. ajustar portal inicial, menus e CRUDs de usuario conforme `docs/ACCESS_MODEL.md`;
-2. executar smoke test completo de empresas, usuarios, permissoes, modulos e auditoria;
-3. evoluir o FP Robots para contratos de eventos e event log quando a fundacao estiver validada.
+1. aplicar a migration `food_store_foundation` no Supabase;
+2. confirmar que o schema `food` esta exposto nas configuracoes de API do Supabase hospedado;
+3. executar `pnpm dev:food` e acessar o frontend Food com usuario autorizado;
+4. selecionar empresa com modulo Food contratado;
+5. criar ou atualizar a configuracao da loja;
+6. confirmar que o evento `food.store.configured` aparece no FP Robots;
+7. seguir para categorias, produtos e cardapio.
 
 ---
 

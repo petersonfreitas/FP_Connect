@@ -106,7 +106,9 @@ export class ModuleAccessGuard implements CanActivate {
     });
 
     if (error || hasModule !== true) {
-      throw new ForbiddenException("Company does not have an active contracted module");
+      throw new ForbiddenException(
+        "Company does not have an implementation or active contracted module"
+      );
     }
   }
 }

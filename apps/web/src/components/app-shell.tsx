@@ -32,7 +32,7 @@ export async function AppShell({ access, activePath = "/", children }: AppShellP
         <nav className="nav-list">
           {navigation.primary.map((item) => (
             <Link
-              className={activePath === item.href ? "nav-item active" : "nav-item"}
+              className={isActiveNavigationItem(activePath, item.href) ? "nav-item active" : "nav-item"}
               href={item.href}
               key={item.href}
             >
@@ -46,7 +46,9 @@ export async function AppShell({ access, activePath = "/", children }: AppShellP
               <div className="nav-group-items">
                 {group.items.map((item) => (
                   <Link
-                    className={activePath === item.href ? "nav-item active" : "nav-item"}
+                    className={
+                      isActiveNavigationItem(activePath, item.href) ? "nav-item active" : "nav-item"
+                    }
                     href={item.href}
                     key={`${group.label}:${item.href}:${item.label}`}
                   >
@@ -76,4 +78,8 @@ export async function AppShell({ access, activePath = "/", children }: AppShellP
       </section>
     </main>
   );
+}
+
+function isActiveNavigationItem(activePath: string, href: string): boolean {
+  return activePath === href || activePath === href.split("?")[0];
 }
