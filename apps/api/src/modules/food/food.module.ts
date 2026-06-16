@@ -3,11 +3,12 @@ import { InternalApiGuard } from "../../auth/internal-api.guard";
 import { ModuleAccessGuard } from "../../auth/module-access.guard";
 import { RobotsModule } from "../robots/robots.module";
 import { FoodController } from "./food.controller";
+import { FoodPublicController } from "./food-public.controller";
 import { FoodService } from "./food.service";
 
 @Module({
   imports: [RobotsModule],
-  controllers: [FoodController],
+  controllers: [FoodController, FoodPublicController],
   providers: [FoodService, InternalApiGuard, ModuleAccessGuard]
 })
 export class FoodModule {}

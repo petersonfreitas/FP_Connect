@@ -57,8 +57,14 @@ O FP Food foi iniciado como frontend separado:
 - app `apps/food`;
 - login compartilhado com Supabase Auth e cookies HttpOnly do ecossistema;
 - uso da API interna central `apps/api`;
+- menu lateral por Cadastro e Movimentacao;
 - schema `food` com configuracao inicial de loja;
-- evento `food.store.configured` publicado para o FP Robots.
+- categorias e produtos operacionais com listas paginadas;
+- cardapio derivado para previa interna;
+- pedido interno V0;
+- vitrine publica V0 por slug em `/l/[slug]`;
+- acompanhamento publico V0 em `/l/[slug]/pedido/[orderNumber]`;
+- eventos `food.store.configured`, `food.menu.updated`, `food.order.created` e `food.order.status_changed` publicados para o FP Robots.
 
 ## Sequencia recomendada
 
@@ -109,17 +115,22 @@ Objetivo: primeiro produto operacional do ecossistema.
 Base criada:
 
 - frontend separado para operacao do Food;
+- navegacao operacional por Cadastro e Movimentacao;
 - empresa com modulo Food contratado;
 - configuracao inicial da loja;
-- primeiro evento de integracao com FP Robots.
+- categorias com listagem paginada;
+- produtos com listagem paginada;
+- cardapio operacional derivado;
+- pedido interno V0;
+- vitrine publica V0 por slug;
+- acompanhamento publico V0 do pedido;
+- eventos iniciais de integracao com FP Robots.
 
 Proximo escopo:
 
-- categorias;
-- produtos;
-- cardapio;
-- pedido funcional simples;
-- status basico de pedido;
+- melhoria de UX operacional;
+- validacao da vitrine publica com pedido real;
+- integracao inicial com Tracking;
 - auditoria minima;
 - eventos publicados para FP Robots quando fizer sentido.
 

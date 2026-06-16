@@ -1,14 +1,46 @@
 "use server";
 
 import { redirect } from "next/navigation";
-import type { FoodStoreStatus, UpsertFoodStoreInput } from "@fp/types";
-import { upsertFoodStore } from "@/lib/internal-api";
+import type {
+  CreateFoodOrderInput,
+  FoodCategoryStatus,
+  FoodOrderStatus,
+  FoodProductStatus,
+  FoodStoreStatus,
+  UpdateFoodOrderStatusInput,
+  UpsertFoodCategoryInput,
+  UpsertFoodProductInput,
+  UpsertFoodStoreInput
+} from "@fp/types";
+import {
+  createFoodOrder,
+  createFoodCategory,
+  createFoodProduct,
+  createPublicFoodOrder,
+  updateFoodCategory,
+  updateFoodOrderStatus,
+  updateFoodProduct,
+  upsertFoodStore
+} from "@/lib/internal-api";
 
 const validStatuses = new Set<FoodStoreStatus>([
   "closed",
   "implementation",
   "open",
   "suspended"
+]);
+const validCategoryStatuses = new Set<FoodCategoryStatus>(["active", "inactive"]);
+const validProductStatuses = new Set<FoodProductStatus>([
+  "available",
+  "hidden",
+  "unavailable"
+]);
+const validOrderStatuses = new Set<FoodOrderStatus>([
+  "accepted",
+  "cancelled",
+  "created",
+  "preparing",
+  "ready"
 ]);
 
 export async function saveFoodStoreAction(formData: FormData): Promise<void> {
@@ -30,10 +62,167 @@ export async function saveFoodStoreAction(formData: FormData): Promise<void> {
   const searchCompany = `companyId=${encodeURIComponent(companyId)}`;
 
   if (result.error) {
-    redirect(`/?${searchCompany}&error=${encodeURIComponent(result.error)}`);
+    redirect(`/cadastro/loja?${searchCompany}&error=${encodeURIComponent(result.error)}`);
   }
 
-  redirect(`/?${searchCompany}&saved=1`);
+  redirect(`/cadastro/loja?${searchCompany}&saved=1`);
+}
+
+export async function saveFoodCategoryAction(formData: FormData): Promise<void> {
+  const companyId = requireCompanyId(formData);
+  const categoryId = optionalText(formData.get("categoryId"));
+  const input: UpsertFoodCategoryInput = {
+    description: optionalText(formData.get("description")),
+    name: String(formData.get("name") ?? ""),
+    slug: optionalText(formData.get("slug")),
+    sortOrder: optionalInteger(formData.get("sortOrder")),
+    status: normalizeCategoryStatus(formData.get("status"))
+  };
+  const result = categoryId
+    ? await updateFoodCategory(companyId, categoryId, input)
+    : await createFoodCategory(companyId, input);
+
+  redirectWithResult(
+    "/cadastro/categorias",
+    companyId,
+    result.error,
+    categoryId ? "categoryUpdated" : "categoryCreated"
+  );
+}
+
+export async function saveFoodProductAction(formData: FormData): Promise<void> {
+  const companyId = requireCompanyId(formData);
+  const productId = optionalText(formData.get("productId"));
+  const input: UpsertFoodProductInput = {
+    categoryId: optionalText(formData.get("categoryId")),
+    description: optionalText(formData.get("description")),
+    imageUrl: optionalText(formData.get("imageUrl")),
+    name: String(formData.get("name") ?? ""),
+    priceCents: parseMoneyToCents(formData.get("price")),
+    slug: optionalText(formData.get("slug")),
+    sortOrder: optionalInteger(formData.get("sortOrder")),
+    status: normalizeProductStatus(formData.get("status"))
+  };
+  const result = productId
+    ? await updateFoodProduct(companyId, productId, input)
+    : await createFoodProduct(companyId, input);
+
+  redirectWithResult(
+    "/cadastro/produtos",
+    companyId,
+    result.error,
+    productId ? "productUpdated" : "productCreated"
+  );
+}
+
+export async function createInternalFoodOrderAction(formData: FormData): Promise<void> {
+  const companyId = requireCompanyId(formData);
+  const productIds = formData.getAll("productId").map((value) => String(value));
+  const items = productIds
+    .map((productId) => ({
+      productId,
+      quantity: optionalInteger(formData.get(`quantity:${productId}`)) ?? 0
+    }))
+    .filter((item) => item.quantity > 0);
+  const input: CreateFoodOrderInput = {
+    customerName: optionalText(formData.get("customerName")),
+    customerNote: optionalText(formData.get("customerNote")),
+    customerPhone: optionalText(formData.get("customerPhone")),
+    items
+  };
+  const result = await createFoodOrder(companyId, input);
+
+  redirectWithResult(
+    "/movimentacao/pedidos",
+    companyId,
+    result.error,
+    "orderCreated"
+  );
+}
+
+export async function updateFoodOrderStatusAction(formData: FormData): Promise<void> {
+  const companyId = requireCompanyId(formData);
+  const orderId = String(formData.get("orderId") ?? "").trim();
+
+  if (!orderId) {
+    redirect(`/movimentacao/pedidos?companyId=${encodeURIComponent(companyId)}&error=Pedido%20nao%20informado.`);
+  }
+
+  const input: UpdateFoodOrderStatusInput = {
+    status: normalizeOrderStatus(formData.get("status"))
+  };
+  const result = await updateFoodOrderStatus(companyId, orderId, input);
+
+  redirectWithResult(
+    "/movimentacao/pedidos",
+    companyId,
+    result.error,
+    "orderUpdated"
+  );
+}
+
+export async function createPublicFoodOrderAction(formData: FormData): Promise<void> {
+  const publicSlug = normalizePublicSlug(formData.get("publicSlug"));
+  const productIds = formData.getAll("productId").map((value) => String(value));
+  const items = productIds
+    .map((productId) => ({
+      productId,
+      quantity: optionalInteger(formData.get(`quantity:${productId}`)) ?? 0
+    }))
+    .filter((item) => item.quantity > 0);
+  const input: CreateFoodOrderInput = {
+    customerName: optionalText(formData.get("customerName")),
+    customerNote: optionalText(formData.get("customerNote")),
+    customerPhone: optionalText(formData.get("customerPhone")),
+    items
+  };
+  const result = await createPublicFoodOrder(publicSlug, input);
+  const basePath = `/l/${encodeURIComponent(publicSlug)}`;
+
+  if (result.error || !result.data) {
+    redirect(
+      `${basePath}?error=${encodeURIComponent(result.error ?? "Pedido nao foi criado.")}`
+    );
+  }
+
+  redirect(
+    `${basePath}/pedido/${encodeURIComponent(result.data.orderNumber)}?created=1`
+  );
+}
+
+function requireCompanyId(formData: FormData): string {
+  const companyId = String(formData.get("companyId") ?? "").trim();
+
+  if (!companyId) {
+    redirect("/?error=Empresa%20nao%20informada.");
+  }
+
+  return companyId;
+}
+
+function normalizePublicSlug(value: FormDataEntryValue | null): string {
+  const slug = String(value ?? "").trim().toLowerCase();
+
+  if (!/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(slug)) {
+    redirect("/l/loja-nao-informada?error=Loja%20publica%20invalida.");
+  }
+
+  return slug;
+}
+
+function redirectWithResult(
+  basePath: string,
+  companyId: string,
+  error: string | null,
+  successKey: string
+): never {
+  const searchCompany = `companyId=${encodeURIComponent(companyId)}`;
+
+  if (error) {
+    redirect(`${basePath}?${searchCompany}&error=${encodeURIComponent(error)}`);
+  }
+
+  redirect(`${basePath}?${searchCompany}&${successKey}=1`);
 }
 
 function optionalText(value: FormDataEntryValue | null): string | null {
@@ -59,4 +248,48 @@ function normalizeStatus(value: FormDataEntryValue | null): FoodStoreStatus {
   }
 
   return status as FoodStoreStatus;
+}
+
+function normalizeCategoryStatus(value: FormDataEntryValue | null): FoodCategoryStatus {
+  const status = String(value ?? "");
+
+  if (!validCategoryStatuses.has(status as FoodCategoryStatus)) {
+    return "active";
+  }
+
+  return status as FoodCategoryStatus;
+}
+
+function normalizeProductStatus(value: FormDataEntryValue | null): FoodProductStatus {
+  const status = String(value ?? "");
+
+  if (!validProductStatuses.has(status as FoodProductStatus)) {
+    return "available";
+  }
+
+  return status as FoodProductStatus;
+}
+
+function normalizeOrderStatus(value: FormDataEntryValue | null): FoodOrderStatus {
+  const status = String(value ?? "");
+
+  if (!validOrderStatuses.has(status as FoodOrderStatus)) {
+    return "created";
+  }
+
+  return status as FoodOrderStatus;
+}
+
+function parseMoneyToCents(value: FormDataEntryValue | null): number {
+  const normalized = String(value ?? "")
+    .trim()
+    .replace(/\./g, "")
+    .replace(",", ".");
+  const parsed = Number(normalized);
+
+  if (!Number.isFinite(parsed) || parsed < 0) {
+    return 0;
+  }
+
+  return Math.round(parsed * 100);
 }

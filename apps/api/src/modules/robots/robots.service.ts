@@ -194,7 +194,7 @@ export class RobotsService {
 
   async createEvent(
     companyId: string,
-    actorUserId: string,
+    actorUserId: string | null,
     input: CreateRobotsEventInput
   ): Promise<CreateRobotsEventContract> {
     const normalized = normalizeCreateEventInput(input);
@@ -451,7 +451,7 @@ export class RobotsService {
 
   private async createExecutionsForEvent(
     event: RobotsEventContract,
-    actorUserId: string
+    actorUserId: string | null
   ): Promise<number> {
     const { data: rulesData, error: rulesError } = await this.supabase.robots
       .from("automation_rules")

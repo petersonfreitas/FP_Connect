@@ -69,6 +69,10 @@ Este arquivo registra decisoes arquiteturais e operacionais para evitar retrabal
 | DEC-061 | Reprocessamento V0 do FP Robots fica limitado a execucoes falhadas de `internal_log`; conectores reais devem implementar retry/reprocessamento especifico quando SMTP, webhook ou Gateway entrarem. | Aprovada |
 | DEC-062 | FP Food nasce como frontend separado em `apps/food`, consumindo a API interna central `apps/api`, o Supabase Auth unico, o banco unico e o controle de acesso do `core`. | Aprovada |
 | DEC-063 | Alteracoes operacionais relevantes do FP Food devem publicar eventos `food.*` no FP Robots; a primeira integracao oficial e `food.store.configured`. | Aprovada |
+| DEC-064 | O cardapio operacional do FP Food deriva de categorias ativas e produtos disponiveis; a vitrine publica sera uma camada posterior sobre o mesmo catalogo. | Aprovada |
+| DEC-065 | Pedido interno V0 do FP Food serve para validar fluxo transacional antes da vitrine publica; cria pedidos manualmente, altera status simples e publica eventos no FP Robots. | Aprovada |
+| DEC-066 | A vitrine publica V0 do FP Food deve ser servida pelo frontend Food em `/l/[slug]`, consumindo API interna protegida por token servidor-servidor; pedidos publicos nao exigem usuario autenticado e continuam recalculando precos no backend antes da gravacao. | Aprovada |
+| DEC-067 | O acompanhamento publico V0 do pedido Food usa rota `/l/[slug]/pedido/[orderNumber]`, expondo apenas o status simples e os itens do pedido; token dedicado de rastreio fica para a fase Tracking/checkout avancado. | Aprovada |
 
 ---
 

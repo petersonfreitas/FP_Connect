@@ -2,8 +2,17 @@ import "server-only";
 
 import type {
   AdminCurrentUserAccessContract,
+  CreateFoodOrderInput,
+  FoodCategoryContract,
+  FoodMenuContract,
+  FoodOrderContract,
+  FoodProductContract,
   FoodStoreContract,
   ModuleAccessContract,
+  PaginatedContract,
+  UpdateFoodOrderStatusInput,
+  UpsertFoodCategoryInput,
+  UpsertFoodProductInput,
   UpsertFoodStoreInput
 } from "@fp/types";
 import { requireCurrentUser } from "./auth";
@@ -20,6 +29,11 @@ type InternalApiResult<T> =
       data: null;
       error: string;
     };
+
+type PaginationParams = {
+  page?: number;
+  pageSize?: number;
+};
 
 export async function getCurrentAdminAccess(): Promise<
   InternalApiResult<AdminCurrentUserAccessContract>
@@ -58,6 +72,256 @@ export async function upsertFoodStore(
     },
     method: "POST"
   });
+}
+
+export async function listFoodCategories(
+  companyId: string,
+  pagination: PaginationParams = {}
+): Promise<InternalApiResult<PaginatedContract<FoodCategoryContract>>> {
+  return fetchInternal<PaginatedContract<FoodCategoryContract>>(
+    `food/categories${formatPaginationSearch(pagination)}`,
+    {
+      headers: {
+        "X-FP-Company-Id": companyId
+      }
+    }
+  );
+}
+
+export async function listAllFoodCategories(
+  companyId: string
+): Promise<InternalApiResult<FoodCategoryContract[]>> {
+  const result = await listFoodCategories(companyId, {
+    page: 1,
+    pageSize: 100
+  });
+
+  if (result.error || !result.data) {
+    return result;
+  }
+
+  return {
+    data: result.data.items,
+    error: null
+  };
+}
+
+export async function listFoodProducts(
+  companyId: string,
+  pagination: PaginationParams = {}
+): Promise<InternalApiResult<PaginatedContract<FoodProductContract>>> {
+  return fetchInternal<PaginatedContract<FoodProductContract>>(
+    `food/products${formatPaginationSearch(pagination)}`,
+    {
+      headers: {
+        "X-FP-Company-Id": companyId
+      }
+    }
+  );
+}
+
+export async function listAllFoodProducts(
+  companyId: string
+): Promise<InternalApiResult<FoodProductContract[]>> {
+  const result = await listFoodProducts(companyId, {
+    page: 1,
+    pageSize: 100
+  });
+
+  if (result.error || !result.data) {
+    return result;
+  }
+
+  return {
+    data: result.data.items,
+    error: null
+  };
+}
+
+export async function createFoodCategory(
+  companyId: string,
+  input: UpsertFoodCategoryInput
+): Promise<InternalApiResult<FoodCategoryContract>> {
+  return fetchInternal<FoodCategoryContract>("food/categories", {
+    body: JSON.stringify(input),
+    headers: {
+      "X-FP-Company-Id": companyId
+    },
+    method: "POST"
+  });
+}
+
+export async function updateFoodCategory(
+  companyId: string,
+  categoryId: string,
+  input: UpsertFoodCategoryInput
+): Promise<InternalApiResult<FoodCategoryContract>> {
+  return fetchInternal<FoodCategoryContract>(`food/categories/${categoryId}`, {
+    body: JSON.stringify(input),
+    headers: {
+      "X-FP-Company-Id": companyId
+    },
+    method: "PATCH"
+  });
+}
+
+export async function createFoodProduct(
+  companyId: string,
+  input: UpsertFoodProductInput
+): Promise<InternalApiResult<FoodProductContract>> {
+  return fetchInternal<FoodProductContract>("food/products", {
+    body: JSON.stringify(input),
+    headers: {
+      "X-FP-Company-Id": companyId
+    },
+    method: "POST"
+  });
+}
+
+export async function updateFoodProduct(
+  companyId: string,
+  productId: string,
+  input: UpsertFoodProductInput
+): Promise<InternalApiResult<FoodProductContract>> {
+  return fetchInternal<FoodProductContract>(`food/products/${productId}`, {
+    body: JSON.stringify(input),
+    headers: {
+      "X-FP-Company-Id": companyId
+    },
+    method: "PATCH"
+  });
+}
+
+export async function getFoodMenu(
+  companyId: string
+): Promise<InternalApiResult<FoodMenuContract>> {
+  return fetchInternal<FoodMenuContract>("food/menu", {
+    headers: {
+      "X-FP-Company-Id": companyId
+    }
+  });
+}
+
+export async function getPublicFoodMenu(
+  publicSlug: string
+): Promise<InternalApiResult<FoodMenuContract>> {
+  return fetchPublicInternal<FoodMenuContract>(
+    `food/public/stores/${encodeURIComponent(publicSlug)}/menu`
+  );
+}
+
+export async function listFoodOrders(
+  companyId: string,
+  pagination: PaginationParams = {}
+): Promise<InternalApiResult<PaginatedContract<FoodOrderContract>>> {
+  return fetchInternal<PaginatedContract<FoodOrderContract>>(
+    `food/orders${formatPaginationSearch(pagination)}`,
+    {
+      headers: {
+        "X-FP-Company-Id": companyId
+      }
+    }
+  );
+}
+
+export async function createFoodOrder(
+  companyId: string,
+  input: CreateFoodOrderInput
+): Promise<InternalApiResult<FoodOrderContract>> {
+  return fetchInternal<FoodOrderContract>("food/orders", {
+    body: JSON.stringify(input),
+    headers: {
+      "X-FP-Company-Id": companyId
+    },
+    method: "POST"
+  });
+}
+
+export async function createPublicFoodOrder(
+  publicSlug: string,
+  input: CreateFoodOrderInput
+): Promise<InternalApiResult<FoodOrderContract>> {
+  return fetchPublicInternal<FoodOrderContract>(
+    `food/public/stores/${encodeURIComponent(publicSlug)}/orders`,
+    {
+      body: JSON.stringify(input),
+      method: "POST"
+    }
+  );
+}
+
+export async function getPublicFoodOrder(
+  publicSlug: string,
+  orderNumber: string
+): Promise<InternalApiResult<FoodOrderContract>> {
+  return fetchPublicInternal<FoodOrderContract>(
+    `food/public/stores/${encodeURIComponent(publicSlug)}/orders/${encodeURIComponent(orderNumber)}`
+  );
+}
+
+export async function updateFoodOrderStatus(
+  companyId: string,
+  orderId: string,
+  input: UpdateFoodOrderStatusInput
+): Promise<InternalApiResult<FoodOrderContract>> {
+  return fetchInternal<FoodOrderContract>(`food/orders/${orderId}/status`, {
+    body: JSON.stringify(input),
+    headers: {
+      "X-FP-Company-Id": companyId
+    },
+    method: "PATCH"
+  });
+}
+
+async function fetchPublicInternal<T>(
+  path: string,
+  init: RequestInit = {}
+): Promise<InternalApiResult<T>> {
+  loadServerEnv();
+
+  const token = process.env.FP_INTERNAL_API_TOKEN?.trim();
+  if (!token) {
+    return {
+      data: null,
+      error: "FP_INTERNAL_API_TOKEN nao foi configurado no servidor Food."
+    };
+  }
+
+  const baseUrl = getInternalApiBaseUrl();
+  const response = await fetch(`${baseUrl}/${path}`, {
+    cache: "no-store",
+    ...init,
+    headers: {
+      "Content-Type": "application/json",
+      "X-FP-Internal-Token": token,
+      ...init.headers
+    }
+  }).catch((): null => {
+    return null;
+  });
+
+  if (!response) {
+    return {
+      data: null,
+      error: "API interna respondeu 503 fetch failed"
+    };
+  }
+
+  if (!response.ok) {
+    const detail = await readErrorDetail(response);
+
+    return {
+      data: null,
+      error: [`API interna respondeu ${response.status} ${response.statusText}`.trim(), detail]
+        .filter(Boolean)
+        .join(": ")
+    };
+  }
+
+  return {
+    data: (await response.json()) as T,
+    error: null
+  };
 }
 
 async function fetchInternal<T>(
@@ -116,6 +380,21 @@ async function fetchInternal<T>(
 function getInternalApiBaseUrl(): string {
   const value = process.env.FP_API_INTERNAL_URL?.trim() || DEFAULT_INTERNAL_API_BASE_URL;
   return value.replace(/\/$/, "");
+}
+
+function formatPaginationSearch({ page, pageSize }: PaginationParams): string {
+  const params = new URLSearchParams();
+
+  if (page) {
+    params.set("page", String(page));
+  }
+
+  if (pageSize) {
+    params.set("pageSize", String(pageSize));
+  }
+
+  const search = params.toString();
+  return search ? `?${search}` : "";
 }
 
 async function readErrorDetail(response: Response): Promise<string | undefined> {

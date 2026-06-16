@@ -20,7 +20,7 @@ Este arquivo controla o avanco dos modulos do ecossistema.
 |---|---:|---:|---|---|
 | FP Connect Admin Console | Alta | 2 | Base funcional estabilizada | Empresas, usuarios, papel de plataforma, permissoes, modulos contratados, suporte por carteira, catalogo, auditoria, guards, bloqueios, paginacao inicial e inativacao operacional ja possuem API e telas principais. |
 | FP Robots | Alta | 2 | Base funcional em evolucao | Schema `robots`, catalogo de eventos, event log, regras simples `evento -> acao`, execucoes, falha simulada, reprocessamento basico, API interna e tela inicial no Console criados. |
-| FP Food | Alta | 2 | Base funcional iniciada | Frontend separado `apps/food`, endpoint interno de acesso, configuracao inicial da loja, schema `food` e evento `food.store.configured` para Robots criados. |
+| FP Food | Alta | 2 | Base funcional em evolucao | Frontend separado `apps/food`, menu lateral por Cadastro/Movimentacao, configuracao da loja, categorias/produtos paginados, cardapio derivado, pedido interno V0, vitrine publica V0 por slug, acompanhamento publico de pedido e eventos `food.*` iniciais criados. |
 | FP Tracking | Alta | 0 | Fundacao de acesso preparada | Endpoint interno `/api/tracking/access` ja valida empresa, modulo contratado e permissao; deve nascer como frontend separado quando entrar em desenvolvimento. |
 | FP Billing | Futura | 0 | Fundacao de acesso preparada | Endpoint interno `/api/billing/access` ja valida empresa, modulo contratado e permissao; entrara apos base operacional. |
 | FP Tickets | Futura | 0 | Fundacao de acesso preparada | Endpoint interno `/api/tickets/access` ja valida empresa, modulo contratado e permissao; entrara apos base operacional. |
@@ -117,19 +117,23 @@ Este arquivo controla o avanco dos modulos do ecossistema.
 ## Checklist - FP Food
 
 - [x] Frontend separado quando iniciar o modulo
+- [x] Menu lateral por Cadastro e Movimentacao
 - [x] Schema `food`
 - [x] Endpoint interno de acesso
 - [x] Configuracao da loja
 - [x] Evento `food.store.configured` para Robots
-- [ ] Categorias
-- [ ] Produtos
-- [ ] Cardapio
-- [ ] Vitrine publica
-- [ ] Criacao de pedido
-- [ ] Painel de pedidos
-- [ ] Status do pedido
+- [x] Categorias
+- [x] Produtos
+- [x] Listas paginadas de categorias e produtos
+- [x] Cardapio operacional derivado
+- [x] Evento `food.menu.updated` para Robots
+- [x] Vitrine publica V0 por slug
+- [x] Acompanhamento publico V0 por numero do pedido
+- [x] Criacao de pedido interno V0
+- [x] Painel interno de pedidos
+- [x] Status simples do pedido
 - [ ] Pagamento manual, se previsto
-- [ ] Eventos de pedido para Robots
+- [x] Eventos de pedido para Robots
 - [ ] Integracao com Tracking
 
 ---
@@ -154,15 +158,19 @@ Este arquivo controla o avanco dos modulos do ecossistema.
 
 ## Proximo marco recomendado
 
-Validar o primeiro ciclo funcional do FP Food:
+Validar o ciclo funcional da vitrine publica V0 do FP Food:
 
-1. aplicar a migration `food_store_foundation` no Supabase;
+1. confirmar que a loja esta com status `open`;
 2. confirmar que o schema `food` esta exposto nas configuracoes de API do Supabase hospedado;
 3. executar `pnpm dev:food` e acessar o frontend Food com usuario autorizado;
-4. selecionar empresa com modulo Food contratado;
-5. criar ou atualizar a configuracao da loja;
-6. confirmar que o evento `food.store.configured` aparece no FP Robots;
-7. seguir para categorias, produtos e cardapio.
+4. acessar `/l/[slug-da-loja]`;
+5. adicionar produtos ao carrinho simples;
+6. enviar pedido publico;
+7. confirmar a pagina `/l/[slug-da-loja]/pedido/[numero]`;
+8. alterar status em `Movimentacao > Pedidos`;
+9. recarregar a pagina publica do pedido e validar o novo status;
+10. confirmar evento `food.order.created` no FP Robots com origem `public-store-v0`;
+11. seguir para melhoria de UX operacional ou preparacao da integracao com Tracking.
 
 ---
 
