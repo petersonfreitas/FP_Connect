@@ -10,6 +10,7 @@ import type {
   CreateFoodOrderInput,
   FoodCategoryContract,
   FoodCategoryStatus,
+  FoodDashboardContract,
   FoodOrderDetailContract,
   FoodMenuContract,
   FoodOrderContract,
@@ -111,6 +112,14 @@ type FoodOrderStatusHistoryRow = {
   status: FoodOrderStatus;
   actor_user_id: string | null;
   changed_at: string;
+};
+
+type FoodDashboardOrderRow = {
+  id: string;
+  status: FoodOrderStatus;
+  payment_status: FoodPaymentStatus;
+  total_cents: number;
+  created_at: string;
 };
 
 type PaginationOptions = {
@@ -460,6 +469,56 @@ export class FoodService {
   async getMenu(companyId: string): Promise<FoodMenuContract> {
     const store = await this.getStore(companyId);
     return this.buildMenu(store);
+  }
+
+  async getDashboard(companyId: string): Promise<FoodDashboardContract> {
+    const { periodStart, periodEnd } = getCurrentDayPeriod();
+    const [periodRows, activeRows] = await Promise.all([
+      this.listDashboardOrders(companyId, {
+        periodEnd,
+        periodStart
+      }),
+      this.listDashboardOrders(companyId, {
+        statuses: ["accepted", "preparing", "ready", "out_for_delivery"]
+      })
+    ]);
+    const orderStatusCounts = createOrderStatusCount();
+    const paymentStatusCounts = createPaymentStatusCount();
+    let totalCents = 0;
+    let paidCents = 0;
+    let pendingPaymentCents = 0;
+
+    for (const order of periodRows) {
+      orderStatusCounts[order.status] += 1;
+      paymentStatusCounts[order.payment_status] += 1;
+      totalCents += order.total_cents;
+
+      if (order.payment_status === "paid") {
+        paidCents += order.total_cents;
+      }
+
+      if (order.payment_status === "pending") {
+        pendingPaymentCents += order.total_cents;
+      }
+    }
+
+    return {
+      activeDeliveryCount: activeRows.filter(
+        (order) => order.status === "ready" || order.status === "out_for_delivery"
+      ).length,
+      activeKitchenCount: activeRows.filter(
+        (order) => order.status === "accepted" || order.status === "preparing"
+      ).length,
+      generatedAt: new Date().toISOString(),
+      orderStatusCounts,
+      paidCents,
+      paymentStatusCounts,
+      pendingPaymentCents,
+      periodEnd: periodEnd.toISOString(),
+      periodStart: periodStart.toISOString(),
+      totalCents,
+      totalOrders: periodRows.length
+    };
   }
 
   async getPublicMenu(publicSlug: string): Promise<FoodMenuContract> {
@@ -846,6 +905,43 @@ export class FoodService {
     }
 
     return ((data ?? []) as unknown as FoodProductRow[]).map(mapProduct);
+  }
+
+  private async listDashboardOrders(
+    companyId: string,
+    options: {
+      periodEnd?: Date;
+      periodStart?: Date;
+      statuses?: FoodOrderStatus[];
+    }
+  ): Promise<FoodDashboardOrderRow[]> {
+    let query = this.supabase.food
+      .from("orders")
+      .select("id,status,payment_status,total_cents,created_at")
+      .eq("company_id", companyId)
+      .is("deleted_at", null)
+      .order("created_at", { ascending: false })
+      .limit(1000);
+
+    if (options.periodStart) {
+      query = query.gte("created_at", options.periodStart.toISOString());
+    }
+
+    if (options.periodEnd) {
+      query = query.lt("created_at", options.periodEnd.toISOString());
+    }
+
+    if (options.statuses?.length) {
+      query = query.in("status", options.statuses);
+    }
+
+    const { data, error } = await query;
+
+    if (error) {
+      throwSupabaseError(error);
+    }
+
+    return (data ?? []) as unknown as FoodDashboardOrderRow[];
   }
 
   private async normalizeProductInput(companyId: string, input: UpsertFoodProductInput) {
@@ -1337,6 +1433,38 @@ function normalizeOptionalPaymentMethod(value: unknown): FoodPaymentMethod | nul
   }
 
   return value as FoodPaymentMethod;
+}
+
+function getCurrentDayPeriod(): { periodEnd: Date; periodStart: Date } {
+  const periodStart = new Date();
+  periodStart.setHours(0, 0, 0, 0);
+  const periodEnd = new Date(periodStart);
+  periodEnd.setDate(periodEnd.getDate() + 1);
+
+  return {
+    periodEnd,
+    periodStart
+  };
+}
+
+function createOrderStatusCount(): Record<FoodOrderStatus, number> {
+  return {
+    accepted: 0,
+    cancelled: 0,
+    created: 0,
+    delivered: 0,
+    out_for_delivery: 0,
+    preparing: 0,
+    ready: 0
+  };
+}
+
+function createPaymentStatusCount(): Record<FoodPaymentStatus, number> {
+  return {
+    cancelled: 0,
+    paid: 0,
+    pending: 0
+  };
 }
 
 function normalizePreparationTime(value: unknown): number | null {

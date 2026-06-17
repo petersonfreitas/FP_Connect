@@ -10,7 +10,7 @@ type FoodShellProps = {
 };
 
 const navigation = {
-  primary: [{ href: "/cadastro/loja", label: "Loja" }],
+  primary: [{ href: "/", label: "Dashboard" }],
   groups: [
     {
       label: "Cadastro",
@@ -38,7 +38,7 @@ export async function FoodShell({ activePath, children }: FoodShellProps) {
   return (
     <main className="app-shell">
       <aside className="sidebar" aria-label="Navegacao principal">
-        <Link className="sidebar-brand-text" href="/cadastro/loja">
+        <Link className="sidebar-brand-text" href="/">
           FP Food
         </Link>
         <nav className="nav-list">

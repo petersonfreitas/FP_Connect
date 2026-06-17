@@ -179,6 +179,16 @@ export class FoodController {
     return this.foodService.getMenu(companyId);
   }
 
+  @Get("dashboard")
+  @ModuleAccessPolicy({
+    applicationKey: "food",
+    companyHeader: "x-fp-company-id",
+    permissionKey: "food.access"
+  })
+  getDashboard(@Headers("x-fp-company-id") companyId: string) {
+    return this.foodService.getDashboard(companyId);
+  }
+
   @Get("orders")
   @ModuleAccessPolicy({
     applicationKey: "food",

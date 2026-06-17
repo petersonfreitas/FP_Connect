@@ -4,6 +4,7 @@ import type {
   AdminCurrentUserAccessContract,
   CreateFoodOrderInput,
   FoodCategoryContract,
+  FoodDashboardContract,
   FoodMenuContract,
   FoodOrderContract,
   FoodOrderDetailContract,
@@ -200,6 +201,16 @@ export async function getFoodMenu(
   companyId: string
 ): Promise<InternalApiResult<FoodMenuContract>> {
   return fetchInternal<FoodMenuContract>("food/menu", {
+    headers: {
+      "X-FP-Company-Id": companyId
+    }
+  });
+}
+
+export async function getFoodDashboard(
+  companyId: string
+): Promise<InternalApiResult<FoodDashboardContract>> {
+  return fetchInternal<FoodDashboardContract>("food/dashboard", {
     headers: {
       "X-FP-Company-Id": companyId
     }

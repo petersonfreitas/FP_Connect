@@ -410,6 +410,87 @@ textarea {
   padding: 8px 12px;
 }
 
+.dashboard-grid {
+  display: grid;
+  gap: 24px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  margin-left: auto;
+  margin-right: auto;
+  max-width: 1180px;
+}
+
+.dashboard-panel {
+  margin: 0;
+  max-width: none;
+}
+
+.dashboard-metrics-grid {
+  display: grid;
+  gap: 14px;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.compact-dashboard-grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.dashboard-metric {
+  background: #f8fbfa;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+  padding: 16px;
+}
+
+.dashboard-metric span,
+.dashboard-list-row span {
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 900;
+}
+
+.dashboard-metric strong {
+  color: var(--accent-strong);
+  font-size: 28px;
+  letter-spacing: 0;
+}
+
+.dashboard-metric small {
+  color: var(--muted);
+  line-height: 1.5;
+}
+
+.dashboard-actions {
+  border-top: 1px solid var(--line);
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 18px;
+  padding-top: 16px;
+}
+
+.dashboard-list {
+  display: grid;
+  gap: 10px;
+}
+
+.dashboard-list-row {
+  align-items: center;
+  background: #f8fbfa;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  display: flex;
+  gap: 12px;
+  justify-content: space-between;
+  padding: 12px 14px;
+}
+
+.dashboard-list-row strong {
+  color: var(--accent-strong);
+}
+
 .store-form,
 .record-form,
 .auth-form {
@@ -1285,6 +1366,12 @@ textarea {
   }
 
   .quick-status-actions {
+    grid-template-columns: 1fr;
+  }
+
+  .dashboard-grid,
+  .dashboard-metrics-grid,
+  .compact-dashboard-grid {
     grid-template-columns: 1fr;
   }
 

@@ -79,6 +79,7 @@ Este arquivo registra decisoes arquiteturais e operacionais para evitar retrabal
 | DEC-071 | A Entrega simples V0 do FP Food reutiliza o status do pedido, sem tabela propria de tracking; a tela operacional filtra pedidos `ready` e `out_for_delivery`, permitindo marcar `out_for_delivery` e `delivered`. FP Tracking permanece dono futuro de entregador, rota, ocorrencias e rastreamento publico dedicado. | Aprovada |
 | DEC-072 | O historico simples de status do pedido pertence ao FP Food em `food.order_status_history`, para auditoria operacional do pedido; FP Robots permanece como log/event bus de automacoes e nao substitui a timeline de negocio do pedido. | Aprovada |
 | DEC-073 | Pagamento manual V0 do FP Food registra status, forma, observacao, usuario e data no proprio pedido; pagamentos online, conciliacao, webhooks e credenciais externas permanecem responsabilidade futura do FP Gateway. | Aprovada |
+| DEC-074 | Dashboard operacional V0 do FP Food pode existir dentro do proprio modulo com indicadores simples de pedidos, pagamentos e filas; FP BI permanece futuro para analises consolidadas e cruzadas entre modulos. | Aprovada |
 
 ---
 

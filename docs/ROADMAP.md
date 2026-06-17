@@ -57,6 +57,7 @@ O FP Food foi iniciado como frontend separado:
 - app `apps/food`;
 - login compartilhado com Supabase Auth e cookies HttpOnly do ecossistema;
 - uso da API interna central `apps/api`;
+- dashboard operacional V0 em `/`;
 - menu lateral por Cadastro e Movimentacao;
 - schema `food` com configuracao inicial de loja;
 - categorias e produtos operacionais com listas paginadas;
@@ -121,6 +122,7 @@ Objetivo: primeiro produto operacional do ecossistema.
 Base criada:
 
 - frontend separado para operacao do Food;
+- dashboard operacional V0;
 - navegacao operacional por Cadastro e Movimentacao;
 - empresa com modulo Food contratado;
 - configuracao inicial da loja;

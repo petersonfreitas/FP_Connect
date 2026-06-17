@@ -174,6 +174,20 @@ export type FoodOrderDetailContract = FoodOrderContract & {
   statusHistory: FoodOrderStatusHistoryContract[];
 };
 
+export type FoodDashboardContract = {
+  activeDeliveryCount: number;
+  activeKitchenCount: number;
+  generatedAt: string;
+  orderStatusCounts: Record<FoodOrderStatus, number>;
+  paidCents: number;
+  paymentStatusCounts: Record<FoodPaymentStatus, number>;
+  pendingPaymentCents: number;
+  periodEnd: string;
+  periodStart: string;
+  totalCents: number;
+  totalOrders: number;
+};
+
 export type CreateFoodOrderItemInput = {
   productId: string;
   quantity: number;

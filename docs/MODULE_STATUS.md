@@ -20,7 +20,7 @@ Este arquivo controla o avanco dos modulos do ecossistema.
 |---|---:|---:|---|---|
 | FP Connect Admin Console | Alta | 2 | Base funcional estabilizada | Empresas, usuarios, papel de plataforma, permissoes, modulos contratados, suporte por carteira, catalogo, auditoria, guards, bloqueios, paginacao inicial e inativacao operacional ja possuem API e telas principais. |
 | FP Robots | Alta | 2 | Base funcional em evolucao | Schema `robots`, catalogo de eventos, event log, regras simples `evento -> acao`, execucoes, falha simulada, reprocessamento basico, API interna e tela inicial no Console criados. |
-| FP Food | Alta | 2 | Base funcional em evolucao | Frontend separado `apps/food`, menu lateral por Cadastro/Movimentacao, configuracao da loja, categorias/produtos paginados, cardapio derivado, pedido interno V0, vitrine publica V0 por slug, acompanhamento publico de pedido, painel de pedidos com filtro/status, detalhe de pedido com historico simples, pagamento manual V0, Cozinha V0, Entrega simples V0 e eventos `food.*` iniciais criados. |
+| FP Food | Alta | 2 | Base funcional em evolucao | Frontend separado `apps/food`, dashboard operacional V0, menu lateral por Cadastro/Movimentacao, configuracao da loja, categorias/produtos paginados, cardapio derivado, pedido interno V0, vitrine publica V0 por slug, acompanhamento publico de pedido, painel de pedidos com filtro/status, detalhe de pedido com historico simples, pagamento manual V0, Cozinha V0, Entrega simples V0 e eventos `food.*` iniciais criados. |
 | FP Tracking | Alta | 0 | Fundacao de acesso preparada | Endpoint interno `/api/tracking/access` ja valida empresa, modulo contratado e permissao; deve nascer como frontend separado quando entrar em desenvolvimento. |
 | FP Billing | Futura | 0 | Fundacao de acesso preparada | Endpoint interno `/api/billing/access` ja valida empresa, modulo contratado e permissao; entrara apos base operacional. |
 | FP Tickets | Futura | 0 | Fundacao de acesso preparada | Endpoint interno `/api/tickets/access` ja valida empresa, modulo contratado e permissao; entrara apos base operacional. |
@@ -117,6 +117,7 @@ Este arquivo controla o avanco dos modulos do ecossistema.
 ## Checklist - FP Food
 
 - [x] Frontend separado quando iniciar o modulo
+- [x] Dashboard operacional V0
 - [x] Menu lateral por Cadastro e Movimentacao
 - [x] Schema `food`
 - [x] Endpoint interno de acesso
