@@ -16,11 +16,14 @@ import type {
   FoodOrderItemContract,
   FoodOrderStatusHistoryContract,
   FoodOrderStatus,
+  FoodPaymentMethod,
+  FoodPaymentStatus,
   FoodProductContract,
   FoodProductStatus,
   FoodStoreContract,
   FoodStoreStatus,
   PaginatedContract,
+  UpdateFoodOrderPaymentInput,
   UpdateFoodOrderStatusInput,
   UpsertFoodCategoryInput,
   UpsertFoodProductInput,
@@ -78,6 +81,11 @@ type FoodOrderRow = {
   customer_name: string | null;
   customer_phone: string | null;
   customer_note: string | null;
+  paid_at: string | null;
+  paid_by: string | null;
+  payment_method: FoodPaymentMethod | null;
+  payment_note: string | null;
+  payment_status: FoodPaymentStatus;
   subtotal_cents: number;
   total_cents: number;
   created_at: string;
@@ -169,6 +177,11 @@ const orderSelect = [
   "customer_name",
   "customer_phone",
   "customer_note",
+  "paid_at",
+  "paid_by",
+  "payment_method",
+  "payment_note",
+  "payment_status",
   "subtotal_cents",
   "total_cents",
   "created_at",
@@ -216,6 +229,12 @@ const validOrderStatuses = new Set<FoodOrderStatus>([
   "out_for_delivery",
   "preparing",
   "ready"
+]);
+const validPaymentMethods = new Set<FoodPaymentMethod>(["card", "cash", "other", "pix"]);
+const validPaymentStatuses = new Set<FoodPaymentStatus>([
+  "cancelled",
+  "paid",
+  "pending"
 ]);
 
 @Injectable()
@@ -676,6 +695,51 @@ export class FoodService {
     return order;
   }
 
+  async updateOrderPayment(
+    companyId: string,
+    actorUserId: string,
+    orderId: string,
+    input: UpdateFoodOrderPaymentInput
+  ): Promise<FoodOrderContract> {
+    const normalized = normalizePaymentInput(input);
+    const current = await this.getOrderRow(companyId, orderId);
+    const paidAt =
+      normalized.paymentStatus === "paid"
+        ? current.paid_at ?? new Date().toISOString()
+        : null;
+    const paidBy = normalized.paymentStatus === "paid" ? current.paid_by ?? actorUserId : null;
+
+    const { data, error } = await this.supabase.food
+      .from("orders")
+      .update({
+        paid_at: paidAt,
+        paid_by: paidBy,
+        payment_method: normalized.paymentMethod,
+        payment_note: normalized.paymentNote,
+        payment_status: normalized.paymentStatus,
+        updated_by: actorUserId
+      })
+      .eq("id", orderId)
+      .eq("company_id", companyId)
+      .is("deleted_at", null)
+      .select(orderSelect)
+      .single();
+
+    if (error) {
+      throwSupabaseError(error);
+    }
+
+    const orderRow = data as unknown as FoodOrderRow;
+    const items = await this.listOrderItemsByOrderIds(companyId, [orderRow.id]);
+    const order = mapOrder(orderRow, items.get(orderRow.id) ?? []);
+
+    if (current.payment_status !== "paid" && order.paymentStatus === "paid") {
+      await this.emitPaymentMarkedAsPaid(companyId, actorUserId, order);
+    }
+
+    return order;
+  }
+
   private async findStore(companyId: string): Promise<FoodStoreRow | null> {
     const { data, error } = await this.supabase.food
       .from("stores")
@@ -1072,6 +1136,30 @@ export class FoodService {
       sourceEventId: order.id
     });
   }
+
+  private async emitPaymentMarkedAsPaid(
+    companyId: string,
+    actorUserId: string,
+    order: FoodOrderContract
+  ): Promise<void> {
+    await this.robots.createEvent(companyId, actorUserId, {
+      eventCode: "food.payment.marked_as_paid",
+      idempotencyKey: `food-payment-paid:${order.id}:${order.paidAt ?? Date.now()}`,
+      originMetadata: {
+        generatedBy: "fp-food",
+        source: "manual-payment-v0"
+      },
+      payload: {
+        orderId: order.id,
+        orderNumber: order.orderNumber,
+        paymentMethod: order.paymentMethod,
+        paymentStatus: order.paymentStatus,
+        totalCents: order.totalCents
+      },
+      sourceApplicationKey: "food",
+      sourceEventId: order.id
+    });
+  }
 }
 
 function normalizeStoreInput(input: UpsertFoodStoreInput) {
@@ -1211,6 +1299,46 @@ function normalizeOrderStatus(value: unknown): FoodOrderStatus {
   return value as FoodOrderStatus;
 }
 
+function normalizePaymentInput(input: UpdateFoodOrderPaymentInput): {
+  paymentMethod: FoodPaymentMethod | null;
+  paymentNote: string | null;
+  paymentStatus: FoodPaymentStatus;
+} {
+  const paymentStatus = normalizePaymentStatus(input.paymentStatus);
+  const paymentMethod = normalizeOptionalPaymentMethod(input.paymentMethod);
+  const paymentNote = normalizeOptionalText(input.paymentNote, "paymentNote", 600);
+
+  if (paymentStatus === "paid" && !paymentMethod) {
+    throw new BadRequestException("paymentMethod e obrigatorio para pagamento pago");
+  }
+
+  return {
+    paymentMethod,
+    paymentNote,
+    paymentStatus
+  };
+}
+
+function normalizePaymentStatus(value: unknown): FoodPaymentStatus {
+  if (typeof value !== "string" || !validPaymentStatuses.has(value as FoodPaymentStatus)) {
+    throw new BadRequestException("status do pagamento Food invalido");
+  }
+
+  return value as FoodPaymentStatus;
+}
+
+function normalizeOptionalPaymentMethod(value: unknown): FoodPaymentMethod | null {
+  if (value === undefined || value === null || value === "") {
+    return null;
+  }
+
+  if (typeof value !== "string" || !validPaymentMethods.has(value as FoodPaymentMethod)) {
+    throw new BadRequestException("forma de pagamento Food invalida");
+  }
+
+  return value as FoodPaymentMethod;
+}
+
 function normalizePreparationTime(value: unknown): number | null {
   if (value === undefined || value === null || value === "") {
     return null;
@@ -1333,6 +1461,11 @@ function mapOrder(row: FoodOrderRow, items: FoodOrderItemContract[]): FoodOrderC
     id: row.id,
     items,
     orderNumber: row.order_number,
+    paidAt: row.paid_at,
+    paidBy: row.paid_by,
+    paymentMethod: row.payment_method,
+    paymentNote: row.payment_note,
+    paymentStatus: row.payment_status,
     status: row.status,
     storeId: row.store_id,
     subtotalCents: row.subtotal_cents,

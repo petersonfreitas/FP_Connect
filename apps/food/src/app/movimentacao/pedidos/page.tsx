@@ -1,5 +1,5 @@
 import Link from "next/link";
-import type { FoodOrderStatus } from "@fp/types";
+import type { FoodOrderStatus, FoodPaymentStatus } from "@fp/types";
 import { CompanySwitcher } from "@/components/company-switcher";
 import { formatMoney } from "@/components/food-forms";
 import { FoodShell } from "@/components/food-shell";
@@ -40,6 +40,12 @@ const orderStatusLabels = {
   out_for_delivery: "Saiu para entrega",
   preparing: "Em preparo",
   ready: "Pronto"
+};
+
+const paymentStatusLabels: Record<FoodPaymentStatus, string> = {
+  cancelled: "Pagamento cancelado",
+  paid: "Pago",
+  pending: "Pagamento pendente"
 };
 
 const orderStatusOptions = [
@@ -234,6 +240,7 @@ export default async function OrdersPage({ searchParams }: OrdersPageProps) {
                           {order.customerName ?? "Cliente nao informado"} -{" "}
                           {new Date(order.createdAt).toLocaleString("pt-BR")}
                         </small>
+                        <small>{paymentStatusLabels[order.paymentStatus]}</small>
                       </div>
                       <span>{orderStatusLabels[order.status]}</span>
                     </div>

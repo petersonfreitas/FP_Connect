@@ -37,6 +37,8 @@ export type RobotsActionType =
 export type FoodStoreStatus = "closed" | "implementation" | "open" | "suspended";
 export type FoodCategoryStatus = "active" | "inactive";
 export type FoodProductStatus = "available" | "hidden" | "unavailable";
+export type FoodPaymentMethod = "card" | "cash" | "other" | "pix";
+export type FoodPaymentStatus = "cancelled" | "paid" | "pending";
 export type FoodOrderStatus =
   | "accepted"
   | "cancelled"
@@ -156,6 +158,11 @@ export type FoodOrderContract = {
   customerName: string | null;
   customerPhone: string | null;
   customerNote: string | null;
+  paidAt: string | null;
+  paidBy: string | null;
+  paymentMethod: FoodPaymentMethod | null;
+  paymentNote: string | null;
+  paymentStatus: FoodPaymentStatus;
   subtotalCents: number;
   totalCents: number;
   createdAt: string;
@@ -181,6 +188,12 @@ export type CreateFoodOrderInput = {
 
 export type UpdateFoodOrderStatusInput = {
   status: FoodOrderStatus;
+};
+
+export type UpdateFoodOrderPaymentInput = {
+  paymentMethod?: FoodPaymentMethod | null;
+  paymentNote?: string | null;
+  paymentStatus: FoodPaymentStatus;
 };
 
 export type RobotsEventCatalogContract = {

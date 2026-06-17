@@ -1,4 +1,5 @@
 import Link from "next/link";
+import type { FoodPaymentStatus } from "@fp/types";
 import { Notice } from "@/components/page-feedback";
 import { PublicCustomerMenu } from "@/components/public-customer-menu";
 import { getPublicFoodOrder } from "@/lib/internal-api";
@@ -21,6 +22,12 @@ const orderStatusLabels = {
   out_for_delivery: "Saiu para entrega",
   preparing: "Em preparo",
   ready: "Pronto"
+};
+
+const paymentStatusLabels: Record<FoodPaymentStatus, string> = {
+  cancelled: "Pagamento cancelado",
+  paid: "Pagamento confirmado",
+  pending: "Pagamento pendente"
 };
 
 const statusSteps = [
@@ -76,7 +83,10 @@ export default async function PublicOrderPage({
         <div>
           <div className="eyebrow">Acompanhamento</div>
           <h1>{order.orderNumber}</h1>
-          <p>Status atual: {orderStatusLabels[order.status]}</p>
+          <p>
+            Status atual: {orderStatusLabels[order.status]} -{" "}
+            {paymentStatusLabels[order.paymentStatus]}
+          </p>
         </div>
         <Link className="secondary-action" href={`/l/${encodeURIComponent(slug)}`}>
           Voltar ao cardapio

@@ -5,8 +5,11 @@ import type {
   CreateFoodOrderInput,
   FoodCategoryStatus,
   FoodOrderStatus,
+  FoodPaymentMethod,
+  FoodPaymentStatus,
   FoodProductStatus,
   FoodStoreStatus,
+  UpdateFoodOrderPaymentInput,
   UpdateFoodOrderStatusInput,
   UpsertFoodCategoryInput,
   UpsertFoodProductInput,
@@ -18,6 +21,7 @@ import {
   createFoodProduct,
   createPublicFoodOrder,
   updateFoodCategory,
+  updateFoodOrderPayment,
   updateFoodOrderStatus,
   updateFoodProduct,
   upsertFoodStore
@@ -43,6 +47,12 @@ const validOrderStatuses = new Set<FoodOrderStatus>([
   "out_for_delivery",
   "preparing",
   "ready"
+]);
+const validPaymentMethods = new Set<FoodPaymentMethod>(["card", "cash", "other", "pix"]);
+const validPaymentStatuses = new Set<FoodPaymentStatus>([
+  "cancelled",
+  "paid",
+  "pending"
 ]);
 
 export async function saveFoodStoreAction(formData: FormData): Promise<void> {
@@ -201,6 +211,25 @@ export async function updateFoodOrderStatusInlineAction(input: {
   return { error: result.error };
 }
 
+export async function updateFoodOrderPaymentAction(formData: FormData): Promise<void> {
+  const companyId = requireCompanyId(formData);
+  const orderId = String(formData.get("orderId") ?? "").trim();
+  const returnTo = normalizeFoodReturnPath(formData.get("returnTo"));
+
+  if (!orderId) {
+    redirectWithResult(returnTo, companyId, "Pedido nao informado.", "paymentUpdated");
+  }
+
+  const input: UpdateFoodOrderPaymentInput = {
+    paymentMethod: optionalPaymentMethod(formData.get("paymentMethod")),
+    paymentNote: optionalText(formData.get("paymentNote")),
+    paymentStatus: normalizePaymentStatus(formData.get("paymentStatus"))
+  };
+  const result = await updateFoodOrderPayment(companyId, orderId, input);
+
+  redirectWithResult(returnTo, companyId, result.error, "paymentUpdated");
+}
+
 export async function createPublicFoodOrderAction(formData: FormData): Promise<void> {
   const publicSlug = normalizePublicSlug(formData.get("publicSlug"));
   const productIds = formData.getAll("productId").map((value) => String(value));
@@ -351,6 +380,26 @@ function optionalOrderStatusFilter(value: FormDataEntryValue | null): FoodOrderS
   }
 
   return status as FoodOrderStatus;
+}
+
+function normalizePaymentStatus(value: FormDataEntryValue | null): FoodPaymentStatus {
+  const status = String(value ?? "");
+
+  if (!validPaymentStatuses.has(status as FoodPaymentStatus)) {
+    return "pending";
+  }
+
+  return status as FoodPaymentStatus;
+}
+
+function optionalPaymentMethod(value: FormDataEntryValue | null): FoodPaymentMethod | null {
+  const method = String(value ?? "");
+
+  if (!validPaymentMethods.has(method as FoodPaymentMethod)) {
+    return null;
+  }
+
+  return method as FoodPaymentMethod;
 }
 
 function normalizeFoodReturnPath(value: FormDataEntryValue | null): string {

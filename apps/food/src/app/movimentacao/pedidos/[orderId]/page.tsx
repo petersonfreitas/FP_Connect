@@ -1,6 +1,6 @@
 import Link from "next/link";
-import type { FoodOrderStatus } from "@fp/types";
-import { updateFoodOrderStatusAction } from "@/app/actions";
+import type { FoodOrderStatus, FoodPaymentMethod, FoodPaymentStatus } from "@fp/types";
+import { updateFoodOrderPaymentAction, updateFoodOrderStatusAction } from "@/app/actions";
 import { CompanySwitcher } from "@/components/company-switcher";
 import { formatMoney } from "@/components/food-forms";
 import { FoodShell } from "@/components/food-shell";
@@ -17,6 +17,7 @@ type OrderDetailPageProps = {
     companyId?: string;
     error?: string;
     orderUpdated?: string;
+    paymentUpdated?: string;
   }>;
 };
 
@@ -40,6 +41,33 @@ const orderStatusOptions = [
   ["out_for_delivery", "Saiu para entrega"],
   ["delivered", "Entregue"],
   ["cancelled", "Cancelado"]
+] as const;
+
+const paymentStatusLabels: Record<FoodPaymentStatus, string> = {
+  cancelled: "Cancelado",
+  paid: "Pago",
+  pending: "Pendente"
+};
+
+const paymentMethodLabels: Record<FoodPaymentMethod, string> = {
+  card: "Cartao",
+  cash: "Dinheiro",
+  other: "Outro",
+  pix: "Pix"
+};
+
+const paymentStatusOptions = [
+  ["pending", "Pendente"],
+  ["paid", "Pago"],
+  ["cancelled", "Cancelado"]
+] as const;
+
+const paymentMethodOptions = [
+  ["", "Selecione"],
+  ["cash", "Dinheiro"],
+  ["pix", "Pix"],
+  ["card", "Cartao"],
+  ["other", "Outro"]
 ] as const;
 
 export default async function OrderDetailPage({
@@ -76,6 +104,7 @@ export default async function OrderDetailPage({
       {orderResult.error ? <Notice tone="danger" message={orderResult.error} /> : null}
       {query?.error ? <Notice tone="danger" message={query.error} /> : null}
       {query?.orderUpdated ? <Notice tone="success" message="Status do pedido atualizado." /> : null}
+      {query?.paymentUpdated ? <Notice tone="success" message="Pagamento do pedido atualizado." /> : null}
 
       <CompanySwitcher
         basePath={detailPath}
@@ -111,6 +140,7 @@ export default async function OrderDetailPage({
               </div>
               <div className="panel-heading-actions">
                 <span className="status-chip">{orderStatusLabels[order.status]}</span>
+                <span className="status-chip">{paymentStatusLabels[order.paymentStatus]}</span>
                 <Link className="secondary-action compact-action" href={ordersHref}>
                   Voltar para pedidos
                 </Link>
@@ -128,6 +158,17 @@ export default async function OrderDetailPage({
                 <div className="eyebrow">Valores</div>
                 <strong>{formatMoney(order.totalCents)}</strong>
                 <span>Subtotal: {formatMoney(order.subtotalCents)}</span>
+              </div>
+              <div className="order-detail-block">
+                <div className="eyebrow">Pagamento</div>
+                <strong>{paymentStatusLabels[order.paymentStatus]}</strong>
+                <span>
+                  Forma:{" "}
+                  {order.paymentMethod ? paymentMethodLabels[order.paymentMethod] : "Nao informada"}
+                </span>
+                {order.paidAt ? (
+                  <span>Pago em: {new Date(order.paidAt).toLocaleString("pt-BR")}</span>
+                ) : null}
               </div>
               <div className="order-detail-block">
                 <div className="eyebrow">Atualizacao</div>
@@ -151,6 +192,59 @@ export default async function OrderDetailPage({
               <PendingSubmitButton className="secondary-action compact-action" pendingLabel="Salvando...">
                 Atualizar
               </PendingSubmitButton>
+            </form>
+          </section>
+
+          <section className="content-panel stack-panel">
+            <div className="panel-heading">
+              <div>
+                <h1>Pagamento manual</h1>
+                <p>Registre a confirmacao manual do pagamento sem integrar Gateway neste MVP.</p>
+              </div>
+              <span>{paymentStatusLabels[order.paymentStatus]}</span>
+            </div>
+
+            <form action={updateFoodOrderPaymentAction} className="store-form">
+              <input name="companyId" type="hidden" value={selectedCompany.company.id} />
+              <input name="orderId" type="hidden" value={order.id} />
+              <input name="returnTo" type="hidden" value={detailPath} />
+              <div className="form-grid">
+                <label>
+                  Status do pagamento
+                  <select defaultValue={order.paymentStatus} name="paymentStatus">
+                    {paymentStatusOptions.map(([value, label]) => (
+                      <option key={value} value={value}>
+                        {label}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <label>
+                  Forma de pagamento
+                  <select defaultValue={order.paymentMethod ?? ""} name="paymentMethod">
+                    {paymentMethodOptions.map(([value, label]) => (
+                      <option key={value || "empty"} value={value}>
+                        {label}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              </div>
+              <label>
+                Observacao do pagamento
+                <textarea
+                  defaultValue={order.paymentNote ?? ""}
+                  maxLength={600}
+                  name="paymentNote"
+                  rows={3}
+                />
+              </label>
+              <div className="form-footer">
+                <span>Marcar como pago emite food.payment.marked_as_paid para o FP Robots.</span>
+                <PendingSubmitButton pendingLabel="Salvando...">
+                  Salvar pagamento
+                </PendingSubmitButton>
+              </div>
             </form>
           </section>
 

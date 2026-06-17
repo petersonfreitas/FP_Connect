@@ -17,6 +17,7 @@ import { buildModuleAccessResponse } from "../../auth/module-access-response";
 import type {
   CreateFoodOrderInput,
   FoodOrderStatus,
+  UpdateFoodOrderPaymentInput,
   UpdateFoodOrderStatusInput,
   UpsertFoodCategoryInput,
   UpsertFoodProductInput,
@@ -222,6 +223,21 @@ export class FoodController {
     @Param("orderId") orderId: string
   ) {
     return this.foodService.getOrderDetail(companyId, orderId);
+  }
+
+  @Patch("orders/:orderId/payment")
+  @ModuleAccessPolicy({
+    applicationKey: "food",
+    companyHeader: "x-fp-company-id",
+    permissionKey: "food.access"
+  })
+  updateOrderPayment(
+    @Body() input: UpdateFoodOrderPaymentInput,
+    @Headers("x-fp-company-id") companyId: string,
+    @Headers("x-fp-actor-user-id") actorUserId: string,
+    @Param("orderId") orderId: string
+  ) {
+    return this.foodService.updateOrderPayment(companyId, actorUserId, orderId, input);
   }
 
   @Patch("orders/:orderId/status")

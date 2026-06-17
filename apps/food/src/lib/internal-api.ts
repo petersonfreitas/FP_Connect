@@ -12,6 +12,7 @@ import type {
   FoodStoreContract,
   ModuleAccessContract,
   PaginatedContract,
+  UpdateFoodOrderPaymentInput,
   UpdateFoodOrderStatusInput,
   UpsertFoodCategoryInput,
   UpsertFoodProductInput,
@@ -279,6 +280,20 @@ export async function updateFoodOrderStatus(
   input: UpdateFoodOrderStatusInput
 ): Promise<InternalApiResult<FoodOrderContract>> {
   return fetchInternal<FoodOrderContract>(`food/orders/${orderId}/status`, {
+    body: JSON.stringify(input),
+    headers: {
+      "X-FP-Company-Id": companyId
+    },
+    method: "PATCH"
+  });
+}
+
+export async function updateFoodOrderPayment(
+  companyId: string,
+  orderId: string,
+  input: UpdateFoodOrderPaymentInput
+): Promise<InternalApiResult<FoodOrderContract>> {
+  return fetchInternal<FoodOrderContract>(`food/orders/${orderId}/payment`, {
     body: JSON.stringify(input),
     headers: {
       "X-FP-Company-Id": companyId
