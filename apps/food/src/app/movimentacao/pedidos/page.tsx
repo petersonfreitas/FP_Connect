@@ -1,6 +1,9 @@
+import Link from "next/link";
+import type { FoodOrderStatus } from "@fp/types";
 import { CompanySwitcher } from "@/components/company-switcher";
 import { formatMoney } from "@/components/food-forms";
 import { FoodShell } from "@/components/food-shell";
+import { OrderAutoRefresh } from "@/components/order-auto-refresh";
 import { PaginationControls } from "@/components/pagination-controls";
 import { EmptyFoodAccess, Notice } from "@/components/page-feedback";
 import {
@@ -22,6 +25,7 @@ type OrdersPageProps = {
     orderCreated?: string;
     orderUpdated?: string;
     page?: string;
+    status?: string;
   }>;
 };
 
@@ -44,9 +48,38 @@ const orderStatusOptions = [
   ["cancelled", "Cancelado"]
 ] as const;
 
+const orderFilterOptions = [
+  ["", "Todos"],
+  ["created", "Criado"],
+  ["accepted", "Aceito"],
+  ["preparing", "Em preparo"],
+  ["ready", "Pronto"],
+  ["cancelled", "Cancelado"]
+] as const;
+
+const quickStatusOptions: Record<FoodOrderStatus, Array<[FoodOrderStatus, string]>> = {
+  accepted: [
+    ["preparing", "Preparar"],
+    ["ready", "Pronto"],
+    ["cancelled", "Cancelar"]
+  ],
+  cancelled: [],
+  created: [
+    ["accepted", "Aceitar"],
+    ["preparing", "Preparar"],
+    ["cancelled", "Cancelar"]
+  ],
+  preparing: [
+    ["ready", "Pronto"],
+    ["cancelled", "Cancelar"]
+  ],
+  ready: [["cancelled", "Cancelar"]]
+};
+
 export default async function OrdersPage({ searchParams }: OrdersPageProps) {
   const params = await searchParams;
   const page = normalizePage(params?.page);
+  const statusFilter = normalizeOrderStatusFilter(params?.status);
   const context = await getFoodPageContext(params?.companyId);
   const selectedCompany = context.selectedCompany;
   const foodAccessResult = selectedCompany
@@ -56,7 +89,7 @@ export default async function OrdersPage({ searchParams }: OrdersPageProps) {
     selectedCompany && !foodAccessResult.error
       ? await Promise.all([
           listAllFoodProducts(selectedCompany.company.id),
-          listFoodOrders(selectedCompany.company.id, { page, pageSize })
+          listFoodOrders(selectedCompany.company.id, { page, pageSize, status: statusFilter })
         ])
       : [{ data: null, error: null }, { data: null, error: null }];
   const availableProducts = (productsResult.data ?? []).filter(
@@ -103,6 +136,7 @@ export default async function OrdersPage({ searchParams }: OrdersPageProps) {
 
             <form action={createInternalFoodOrderAction} className="store-form">
               <input name="companyId" type="hidden" value={selectedCompany.company.id} />
+              <input name="statusFilter" type="hidden" value={statusFilter ?? ""} />
               <div className="form-grid">
                 <label>
                   Cliente
@@ -154,10 +188,25 @@ export default async function OrdersPage({ searchParams }: OrdersPageProps) {
             <div className="panel-heading">
               <div>
                 <h1>Pedidos criados</h1>
-                <p>Lista paginada dos pedidos internos da empresa selecionada.</p>
+                <p>Lista operacional com filtro por status e atualizacao leve a cada 30 segundos.</p>
               </div>
-              <span>{pagination?.total ?? 0} registro(s)</span>
+              <div className="panel-heading-actions">
+                <OrderAutoRefresh intervalSeconds={30} />
+                <span>{pagination?.total ?? 0} registro(s)</span>
+              </div>
             </div>
+
+            <nav className="status-filter-bar" aria-label="Filtro de status dos pedidos">
+              {orderFilterOptions.map(([value, label]) => (
+                <Link
+                  className={value === (statusFilter ?? "") ? "status-filter active" : "status-filter"}
+                  href={getStatusFilterHref(selectedCompany.company.id, value)}
+                  key={value || "all"}
+                >
+                  {label}
+                </Link>
+              ))}
+            </nav>
 
             {orders.length > 0 ? (
               <div className="order-list">
@@ -188,6 +237,7 @@ export default async function OrdersPage({ searchParams }: OrdersPageProps) {
                     <form action={updateFoodOrderStatusAction} className="order-status-form">
                       <input name="companyId" type="hidden" value={selectedCompany.company.id} />
                       <input name="orderId" type="hidden" value={order.id} />
+                      <input name="statusFilter" type="hidden" value={statusFilter ?? ""} />
                       <strong>Total: {formatMoney(order.totalCents)}</strong>
                       <select defaultValue={order.status} name="status">
                         {orderStatusOptions.map(([value, label]) => (
@@ -203,11 +253,34 @@ export default async function OrdersPage({ searchParams }: OrdersPageProps) {
                         Atualizar
                       </PendingSubmitButton>
                     </form>
+
+                    {quickStatusOptions[order.status].length > 0 ? (
+                      <div className="quick-status-actions">
+                        {quickStatusOptions[order.status].map(([status, label]) => (
+                          <form action={updateFoodOrderStatusAction} key={status}>
+                            <input name="companyId" type="hidden" value={selectedCompany.company.id} />
+                            <input name="orderId" type="hidden" value={order.id} />
+                            <input name="status" type="hidden" value={status} />
+                            <input name="statusFilter" type="hidden" value={statusFilter ?? ""} />
+                            <PendingSubmitButton
+                              className={
+                                status === "cancelled"
+                                  ? "secondary-action compact-action danger-action"
+                                  : "secondary-action compact-action"
+                              }
+                              pendingLabel="Salvando..."
+                            >
+                              {label}
+                            </PendingSubmitButton>
+                          </form>
+                        ))}
+                      </div>
+                    ) : null}
                   </article>
                 ))}
               </div>
             ) : (
-              <div className="empty-state">Nenhum pedido criado ainda.</div>
+              <div className="empty-state">Nenhum pedido encontrado para este filtro.</div>
             )}
 
             {pagination ? (
@@ -215,7 +288,7 @@ export default async function OrdersPage({ searchParams }: OrdersPageProps) {
                 basePath="/movimentacao/pedidos"
                 page={pagination.page}
                 pageSize={pagination.pageSize}
-                params={{ companyId: selectedCompany.company.id }}
+                params={{ companyId: selectedCompany.company.id, status: statusFilter }}
                 total={pagination.total}
                 totalPages={pagination.totalPages}
               />
@@ -230,4 +303,30 @@ export default async function OrdersPage({ searchParams }: OrdersPageProps) {
 function normalizePage(value: string | undefined): number {
   const page = Number(value);
   return Number.isInteger(page) && page > 0 ? page : 1;
+}
+
+function normalizeOrderStatusFilter(value: string | undefined): FoodOrderStatus | undefined {
+  if (
+    value === "accepted" ||
+    value === "cancelled" ||
+    value === "created" ||
+    value === "preparing" ||
+    value === "ready"
+  ) {
+    return value;
+  }
+
+  return undefined;
+}
+
+function getStatusFilterHref(companyId: string, status: string): string {
+  const params = new URLSearchParams({
+    companyId
+  });
+
+  if (status) {
+    params.set("status", status);
+  }
+
+  return `/movimentacao/pedidos?${params.toString()}`;
 }

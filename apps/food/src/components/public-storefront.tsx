@@ -3,13 +3,19 @@
 import { useMemo, useState } from "react";
 import type { FoodMenuContract, FoodProductContract } from "@fp/types";
 import { PendingSubmitButton } from "@/components/pending-submit-button";
+import { PublicCustomerMenu } from "@/components/public-customer-menu";
 
 type PublicStorefrontProps = {
   createOrderAction: (formData: FormData) => void | Promise<void>;
   menu: FoodMenuContract;
+  trackOrderAction: (formData: FormData) => void | Promise<void>;
 };
 
-export function PublicStorefront({ createOrderAction, menu }: PublicStorefrontProps) {
+export function PublicStorefront({
+  createOrderAction,
+  menu,
+  trackOrderAction
+}: PublicStorefrontProps) {
   const products = useMemo(() => flattenProducts(menu), [menu]);
   const [quantities, setQuantities] = useState<Record<string, number>>({});
   const selectedItems = products.filter((product) => (quantities[product.id] ?? 0) > 0);
@@ -30,6 +36,12 @@ export function PublicStorefront({ createOrderAction, menu }: PublicStorefrontPr
 
   return (
     <main className="public-store">
+      <PublicCustomerMenu
+        active="menu"
+        contactPhone={menu.store.contactPhone}
+        slug={menu.store.publicSlug}
+      />
+
       <section className="public-hero">
         <div>
           <div className="eyebrow">FP Food</div>
@@ -41,6 +53,26 @@ export function PublicStorefront({ createOrderAction, menu }: PublicStorefrontPr
           </p>
         </div>
         <div className="public-store-status">Loja aberta</div>
+      </section>
+
+      <section className="public-order-lookup" id="meus-pedidos">
+        <div>
+          <div className="eyebrow">Meus pedidos</div>
+          <h2>Acompanhar pedido realizado</h2>
+          <p>Informe o numero do pedido para consultar o status atual.</p>
+        </div>
+        <form action={trackOrderAction}>
+          <input name="publicSlug" type="hidden" value={menu.store.publicSlug} />
+          <input
+            maxLength={40}
+            name="orderNumber"
+            placeholder="PED-20260616-123456"
+            required
+          />
+          <PendingSubmitButton className="secondary-action" pendingLabel="Buscando...">
+            Acompanhar
+          </PendingSubmitButton>
+        </form>
       </section>
 
       <form action={createOrderAction} className="public-order-layout">
@@ -141,7 +173,9 @@ export function PublicStorefront({ createOrderAction, menu }: PublicStorefrontPr
           </label>
 
           {menu.store.deliveryNotes ? (
-            <p className="public-delivery-note">{menu.store.deliveryNotes}</p>
+            <p className="public-delivery-note" id="ajuda">
+              {menu.store.deliveryNotes}
+            </p>
           ) : null}
 
           <PendingSubmitButton

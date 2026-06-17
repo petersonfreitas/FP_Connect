@@ -98,6 +98,10 @@ type PaginationOptions = {
   pageSize: number;
 };
 
+type OrderListOptions = PaginationOptions & {
+  status?: FoodOrderStatus;
+};
+
 type CreateOrderOptions = {
   eventSource: "internal-order-v0" | "public-store-v0";
 };
@@ -498,16 +502,22 @@ export class FoodService {
 
   async listOrders(
     companyId: string,
-    pagination: PaginationOptions
+    pagination: OrderListOptions
   ): Promise<PaginatedContract<FoodOrderContract>> {
     const from = (pagination.page - 1) * pagination.pageSize;
     const to = from + pagination.pageSize - 1;
-    const { count, data, error } = await this.supabase.food
+    let query = this.supabase.food
       .from("orders")
       .select(orderSelect, { count: "exact" })
       .eq("company_id", companyId)
       .is("deleted_at", null)
-      .order("created_at", { ascending: false })
+      .order("created_at", { ascending: false });
+
+    if (pagination.status) {
+      query = query.eq("status", pagination.status);
+    }
+
+    const { count, data, error } = await query
       .range(from, to);
 
     if (error) {

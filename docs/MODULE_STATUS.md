@@ -20,7 +20,7 @@ Este arquivo controla o avanco dos modulos do ecossistema.
 |---|---:|---:|---|---|
 | FP Connect Admin Console | Alta | 2 | Base funcional estabilizada | Empresas, usuarios, papel de plataforma, permissoes, modulos contratados, suporte por carteira, catalogo, auditoria, guards, bloqueios, paginacao inicial e inativacao operacional ja possuem API e telas principais. |
 | FP Robots | Alta | 2 | Base funcional em evolucao | Schema `robots`, catalogo de eventos, event log, regras simples `evento -> acao`, execucoes, falha simulada, reprocessamento basico, API interna e tela inicial no Console criados. |
-| FP Food | Alta | 2 | Base funcional em evolucao | Frontend separado `apps/food`, menu lateral por Cadastro/Movimentacao, configuracao da loja, categorias/produtos paginados, cardapio derivado, pedido interno V0, vitrine publica V0 por slug, acompanhamento publico de pedido e eventos `food.*` iniciais criados. |
+| FP Food | Alta | 2 | Base funcional em evolucao | Frontend separado `apps/food`, menu lateral por Cadastro/Movimentacao, configuracao da loja, categorias/produtos paginados, cardapio derivado, pedido interno V0, vitrine publica V0 por slug, acompanhamento publico de pedido, painel de pedidos com filtro/status e eventos `food.*` iniciais criados. |
 | FP Tracking | Alta | 0 | Fundacao de acesso preparada | Endpoint interno `/api/tracking/access` ja valida empresa, modulo contratado e permissao; deve nascer como frontend separado quando entrar em desenvolvimento. |
 | FP Billing | Futura | 0 | Fundacao de acesso preparada | Endpoint interno `/api/billing/access` ja valida empresa, modulo contratado e permissao; entrara apos base operacional. |
 | FP Tickets | Futura | 0 | Fundacao de acesso preparada | Endpoint interno `/api/tickets/access` ja valida empresa, modulo contratado e permissao; entrara apos base operacional. |
@@ -131,6 +131,8 @@ Este arquivo controla o avanco dos modulos do ecossistema.
 - [x] Acompanhamento publico V0 por numero do pedido
 - [x] Criacao de pedido interno V0
 - [x] Painel interno de pedidos
+- [x] Filtro por status no painel de pedidos
+- [x] Polling leve de 30 segundos no painel de pedidos
 - [x] Status simples do pedido
 - [ ] Pagamento manual, se previsto
 - [x] Eventos de pedido para Robots

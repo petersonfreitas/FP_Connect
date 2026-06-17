@@ -73,6 +73,7 @@ Este arquivo registra decisoes arquiteturais e operacionais para evitar retrabal
 | DEC-065 | Pedido interno V0 do FP Food serve para validar fluxo transacional antes da vitrine publica; cria pedidos manualmente, altera status simples e publica eventos no FP Robots. | Aprovada |
 | DEC-066 | A vitrine publica V0 do FP Food deve ser servida pelo frontend Food em `/l/[slug]`, consumindo API interna protegida por token servidor-servidor; pedidos publicos nao exigem usuario autenticado e continuam recalculando precos no backend antes da gravacao. | Aprovada |
 | DEC-067 | O acompanhamento publico V0 do pedido Food usa rota `/l/[slug]/pedido/[orderNumber]`, expondo apenas o status simples e os itens do pedido; token dedicado de rastreio fica para a fase Tracking/checkout avancado. | Aprovada |
+| DEC-068 | O painel interno de pedidos do FP Food usa polling leve de 30 segundos no MVP; realtime fica reservado para fase posterior, quando houver token publico de pedido, RLS/policies e volume real para justificar. | Aprovada |
 
 ---
 

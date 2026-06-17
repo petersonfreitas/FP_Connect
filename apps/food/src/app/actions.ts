@@ -117,6 +117,7 @@ export async function saveFoodProductAction(formData: FormData): Promise<void> {
 
 export async function createInternalFoodOrderAction(formData: FormData): Promise<void> {
   const companyId = requireCompanyId(formData);
+  const statusFilter = optionalOrderStatusFilter(formData.get("statusFilter"));
   const productIds = formData.getAll("productId").map((value) => String(value));
   const items = productIds
     .map((productId) => ({
@@ -136,16 +137,24 @@ export async function createInternalFoodOrderAction(formData: FormData): Promise
     "/movimentacao/pedidos",
     companyId,
     result.error,
-    "orderCreated"
+    "orderCreated",
+    { status: statusFilter }
   );
 }
 
 export async function updateFoodOrderStatusAction(formData: FormData): Promise<void> {
   const companyId = requireCompanyId(formData);
   const orderId = String(formData.get("orderId") ?? "").trim();
+  const statusFilter = optionalOrderStatusFilter(formData.get("statusFilter"));
 
   if (!orderId) {
-    redirect(`/movimentacao/pedidos?companyId=${encodeURIComponent(companyId)}&error=Pedido%20nao%20informado.`);
+    redirectWithResult(
+      "/movimentacao/pedidos",
+      companyId,
+      "Pedido nao informado.",
+      "orderUpdated",
+      { status: statusFilter }
+    );
   }
 
   const input: UpdateFoodOrderStatusInput = {
@@ -157,7 +166,8 @@ export async function updateFoodOrderStatusAction(formData: FormData): Promise<v
     "/movimentacao/pedidos",
     companyId,
     result.error,
-    "orderUpdated"
+    "orderUpdated",
+    { status: statusFilter }
   );
 }
 
@@ -190,6 +200,18 @@ export async function createPublicFoodOrderAction(formData: FormData): Promise<v
   );
 }
 
+export async function trackPublicFoodOrderAction(formData: FormData): Promise<void> {
+  const publicSlug = normalizePublicSlug(formData.get("publicSlug"));
+  const orderNumber = String(formData.get("orderNumber") ?? "").trim().toUpperCase();
+  const basePath = `/l/${encodeURIComponent(publicSlug)}`;
+
+  if (!orderNumber) {
+    redirect(`${basePath}?error=${encodeURIComponent("Informe o numero do pedido.")}`);
+  }
+
+  redirect(`${basePath}/pedido/${encodeURIComponent(orderNumber)}`);
+}
+
 function requireCompanyId(formData: FormData): string {
   const companyId = String(formData.get("companyId") ?? "").trim();
 
@@ -214,15 +236,26 @@ function redirectWithResult(
   basePath: string,
   companyId: string,
   error: string | null,
-  successKey: string
+  successKey: string,
+  extraParams: Record<string, string | undefined> = {}
 ): never {
-  const searchCompany = `companyId=${encodeURIComponent(companyId)}`;
+  const search = new URLSearchParams({
+    companyId
+  });
 
-  if (error) {
-    redirect(`${basePath}?${searchCompany}&error=${encodeURIComponent(error)}`);
+  for (const [key, value] of Object.entries(extraParams)) {
+    if (value) {
+      search.set(key, value);
+    }
   }
 
-  redirect(`${basePath}?${searchCompany}&${successKey}=1`);
+  if (error) {
+    search.set("error", error);
+    redirect(`${basePath}?${search.toString()}`);
+  }
+
+  search.set(successKey, "1");
+  redirect(`${basePath}?${search.toString()}`);
 }
 
 function optionalText(value: FormDataEntryValue | null): string | null {
@@ -275,6 +308,16 @@ function normalizeOrderStatus(value: FormDataEntryValue | null): FoodOrderStatus
 
   if (!validOrderStatuses.has(status as FoodOrderStatus)) {
     return "created";
+  }
+
+  return status as FoodOrderStatus;
+}
+
+function optionalOrderStatusFilter(value: FormDataEntryValue | null): FoodOrderStatus | undefined {
+  const status = String(value ?? "");
+
+  if (!validOrderStatuses.has(status as FoodOrderStatus)) {
+    return undefined;
   }
 
   return status as FoodOrderStatus;

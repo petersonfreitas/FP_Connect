@@ -6,6 +6,7 @@ import type {
   FoodCategoryContract,
   FoodMenuContract,
   FoodOrderContract,
+  FoodOrderStatus,
   FoodProductContract,
   FoodStoreContract,
   ModuleAccessContract,
@@ -33,6 +34,7 @@ type InternalApiResult<T> =
 type PaginationParams = {
   page?: number;
   pageSize?: number;
+  status?: FoodOrderStatus;
 };
 
 export async function getCurrentAdminAccess(): Promise<
@@ -382,7 +384,7 @@ function getInternalApiBaseUrl(): string {
   return value.replace(/\/$/, "");
 }
 
-function formatPaginationSearch({ page, pageSize }: PaginationParams): string {
+function formatPaginationSearch({ page, pageSize, status }: PaginationParams): string {
   const params = new URLSearchParams();
 
   if (page) {
@@ -391,6 +393,10 @@ function formatPaginationSearch({ page, pageSize }: PaginationParams): string {
 
   if (pageSize) {
     params.set("pageSize", String(pageSize));
+  }
+
+  if (status) {
+    params.set("status", status);
   }
 
   const search = params.toString();

@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { Notice } from "@/components/page-feedback";
+import { PublicCustomerMenu } from "@/components/public-customer-menu";
 import { getPublicFoodOrder } from "@/lib/internal-api";
 
 type PublicOrderPageProps = {
@@ -57,6 +58,12 @@ export default async function PublicOrderPage({
 
   return (
     <main className="public-store">
+      <PublicCustomerMenu
+        active="order"
+        orderNumber={order.orderNumber}
+        slug={slug}
+      />
+
       {query?.created ? (
         <Notice tone="success" message={`Pedido ${order.orderNumber} enviado para a loja.`} />
       ) : null}

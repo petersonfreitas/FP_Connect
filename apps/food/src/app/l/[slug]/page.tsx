@@ -1,4 +1,7 @@
-import { createPublicFoodOrderAction } from "@/app/actions";
+import {
+  createPublicFoodOrderAction,
+  trackPublicFoodOrderAction
+} from "@/app/actions";
 import { PublicStorefront } from "@/components/public-storefront";
 import { Notice } from "@/components/page-feedback";
 import { getPublicFoodMenu } from "@/lib/internal-api";
@@ -41,6 +44,7 @@ export default async function PublicStorePage({
       <PublicStorefront
         createOrderAction={createPublicFoodOrderAction}
         menu={menuResult.data}
+        trackOrderAction={trackPublicFoodOrderAction}
       />
     </>
   );

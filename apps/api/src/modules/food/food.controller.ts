@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   Body,
   Controller,
   Get,
@@ -15,12 +16,21 @@ import { ModuleAccessPolicy } from "../../auth/module-access-policy.decorator";
 import { buildModuleAccessResponse } from "../../auth/module-access-response";
 import type {
   CreateFoodOrderInput,
+  FoodOrderStatus,
   UpdateFoodOrderStatusInput,
   UpsertFoodCategoryInput,
   UpsertFoodProductInput,
   UpsertFoodStoreInput
 } from "./food.contracts";
 import { FoodService } from "./food.service";
+
+const validOrderStatuses = new Set<FoodOrderStatus>([
+  "accepted",
+  "cancelled",
+  "created",
+  "preparing",
+  "ready"
+]);
 
 @Controller("food")
 @UseGuards(InternalApiGuard, ModuleAccessGuard)
@@ -175,11 +185,13 @@ export class FoodController {
   listOrders(
     @Headers("x-fp-company-id") companyId: string,
     @Query("page") page: string | undefined,
-    @Query("pageSize") pageSize: string | undefined
+    @Query("pageSize") pageSize: string | undefined,
+    @Query("status") status: string | undefined
   ) {
     return this.foodService.listOrders(companyId, {
       page: normalizePage(page),
-      pageSize: normalizePageSize(pageSize)
+      pageSize: normalizePageSize(pageSize),
+      status: normalizeOptionalOrderStatus(status)
     });
   }
 
@@ -226,4 +238,16 @@ function normalizePageSize(value: string | undefined): number {
   }
 
   return Math.min(pageSize, 100);
+}
+
+function normalizeOptionalOrderStatus(value: string | undefined): FoodOrderStatus | undefined {
+  if (!value) {
+    return undefined;
+  }
+
+  if (!validOrderStatuses.has(value as FoodOrderStatus)) {
+    throw new BadRequestException("status do pedido Food invalido");
+  }
+
+  return value as FoodOrderStatus;
 }
