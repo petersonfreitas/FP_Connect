@@ -291,6 +291,15 @@ export default async function OrdersPage({ searchParams }: OrdersPageProps) {
                         ))}
                       </div>
                     ) : null}
+
+                    <div className="order-card-footer">
+                      <Link
+                        className="secondary-action compact-action"
+                        href={`/movimentacao/pedidos/${order.id}?companyId=${selectedCompany.company.id}`}
+                      >
+                        Ver detalhes
+                      </Link>
+                    </div>
                   </article>
                 ))}
               </div>

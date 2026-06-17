@@ -10,9 +10,11 @@ import type {
   CreateFoodOrderInput,
   FoodCategoryContract,
   FoodCategoryStatus,
+  FoodOrderDetailContract,
   FoodMenuContract,
   FoodOrderContract,
   FoodOrderItemContract,
+  FoodOrderStatusHistoryContract,
   FoodOrderStatus,
   FoodProductContract,
   FoodProductStatus,
@@ -91,6 +93,16 @@ type FoodOrderItemRow = {
   unit_price_cents: number;
   quantity: number;
   total_price_cents: number;
+};
+
+type FoodOrderStatusHistoryRow = {
+  id: string;
+  company_id: string;
+  order_id: string;
+  previous_status: FoodOrderStatus | null;
+  status: FoodOrderStatus;
+  actor_user_id: string | null;
+  changed_at: string;
 };
 
 type PaginationOptions = {
@@ -172,6 +184,16 @@ const orderItemSelect = [
   "unit_price_cents",
   "quantity",
   "total_price_cents"
+].join(",");
+
+const orderStatusHistorySelect = [
+  "id",
+  "company_id",
+  "order_id",
+  "previous_status",
+  "status",
+  "actor_user_id",
+  "changed_at"
 ].join(",");
 
 const validStatuses = new Set<FoodStoreStatus>([
@@ -539,6 +561,19 @@ export class FoodService {
     );
   }
 
+  async getOrderDetail(companyId: string, orderId: string): Promise<FoodOrderDetailContract> {
+    const orderRow = await this.getOrderRow(companyId, orderId);
+    const [items, statusHistory] = await Promise.all([
+      this.listOrderItemsByOrderIds(companyId, [orderRow.id]),
+      this.listOrderStatusHistory(companyId, orderRow.id)
+    ]);
+
+    return {
+      ...mapOrder(orderRow, items.get(orderRow.id) ?? []),
+      statusHistory
+    };
+  }
+
   async createOrder(
     companyId: string,
     actorUserId: string | null,
@@ -595,6 +630,7 @@ export class FoodService {
       orderRow,
       ((itemData ?? []) as unknown as FoodOrderItemRow[]).map(mapOrderItem)
     );
+    await this.insertOrderStatusHistory(companyId, order.id, null, order.status, actorUserId);
     await this.emitOrderCreated(companyId, actorUserId, order, options.eventSource);
 
     return order;
@@ -634,6 +670,7 @@ export class FoodService {
     const items = await this.listOrderItemsByOrderIds(companyId, [orderRow.id]);
     const order = mapOrder(orderRow, items.get(orderRow.id) ?? []);
 
+    await this.insertOrderStatusHistory(companyId, order.id, current.status, order.status, actorUserId);
     await this.emitOrderStatusChanged(companyId, actorUserId, order, current.status);
 
     return order;
@@ -869,6 +906,46 @@ export class FoodService {
     }
 
     return data as unknown as FoodOrderRow;
+  }
+
+  private async listOrderStatusHistory(
+    companyId: string,
+    orderId: string
+  ): Promise<FoodOrderStatusHistoryContract[]> {
+    const { data, error } = await this.supabase.food
+      .from("order_status_history")
+      .select(orderStatusHistorySelect)
+      .eq("company_id", companyId)
+      .eq("order_id", orderId)
+      .order("changed_at", { ascending: true });
+
+    if (error) {
+      throwSupabaseError(error);
+    }
+
+    return ((data ?? []) as unknown as FoodOrderStatusHistoryRow[]).map(mapOrderStatusHistory);
+  }
+
+  private async insertOrderStatusHistory(
+    companyId: string,
+    orderId: string,
+    previousStatus: FoodOrderStatus | null,
+    status: FoodOrderStatus,
+    actorUserId: string | null
+  ): Promise<void> {
+    const { error } = await this.supabase.food
+      .from("order_status_history")
+      .insert({
+        actor_user_id: actorUserId,
+        company_id: companyId,
+        order_id: orderId,
+        previous_status: previousStatus,
+        status
+      });
+
+    if (error) {
+      throwSupabaseError(error);
+    }
   }
 
   private async listOrderItemsByOrderIds(
@@ -1274,6 +1351,18 @@ function mapOrderItem(row: FoodOrderItemRow): FoodOrderItemContract {
     quantity: row.quantity,
     totalPriceCents: row.total_price_cents,
     unitPriceCents: row.unit_price_cents
+  };
+}
+
+function mapOrderStatusHistory(row: FoodOrderStatusHistoryRow): FoodOrderStatusHistoryContract {
+  return {
+    actorUserId: row.actor_user_id,
+    changedAt: row.changed_at,
+    companyId: row.company_id,
+    id: row.id,
+    orderId: row.order_id,
+    previousStatus: row.previous_status,
+    status: row.status
   };
 }
 

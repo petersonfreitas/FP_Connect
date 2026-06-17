@@ -211,6 +211,19 @@ export class FoodController {
     return this.foodService.createOrder(companyId, actorUserId, input);
   }
 
+  @Get("orders/:orderId")
+  @ModuleAccessPolicy({
+    applicationKey: "food",
+    companyHeader: "x-fp-company-id",
+    permissionKey: "food.access"
+  })
+  getOrderDetail(
+    @Headers("x-fp-company-id") companyId: string,
+    @Param("orderId") orderId: string
+  ) {
+    return this.foodService.getOrderDetail(companyId, orderId);
+  }
+
   @Patch("orders/:orderId/status")
   @ModuleAccessPolicy({
     applicationKey: "food",

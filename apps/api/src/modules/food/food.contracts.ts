@@ -101,6 +101,16 @@ export type FoodOrderItemContract = {
   totalPriceCents: number;
 };
 
+export type FoodOrderStatusHistoryContract = {
+  id: string;
+  companyId: string;
+  orderId: string;
+  previousStatus: FoodOrderStatus | null;
+  status: FoodOrderStatus;
+  actorUserId: string | null;
+  changedAt: string;
+};
+
 export type FoodOrderContract = {
   id: string;
   companyId: string;
@@ -115,6 +125,10 @@ export type FoodOrderContract = {
   createdAt: string;
   updatedAt: string;
   items: FoodOrderItemContract[];
+};
+
+export type FoodOrderDetailContract = FoodOrderContract & {
+  statusHistory: FoodOrderStatusHistoryContract[];
 };
 
 export type CreateFoodOrderItemInput = {

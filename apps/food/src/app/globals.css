@@ -687,6 +687,13 @@ textarea {
   padding-top: 14px;
 }
 
+.order-card-footer {
+  border-top: 1px solid var(--line);
+  display: flex;
+  justify-content: flex-end;
+  padding-top: 14px;
+}
+
 .inline-action-error {
   color: var(--danger);
   font-size: 13px;
@@ -695,6 +702,95 @@ textarea {
 
 .order-status-form select {
   max-width: 190px;
+}
+
+.order-detail-grid {
+  display: grid;
+  gap: 14px;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.order-detail-block {
+  background: #f8fbfa;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+  padding: 16px;
+}
+
+.order-detail-block strong {
+  color: var(--accent-strong);
+  font-size: 20px;
+}
+
+.order-detail-block span {
+  color: var(--muted);
+  overflow-wrap: anywhere;
+}
+
+.order-detail-status-form {
+  align-items: center;
+  border-top: 1px solid var(--line);
+  display: flex;
+  gap: 12px;
+  justify-content: flex-end;
+  margin-top: 20px;
+  padding-top: 18px;
+}
+
+.order-detail-status-form select {
+  max-width: 220px;
+}
+
+.order-timeline {
+  display: grid;
+  gap: 0;
+}
+
+.order-timeline-item {
+  display: grid;
+  gap: 14px;
+  grid-template-columns: 18px minmax(0, 1fr);
+  padding-bottom: 18px;
+  position: relative;
+}
+
+.order-timeline-item::before {
+  background: var(--line);
+  bottom: 0;
+  content: "";
+  left: 8px;
+  position: absolute;
+  top: 18px;
+  width: 2px;
+}
+
+.order-timeline-item:last-child {
+  padding-bottom: 0;
+}
+
+.order-timeline-item:last-child::before {
+  display: none;
+}
+
+.order-timeline-item > span {
+  background: var(--accent);
+  border-radius: 999px;
+  height: 18px;
+  position: relative;
+  width: 18px;
+  z-index: 1;
+}
+
+.order-timeline-item div {
+  display: grid;
+  gap: 4px;
+}
+
+.order-timeline-item small {
+  color: var(--muted);
 }
 
 .status-filter-bar {
@@ -1045,7 +1141,7 @@ textarea {
 .public-status-steps {
   display: grid;
   gap: 14px;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
 }
 
 .status-step {
@@ -1190,6 +1286,15 @@ textarea {
 
   .quick-status-actions {
     grid-template-columns: 1fr;
+  }
+
+  .order-detail-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .order-detail-status-form {
+    align-items: stretch;
+    flex-direction: column;
   }
 
   .public-order-layout,

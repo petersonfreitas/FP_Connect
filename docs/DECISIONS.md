@@ -77,6 +77,7 @@ Este arquivo registra decisoes arquiteturais e operacionais para evitar retrabal
 | DEC-069 | A Cozinha V0 do FP Food deve reutilizar os pedidos e status existentes, sem nova tabela; a tela operacional filtra pedidos `accepted` e `preparing`, usando polling de 30 segundos e acoes rapidas de preparo. | Aprovada |
 | DEC-070 | Atualizacoes em tempo real do FP Food ficam previstas para fase posterior; no MVP, telas operacionais podem usar refresh manual, `router.refresh()` e polling leve apenas como solucao provisoria de validacao. | Aprovada |
 | DEC-071 | A Entrega simples V0 do FP Food reutiliza o status do pedido, sem tabela propria de tracking; a tela operacional filtra pedidos `ready` e `out_for_delivery`, permitindo marcar `out_for_delivery` e `delivered`. FP Tracking permanece dono futuro de entregador, rota, ocorrencias e rastreamento publico dedicado. | Aprovada |
+| DEC-072 | O historico simples de status do pedido pertence ao FP Food em `food.order_status_history`, para auditoria operacional do pedido; FP Robots permanece como log/event bus de automacoes e nao substitui a timeline de negocio do pedido. | Aprovada |
 
 ---
 

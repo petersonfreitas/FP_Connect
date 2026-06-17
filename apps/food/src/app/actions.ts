@@ -360,6 +360,10 @@ function normalizeFoodReturnPath(value: FormDataEntryValue | null): string {
     return path;
   }
 
+  if (/^\/movimentacao\/pedidos\/[0-9a-fA-F-]{36}$/.test(path)) {
+    return path;
+  }
+
   return "/movimentacao/pedidos";
 }
 

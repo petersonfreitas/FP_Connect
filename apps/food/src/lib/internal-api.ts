@@ -6,6 +6,7 @@ import type {
   FoodCategoryContract,
   FoodMenuContract,
   FoodOrderContract,
+  FoodOrderDetailContract,
   FoodOrderStatus,
   FoodProductContract,
   FoodStoreContract,
@@ -236,6 +237,17 @@ export async function createFoodOrder(
       "X-FP-Company-Id": companyId
     },
     method: "POST"
+  });
+}
+
+export async function getFoodOrderDetail(
+  companyId: string,
+  orderId: string
+): Promise<InternalApiResult<FoodOrderDetailContract>> {
+  return fetchInternal<FoodOrderDetailContract>(`food/orders/${orderId}`, {
+    headers: {
+      "X-FP-Company-Id": companyId
+    }
   });
 }
 
