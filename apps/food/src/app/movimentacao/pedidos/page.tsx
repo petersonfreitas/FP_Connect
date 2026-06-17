@@ -36,6 +36,8 @@ const orderStatusLabels = {
   accepted: "Aceito",
   cancelled: "Cancelado",
   created: "Criado",
+  delivered: "Entregue",
+  out_for_delivery: "Saiu para entrega",
   preparing: "Em preparo",
   ready: "Pronto"
 };
@@ -45,6 +47,8 @@ const orderStatusOptions = [
   ["accepted", "Aceito"],
   ["preparing", "Em preparo"],
   ["ready", "Pronto"],
+  ["out_for_delivery", "Saiu para entrega"],
+  ["delivered", "Entregue"],
   ["cancelled", "Cancelado"]
 ] as const;
 
@@ -54,6 +58,8 @@ const orderFilterOptions = [
   ["accepted", "Aceito"],
   ["preparing", "Em preparo"],
   ["ready", "Pronto"],
+  ["out_for_delivery", "Saiu para entrega"],
+  ["delivered", "Entregue"],
   ["cancelled", "Cancelado"]
 ] as const;
 
@@ -69,11 +75,20 @@ const quickStatusOptions: Record<FoodOrderStatus, Array<[FoodOrderStatus, string
     ["preparing", "Preparar"],
     ["cancelled", "Cancelar"]
   ],
+  delivered: [],
+  out_for_delivery: [
+    ["delivered", "Entregue"],
+    ["cancelled", "Cancelar"]
+  ],
   preparing: [
     ["ready", "Pronto"],
     ["cancelled", "Cancelar"]
   ],
-  ready: [["cancelled", "Cancelar"]]
+  ready: [
+    ["out_for_delivery", "Saiu para entrega"],
+    ["delivered", "Entregue"],
+    ["cancelled", "Cancelar"]
+  ]
 };
 
 export default async function OrdersPage({ searchParams }: OrdersPageProps) {
@@ -310,6 +325,8 @@ function normalizeOrderStatusFilter(value: string | undefined): FoodOrderStatus 
     value === "accepted" ||
     value === "cancelled" ||
     value === "created" ||
+    value === "delivered" ||
+    value === "out_for_delivery" ||
     value === "preparing" ||
     value === "ready"
   ) {

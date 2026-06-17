@@ -17,6 +17,8 @@ const orderStatusLabels = {
   accepted: "Aceito pela loja",
   cancelled: "Cancelado",
   created: "Enviado para a loja",
+  delivered: "Entregue",
+  out_for_delivery: "Saiu para entrega",
   preparing: "Em preparo",
   ready: "Pronto"
 };
@@ -25,7 +27,9 @@ const statusSteps = [
   ["created", "Enviado"],
   ["accepted", "Aceito"],
   ["preparing", "Preparo"],
-  ["ready", "Pronto"]
+  ["ready", "Pronto"],
+  ["out_for_delivery", "Saiu para entrega"],
+  ["delivered", "Entregue"]
 ] as const;
 
 export const dynamic = "force-dynamic";
@@ -133,7 +137,7 @@ function isStepActive(currentStatus: keyof typeof orderStatusLabels, step: strin
     return false;
   }
 
-  const order = ["created", "accepted", "preparing", "ready"];
+  const order = ["created", "accepted", "preparing", "ready", "out_for_delivery", "delivered"];
   return order.indexOf(step) <= order.indexOf(currentStatus);
 }
 

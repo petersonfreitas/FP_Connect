@@ -190,6 +190,8 @@ const validOrderStatuses = new Set<FoodOrderStatus>([
   "accepted",
   "cancelled",
   "created",
+  "delivered",
+  "out_for_delivery",
   "preparing",
   "ready"
 ]);

@@ -37,7 +37,14 @@ export type RobotsActionType =
 export type FoodStoreStatus = "closed" | "implementation" | "open" | "suspended";
 export type FoodCategoryStatus = "active" | "inactive";
 export type FoodProductStatus = "available" | "hidden" | "unavailable";
-export type FoodOrderStatus = "accepted" | "cancelled" | "created" | "preparing" | "ready";
+export type FoodOrderStatus =
+  | "accepted"
+  | "cancelled"
+  | "created"
+  | "delivered"
+  | "out_for_delivery"
+  | "preparing"
+  | "ready";
 
 export type FoodStoreContract = {
   id: string;

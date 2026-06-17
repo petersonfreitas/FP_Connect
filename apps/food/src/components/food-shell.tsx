@@ -25,7 +25,8 @@ const navigation = {
       items: [
         { href: "/movimentacao/cardapio", label: "Cardapio" },
         { href: "/movimentacao/pedidos", label: "Pedidos" },
-        { href: "/movimentacao/cozinha", label: "Cozinha" }
+        { href: "/movimentacao/cozinha", label: "Cozinha" },
+        { href: "/movimentacao/entregas", label: "Entregas" }
       ]
     }
   ]

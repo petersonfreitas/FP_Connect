@@ -39,6 +39,8 @@ const validOrderStatuses = new Set<FoodOrderStatus>([
   "accepted",
   "cancelled",
   "created",
+  "delivered",
+  "out_for_delivery",
   "preparing",
   "ready"
 ]);
@@ -354,7 +356,7 @@ function optionalOrderStatusFilter(value: FormDataEntryValue | null): FoodOrderS
 function normalizeFoodReturnPath(value: FormDataEntryValue | null): string {
   const path = String(value ?? "").trim();
 
-  if (path === "/movimentacao/cozinha") {
+  if (path === "/movimentacao/cozinha" || path === "/movimentacao/entregas") {
     return path;
   }
 

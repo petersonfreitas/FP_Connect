@@ -2,13 +2,13 @@ import type { FoodOrderContract, FoodOrderStatus } from "@fp/types";
 import { CompanySwitcher } from "@/components/company-switcher";
 import { formatMoney } from "@/components/food-forms";
 import { FoodShell } from "@/components/food-shell";
-import { OrderStatusActions } from "@/components/order-status-actions";
 import { OrderAutoRefresh } from "@/components/order-auto-refresh";
+import { OrderStatusActions } from "@/components/order-status-actions";
 import { EmptyFoodAccess, Notice } from "@/components/page-feedback";
 import { getFoodPageContext } from "@/lib/food-context";
 import { getFoodAccess, listFoodOrders } from "@/lib/internal-api";
 
-type KitchenPageProps = {
+type DeliveryPageProps = {
   searchParams?: Promise<{
     companyId?: string;
     error?: string;
@@ -19,49 +19,49 @@ type KitchenPageProps = {
 export const dynamic = "force-dynamic";
 const pageSize = 50;
 
-export default async function KitchenPage({ searchParams }: KitchenPageProps) {
+export default async function DeliveryPage({ searchParams }: DeliveryPageProps) {
   const params = await searchParams;
   const context = await getFoodPageContext(params?.companyId);
   const selectedCompany = context.selectedCompany;
   const foodAccessResult = selectedCompany
     ? await getFoodAccess(selectedCompany.company.id)
     : { data: null, error: null };
-  const [acceptedResult, preparingResult] =
+  const [readyResult, outForDeliveryResult] =
     selectedCompany && !foodAccessResult.error
       ? await Promise.all([
           listFoodOrders(selectedCompany.company.id, {
             page: 1,
             pageSize,
-            status: "accepted"
+            status: "ready"
           }),
           listFoodOrders(selectedCompany.company.id, {
             page: 1,
             pageSize,
-            status: "preparing"
+            status: "out_for_delivery"
           })
         ])
       : [{ data: null, error: null }, { data: null, error: null }];
-  const acceptedOrders = acceptedResult.data?.items ?? [];
-  const preparingOrders = preparingResult.data?.items ?? [];
+  const readyOrders = readyResult.data?.items ?? [];
+  const outForDeliveryOrders = outForDeliveryResult.data?.items ?? [];
 
   return (
-    <FoodShell activePath="/movimentacao/cozinha">
+    <FoodShell activePath="/movimentacao/entregas">
       <header className="topbar">
         <div>
           <div className="eyebrow">Movimentacao</div>
-          <strong>Cozinha</strong>
+          <strong>Entregas</strong>
         </div>
       </header>
 
       {context.accessError ? <Notice tone="danger" message={context.accessError} /> : null}
       {foodAccessResult.error ? <Notice tone="danger" message={foodAccessResult.error} /> : null}
-      {acceptedResult.error ? <Notice tone="danger" message={acceptedResult.error} /> : null}
-      {preparingResult.error ? <Notice tone="danger" message={preparingResult.error} /> : null}
+      {readyResult.error ? <Notice tone="danger" message={readyResult.error} /> : null}
+      {outForDeliveryResult.error ? <Notice tone="danger" message={outForDeliveryResult.error} /> : null}
       {params?.error ? <Notice tone="danger" message={params.error} /> : null}
       {params?.orderUpdated ? <Notice tone="success" message="Status do pedido atualizado." /> : null}
 
       <CompanySwitcher
-        basePath="/movimentacao/cozinha"
+        basePath="/movimentacao/entregas"
         companies={context.foodCompanies}
         selectedCompanyId={selectedCompany?.company.id}
       />
@@ -72,35 +72,36 @@ export default async function KitchenPage({ searchParams }: KitchenPageProps) {
         <section className="content-panel">
           <div className="panel-heading">
             <div>
-              <h1>Painel de preparo</h1>
-              <p>Pedidos aceitos entram na fila da cozinha e podem ser marcados como em preparo ou prontos.</p>
+              <h1>Painel de entregas</h1>
+              <p>Pedidos prontos podem sair para entrega e depois serem marcados como entregues.</p>
             </div>
             <div className="panel-heading-actions">
               <OrderAutoRefresh intervalSeconds={30} refreshOnFocus refreshOnMount />
               <span>
-                {acceptedOrders.length + preparingOrders.length} pedido(s) em producao
+                {readyOrders.length + outForDeliveryOrders.length} pedido(s) em entrega
               </span>
             </div>
           </div>
 
           <div className="kitchen-board">
-            <KitchenColumn
+            <DeliveryColumn
               companyId={selectedCompany.company.id}
-              emptyMessage="Nenhum pedido aceito aguardando preparo."
-              orders={acceptedOrders}
-              title="Aceitos"
+              emptyMessage="Nenhum pedido pronto aguardando entrega."
+              orders={readyOrders}
+              title="Prontos"
               actions={[
-                ["preparing", "Iniciar preparo"],
+                ["out_for_delivery", "Saiu para entrega"],
+                ["delivered", "Entregue"],
                 ["cancelled", "Cancelar"]
               ]}
             />
-            <KitchenColumn
+            <DeliveryColumn
               companyId={selectedCompany.company.id}
-              emptyMessage="Nenhum pedido em preparo."
-              orders={preparingOrders}
-              title="Em preparo"
+              emptyMessage="Nenhum pedido em rota de entrega."
+              orders={outForDeliveryOrders}
+              title="Em entrega"
               actions={[
-                ["ready", "Marcar pronto"],
+                ["delivered", "Marcar entregue"],
                 ["cancelled", "Cancelar"]
               ]}
             />
@@ -111,7 +112,7 @@ export default async function KitchenPage({ searchParams }: KitchenPageProps) {
   );
 }
 
-function KitchenColumn({
+function DeliveryColumn({
   actions,
   companyId,
   emptyMessage,

@@ -5,17 +5,17 @@ import { useState, useTransition } from "react";
 import type { FoodOrderStatus } from "@fp/types";
 import { updateFoodOrderStatusInlineAction } from "@/app/actions";
 
-type KitchenStatusActionsProps = {
+type OrderStatusActionsProps = {
   actions: Array<[FoodOrderStatus, string]>;
   companyId: string;
   orderId: string;
 };
 
-export function KitchenStatusActions({
+export function OrderStatusActions({
   actions,
   companyId,
   orderId
-}: KitchenStatusActionsProps) {
+}: OrderStatusActionsProps) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
   const [pendingStatus, setPendingStatus] = useState<FoodOrderStatus | null>(null);
