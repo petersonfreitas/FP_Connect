@@ -24,7 +24,8 @@ const navigation = {
       label: "Movimentacao",
       items: [
         { href: "/movimentacao/cardapio", label: "Cardapio" },
-        { href: "/movimentacao/pedidos", label: "Pedidos" }
+        { href: "/movimentacao/pedidos", label: "Pedidos" },
+        { href: "/movimentacao/cozinha", label: "Cozinha" }
       ]
     }
   ]
@@ -45,6 +46,7 @@ export async function FoodShell({ activePath, children }: FoodShellProps) {
               className={isActiveNavigationItem(activePath, item.href) ? "nav-item active" : "nav-item"}
               href={item.href}
               key={item.href}
+              prefetch={false}
             >
               {item.label}
             </Link>
@@ -61,6 +63,7 @@ export async function FoodShell({ activePath, children }: FoodShellProps) {
                     }
                     href={item.href}
                     key={`${group.label}:${item.href}`}
+                    prefetch={false}
                   >
                     {item.label}
                   </Link>

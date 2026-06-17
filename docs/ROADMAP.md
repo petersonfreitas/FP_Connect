@@ -65,6 +65,8 @@ O FP Food foi iniciado como frontend separado:
 - vitrine publica V0 por slug em `/l/[slug]`;
 - acompanhamento publico V0 em `/l/[slug]/pedido/[orderNumber]`;
 - painel interno de pedidos com filtro por status, acoes rapidas e polling leve de 30 segundos;
+- Cozinha V0 com fila de pedidos aceitos/em preparo e acoes rapidas;
+- realtime de pedidos, cozinha e acompanhamento publico fica para fase posterior; refresh manual, `router.refresh()` e polling leve sao provisoriamente aceitaveis no MVP;
 - eventos `food.store.configured`, `food.menu.updated`, `food.order.created` e `food.order.status_changed` publicados para o FP Robots.
 
 ## Sequencia recomendada

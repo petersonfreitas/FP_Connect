@@ -248,7 +248,8 @@ textarea {
   padding: 9px 12px;
 }
 
-.primary-action:disabled {
+.primary-action:disabled,
+.secondary-action:disabled {
   cursor: wait;
   opacity: 0.7;
 }
@@ -686,6 +687,12 @@ textarea {
   padding-top: 14px;
 }
 
+.inline-action-error {
+  color: var(--danger);
+  font-size: 13px;
+  font-weight: 800;
+}
+
 .order-status-form select {
   max-width: 190px;
 }
@@ -710,6 +717,56 @@ textarea {
   background: var(--accent-soft);
   border-color: var(--accent);
   color: var(--accent-strong);
+}
+
+.kitchen-board {
+  align-items: start;
+  display: grid;
+  gap: 18px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.kitchen-column {
+  background: #f8fbfa;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  display: grid;
+  gap: 14px;
+  padding: 16px;
+}
+
+.kitchen-column-heading {
+  align-items: center;
+  display: flex;
+  justify-content: space-between;
+}
+
+.kitchen-column-heading h2 {
+  letter-spacing: 0;
+  margin: 0;
+}
+
+.kitchen-column-heading span {
+  background: var(--accent-soft);
+  border-radius: 999px;
+  color: var(--accent-strong);
+  font-weight: 900;
+  padding: 7px 11px;
+}
+
+.kitchen-order-list {
+  display: grid;
+  gap: 12px;
+}
+
+.kitchen-order-card {
+  background: #ffffff;
+}
+
+.kitchen-empty {
+  margin: 0;
+  max-width: none;
+  padding: 18px;
 }
 
 .login-screen {
@@ -1137,6 +1194,7 @@ textarea {
 
   .public-order-layout,
   .public-product-grid,
+  .kitchen-board,
   .public-order-lookup,
   .public-order-lookup form,
   .public-status-steps {

@@ -146,10 +146,11 @@ export async function updateFoodOrderStatusAction(formData: FormData): Promise<v
   const companyId = requireCompanyId(formData);
   const orderId = String(formData.get("orderId") ?? "").trim();
   const statusFilter = optionalOrderStatusFilter(formData.get("statusFilter"));
+  const returnTo = normalizeFoodReturnPath(formData.get("returnTo"));
 
   if (!orderId) {
     redirectWithResult(
-      "/movimentacao/pedidos",
+      returnTo,
       companyId,
       "Pedido nao informado.",
       "orderUpdated",
@@ -163,12 +164,39 @@ export async function updateFoodOrderStatusAction(formData: FormData): Promise<v
   const result = await updateFoodOrderStatus(companyId, orderId, input);
 
   redirectWithResult(
-    "/movimentacao/pedidos",
+    returnTo,
     companyId,
     result.error,
     "orderUpdated",
     { status: statusFilter }
   );
+}
+
+export async function updateFoodOrderStatusInlineAction(input: {
+  companyId: string;
+  orderId: string;
+  status: FoodOrderStatus;
+}): Promise<{ error: string | null }> {
+  const companyId = input.companyId.trim();
+  const orderId = input.orderId.trim();
+
+  if (!companyId) {
+    return { error: "Empresa nao informada." };
+  }
+
+  if (!orderId) {
+    return { error: "Pedido nao informado." };
+  }
+
+  if (!validOrderStatuses.has(input.status)) {
+    return { error: "Status do pedido invalido." };
+  }
+
+  const result = await updateFoodOrderStatus(companyId, orderId, {
+    status: input.status
+  });
+
+  return { error: result.error };
 }
 
 export async function createPublicFoodOrderAction(formData: FormData): Promise<void> {
@@ -321,6 +349,16 @@ function optionalOrderStatusFilter(value: FormDataEntryValue | null): FoodOrderS
   }
 
   return status as FoodOrderStatus;
+}
+
+function normalizeFoodReturnPath(value: FormDataEntryValue | null): string {
+  const path = String(value ?? "").trim();
+
+  if (path === "/movimentacao/cozinha") {
+    return path;
+  }
+
+  return "/movimentacao/pedidos";
 }
 
 function parseMoneyToCents(value: FormDataEntryValue | null): number {
