@@ -80,6 +80,8 @@ Este arquivo registra decisoes arquiteturais e operacionais para evitar retrabal
 | DEC-072 | O historico simples de status do pedido pertence ao FP Food em `food.order_status_history`, para auditoria operacional do pedido; FP Robots permanece como log/event bus de automacoes e nao substitui a timeline de negocio do pedido. | Aprovada |
 | DEC-073 | Pagamento manual V0 do FP Food registra status, forma, observacao, usuario e data no proprio pedido; pagamentos online, conciliacao, webhooks e credenciais externas permanecem responsabilidade futura do FP Gateway. | Aprovada |
 | DEC-074 | Dashboard operacional V0 do FP Food pode existir dentro do proprio modulo com indicadores simples de pedidos, pagamentos e filas; FP BI permanece futuro para analises consolidadas e cruzadas entre modulos. | Aprovada |
+| DEC-075 | O proximo ciclo deve priorizar FP Gateway real/teste e FP Tracking, deixando configuracoes avancadas do FP Food serem modeladas conforme os contratos reais de pagamento, mensagens e entrega nascerem nesses modulos. | Aprovada |
+| DEC-076 | FP Gateway nasce primeiro como shell operacional no FP Console, com acesso protegido por modulo contratado e permissao; frontend separado so sera avaliado quando volume, operacao ou isolamento justificarem. | Aprovada |
 
 ---
 

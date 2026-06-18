@@ -23,6 +23,7 @@ const applicationToneByKey: Record<string, string> = {
   "admin-console": "Core",
   billing: "Financeiro",
   food: "Produto",
+  gateway: "Integracao",
   marketing: "Crescimento",
   robots: "Automacao",
   sales: "Comercial",

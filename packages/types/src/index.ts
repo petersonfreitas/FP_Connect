@@ -9,6 +9,7 @@ export type UserGlobalRole = "company_user" | "fp_admin" | "super_admin" | "supp
 export type ModuleApplicationKey =
   | "billing"
   | "food"
+  | "gateway"
   | "marketing"
   | "robots"
   | "sales"

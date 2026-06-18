@@ -5,6 +5,7 @@ import { AppConfigModule } from "./config/app-config.module";
 import { AdminConsoleModule } from "./modules/admin-console/admin-console.module";
 import { BillingModule } from "./modules/billing/billing.module";
 import { FoodModule } from "./modules/food/food.module";
+import { GatewayModule } from "./modules/gateway/gateway.module";
 import { HealthModule } from "./modules/health/health.module";
 import { MarketingModule } from "./modules/marketing/marketing.module";
 import { RobotsModule } from "./modules/robots/robots.module";
@@ -20,6 +21,7 @@ import { SupabaseModule } from "./supabase/supabase.module";
     HealthModule,
     AdminConsoleModule,
     RobotsModule,
+    GatewayModule,
     FoodModule,
     TrackingModule,
     MarketingModule,

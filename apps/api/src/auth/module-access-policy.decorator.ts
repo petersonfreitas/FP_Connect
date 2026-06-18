@@ -5,6 +5,7 @@ export const MODULE_ACCESS_POLICY_KEY = "moduleAccessPolicy";
 export type ModuleApplicationKey =
   | "billing"
   | "food"
+  | "gateway"
   | "marketing"
   | "robots"
   | "sales"

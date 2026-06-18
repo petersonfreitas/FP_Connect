@@ -42,7 +42,7 @@ supabase/
 
 Diretrizes:
 
-- `apps/web` concentra o FP Console e o painel inicial do FP Robots;
+- `apps/web` concentra o FP Console, o painel inicial do FP Robots e o shell inicial do FP Gateway;
 - `apps/food` concentra o frontend operacional separado do FP Food;
 - `apps/api` concentra a API Nest modular;
 - `packages/shared` guarda tipos/contratos reutilizaveis;
@@ -61,10 +61,11 @@ Schemas de modulo:
 
 - `robots`: eventos, execucoes, automacoes e logs operacionais;
 - `food`: operacao de pedidos e entidades do produto Food;
+- `gateway`: integracoes externas, credenciais, OAuth, pagamentos, webhooks e canais externos;
 - `tracking`: entregas, status e acompanhamento logistico;
 - outros schemas futuros conforme backlog aprovado.
 
-Os schemas consultados pela API Nest via Supabase/PostgREST precisam estar expostos em `supabase/config.toml` e tambem nas configuracoes de API do projeto Supabase hospedado. A exposicao do schema nao substitui guards, RLS, policies, service role server-side e escopo por empresa.
+Os schemas consultados pela API Nest via Supabase/PostgREST precisam estar expostos em `supabase/config.toml` e tambem nas configuracoes de API do projeto Supabase hospedado. No Supabase hospedado, o caminho e `Project Settings > Data API > Settings > Exposed schemas`. A exposicao do schema nao substitui guards, RLS, policies, service role server-side e escopo por empresa.
 
 Regras:
 
@@ -115,7 +116,7 @@ Regras:
 
 Aplicacoes atuais:
 
-- `apps/web`: FP Console e area administrativa do FP Robots;
+- `apps/web`: FP Console, area administrativa do FP Robots e shell inicial do FP Gateway;
 - `apps/food`: operacao do FP Food.
 
 Os frontends compartilham Supabase Auth, cookies HttpOnly de sessao e a mesma API interna, mas podem ter deploys independentes na Vercel.
@@ -177,7 +178,7 @@ FP Food:
 
 FP Gateway:
 
-- modulo futuro para credenciais, OAuth e provedores externos;
+- modulo iniciado como shell no Console para credenciais, OAuth e provedores externos;
 - deve encapsular WhatsApp, Instagram, Facebook, Ads, Mercado Pago, PagSeguro e canais equivalentes;
 - deve ser a fronteira entre o ecossistema e APIs externas.
 
@@ -221,11 +222,11 @@ Prioridade atual:
 1. FP Connect Admin Console.
 2. FP Robots.
 3. FP Food.
-4. FP Tracking.
+4. FP Gateway.
+5. FP Tracking.
 
 Futuros modulos:
 
-- FP Gateway;
 - FP Fiscal;
 - FP Router;
 - FP Sign;

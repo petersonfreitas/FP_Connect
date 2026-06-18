@@ -73,6 +73,14 @@ O FP Food foi iniciado como frontend separado:
 - realtime de pedidos, cozinha e acompanhamento publico fica para fase posterior; refresh manual, `router.refresh()` e polling leve sao provisoriamente aceitaveis no MVP;
 - eventos `food.store.configured`, `food.menu.updated`, `food.order.created` e `food.order.status_changed` publicados para o FP Robots.
 
+O FP Gateway foi iniciado como shell no FP Console:
+
+- schema `gateway`;
+- catalogo, permissao e role no `core`;
+- endpoint interno `/gateway/access` com guard de modulo contratado;
+- tela `/gateway` para selecionar empresa e validar fronteiras do modulo;
+- `gateway` exposto no `supabase/config.toml`.
+
 ## Sequencia recomendada
 
 ### Bloco 1 - Fechamento do Admin Console
@@ -139,10 +147,11 @@ Base criada:
 
 Proximo escopo:
 
-- melhoria de UX operacional;
+- preparacao dos contratos de integracao com Gateway e Tracking;
 - validacao da vitrine publica com pedido real;
-- consolidacao de pagamento manual com relatorio simples;
 - integracao inicial com Tracking;
+- integracao inicial com Gateway real/teste para pagamentos e mensagens;
+- melhoria de UX operacional conforme gargalos dos fluxos integrados;
 - auditoria minima;
 - eventos publicados para FP Robots quando fizer sentido.
 
@@ -166,20 +175,39 @@ Criterio de saida:
 
 - um pedido ou entrega possui rastreamento operacional simples.
 
-### Bloco 5 - Integracao Food -> Tracking -> Robots
+### Bloco 5 - FP Gateway MVP
+
+Objetivo: iniciar a camada oficial de integracoes externas em ambiente real/teste.
+
+Escopo inicial:
+
+- catalogo inicial de provedores;
+- configuracao de provedor por empresa;
+- conexao real/teste com Mercado Pago ou provedor autorizado;
+- abstracao inicial de pagamento para o Food;
+- recebimento e normalizacao de webhook;
+- logs tecnicos mascarados;
+- eventos `gateway.*` para FP Robots.
+
+Criterio de saida:
+
+- Food consegue solicitar uma operacao de pagamento sem conhecer credenciais ou detalhes do provedor.
+
+### Bloco 6 - Integracao Food -> Gateway -> Tracking -> Robots
 
 Objetivo: validar o ecossistema funcionando em cadeia.
 
 Fluxo esperado:
 
 1. Food cria pedido.
-2. Tracking recebe ou acompanha entrega.
-3. Robots registra eventos operacionais.
-4. Console observa status, logs e permissoes.
+2. Gateway processa pagamento ou mensagem externa quando aplicavel.
+3. Tracking recebe ou acompanha entrega.
+4. Robots registra eventos operacionais.
+5. Console observa status, logs e permissoes.
 
 Criterio de saida:
 
-- fluxo multiempresa ponta a ponta sem automacao externa obrigatoria.
+- fluxo multiempresa ponta a ponta com contratos reais de integracao e sem credenciais externas dentro dos modulos consumidores.
 
 ## Modulos futuros
 

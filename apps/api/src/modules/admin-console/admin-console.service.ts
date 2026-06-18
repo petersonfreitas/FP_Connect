@@ -2758,7 +2758,10 @@ function buildCurrentUserNavigation(
         },
         {
           label: "Sistemas",
-          items: [{ href: "/robots", label: "FP Robots" }]
+          items: [
+            { href: "/robots", label: "FP Robots" },
+            { href: "/gateway", label: "FP Gateway" }
+          ]
         },
         {
           label: "Auditoria",

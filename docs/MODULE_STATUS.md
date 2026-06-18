@@ -21,12 +21,12 @@ Este arquivo controla o avanco dos modulos do ecossistema.
 | FP Connect Admin Console | Alta | 2 | Base funcional estabilizada | Empresas, usuarios, papel de plataforma, permissoes, modulos contratados, suporte por carteira, catalogo, auditoria, guards, bloqueios, paginacao inicial e inativacao operacional ja possuem API e telas principais. |
 | FP Robots | Alta | 2 | Base funcional em evolucao | Schema `robots`, catalogo de eventos, event log, regras simples `evento -> acao`, execucoes, falha simulada, reprocessamento basico, API interna e tela inicial no Console criados. |
 | FP Food | Alta | 2 | Base funcional em evolucao | Frontend separado `apps/food`, dashboard operacional V0, menu lateral por Cadastro/Movimentacao, configuracao da loja, categorias/produtos paginados, cardapio derivado, pedido interno V0, vitrine publica V0 por slug, acompanhamento publico de pedido, painel de pedidos com filtro/status, detalhe de pedido com historico simples, pagamento manual V0, Cozinha V0, Entrega simples V0 e eventos `food.*` iniciais criados. |
-| FP Tracking | Alta | 0 | Fundacao de acesso preparada | Endpoint interno `/api/tracking/access` ja valida empresa, modulo contratado e permissao; deve nascer como frontend separado quando entrar em desenvolvimento. |
+| FP Tracking | Alta | 0 | Proximo ciclo de integracao | Endpoint interno `/api/tracking/access` ja valida empresa, modulo contratado e permissao; deve nascer como frontend separado e assumir entrega/rastreio real do Food. |
 | FP Billing | Futura | 0 | Fundacao de acesso preparada | Endpoint interno `/api/billing/access` ja valida empresa, modulo contratado e permissao; entrara apos base operacional. |
 | FP Tickets | Futura | 0 | Fundacao de acesso preparada | Endpoint interno `/api/tickets/access` ja valida empresa, modulo contratado e permissao; entrara apos base operacional. |
 | FP Sales | Futura | 0 | Fundacao de acesso preparada | Endpoint interno `/api/sales/access` ja valida empresa, modulo contratado e permissao; entrara apos base operacional. |
 | FP Marketing | Futura | 0 | Fundacao de acesso preparada | Endpoint interno `/api/marketing/access` ja valida empresa, modulo contratado e permissao; entrara apos base operacional. |
-| FP Gateway | Alta | 0 | Backlog criado | Integracoes externas, credenciais, OAuth, pagamentos, Mercado Pago, WhatsApp e Meta; LinkedIn e gov.br fora do escopo inicial. |
+| FP Gateway | Alta | 1 | Shell criado | Shell V0 em `/gateway`, schema `gateway`, catalogo/permissao no `core` e endpoint interno `/api/gateway/access` protegidos por empresa, modulo contratado e permissao. |
 | FP Fiscal | Alta/Media | 0 | Backlog criado | Modulo fiscal proprio, com foco inicial na evolucao fiscal do FP Food. |
 | FP Sign | Media | 0 | Backlog criado | Aceite simples, contratos, propostas e arquivamento documental; sem assinatura digital avancada no MVP. |
 | FP BI | Media/Baixa | 0 | Backlog criado | Indicadores e dashboards; evoluir apos maturidade dos modulos transacionais. |
@@ -146,6 +146,24 @@ Este arquivo controla o avanco dos modulos do ecossistema.
 
 ---
 
+## Checklist - FP Gateway
+
+- [x] Shell visual V0 no FP Console
+- [x] Schema `gateway`
+- [x] Catalogo do modulo no `core`
+- [x] Permissao `gateway.access`
+- [x] Role `module-admin`
+- [x] Endpoint interno de acesso
+- [x] Menu condicionado por modulo/permissao
+- [ ] Catalogo inicial de provedores
+- [ ] Configuracao de provedor por empresa
+- [ ] Ambiente real/teste Mercado Pago ou provedor autorizado
+- [ ] Contrato Food -> Gateway para solicitar pagamento
+- [ ] Webhook externo normalizado
+- [ ] Eventos `gateway.*` emitidos para FP Robots
+
+---
+
 ## Checklist - FP Tracking
 
 - [ ] Frontend separado quando iniciar o modulo
@@ -166,24 +184,15 @@ Este arquivo controla o avanco dos modulos do ecossistema.
 
 ## Proximo marco recomendado
 
-Validar o ciclo funcional da operacao publica, entrega simples e detalhe V0 do FP Food:
+Iniciar o ciclo de integracao Gateway + Tracking, usando o FP Food como primeiro consumidor real:
 
-1. confirmar que a loja esta com status `open`;
-2. confirmar que o schema `food` esta exposto nas configuracoes de API do Supabase hospedado;
-3. executar `pnpm dev:food` e acessar o frontend Food com usuario autorizado;
-4. acessar `/l/[slug-da-loja]`;
-5. adicionar produtos ao carrinho simples;
-6. enviar pedido publico;
-7. confirmar a pagina `/l/[slug-da-loja]/pedido/[numero]`;
-8. alterar status em `Movimentacao > Pedidos`;
-9. mover o pedido para `Pronto` na cozinha;
-10. mover o pedido para `Saiu para entrega` e depois `Entregue` em `Movimentacao > Entregas`;
-11. recarregar a pagina publica do pedido e validar os novos status;
-12. abrir o detalhe interno do pedido e validar a timeline de status;
-13. marcar pagamento como `Pago` com forma manual no detalhe do pedido;
-14. confirmar evento `food.order.created` no FP Robots com origem `public-store-v0`;
-15. confirmar evento `food.payment.marked_as_paid` no FP Robots;
-16. seguir para melhoria de UX operacional ou preparacao da integracao com Tracking.
+1. definir o contrato minimo Food -> Gateway para solicitar pagamento em ambiente real/teste;
+2. definir o contrato minimo Gateway -> Food para retorno de status normalizado;
+3. definir o contrato minimo Food -> Tracking para criar entrega a partir de pedido pronto;
+4. definir o contrato minimo Tracking -> Food para retorno de status/link de rastreio;
+5. manter FP Robots como trilha de eventos e automacoes dos fluxos integrados;
+6. modelar configuracoes avancadas do Food somente quando o contrato real exigir;
+7. preservar pagamento manual e entrega simples do Food como fallback operacional do MVP.
 
 ---
 
