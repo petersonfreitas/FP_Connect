@@ -1,37 +1,35 @@
 import Link from "next/link";
-import type { AdminCurrentUserAccessContract } from "@fp/types";
+import type {
+  AdminCurrentUserAccessContract,
+  GatewayCompanyProviderConfigContract,
+  GatewayProviderContract,
+  GatewaySmtpPublicConfig
+} from "@fp/types";
 import { AppShell } from "@/components/app-shell";
-import { getCurrentAdminAccess, getModuleAccess } from "@/lib/internal-api";
+import { PendingSubmitButton } from "@/components/pending-submit-button";
+import {
+  getCurrentAdminAccess,
+  getModuleAccess,
+  listGatewayProviderConfigs,
+  listGatewayProviders
+} from "@/lib/internal-api";
+import { saveGatewaySmtpConfigAction, testGatewaySmtpConfigAction } from "./actions";
 
 export const dynamic = "force-dynamic";
 
 type GatewayPageProps = {
   searchParams?: Promise<{
     companyId?: string;
+    error?: string;
+    message?: string;
+    smtpSaved?: string;
+    smtpTest?: string;
   }>;
 };
 
-const gatewayStages = [
-  {
-    title: "Provedores",
-    description: "Catalogo inicial para Mercado Pago, WhatsApp, Meta e futuros provedores."
-  },
-  {
-    title: "Credenciais",
-    description: "Tokens e OAuth ficarao no Gateway, nunca dentro dos modulos consumidores."
-  },
-  {
-    title: "Webhooks",
-    description: "Retornos externos serao validados, normalizados e publicados como eventos."
-  },
-  {
-    title: "Consumidores",
-    description: "Food, Billing, Marketing e Robots chamarao contratos internos do Gateway."
-  }
-];
-
 const gatewayEvents = [
   "gateway.provider.connected",
+  "gateway.smtp.validated",
   "gateway.payment.created",
   "gateway.payment.approved",
   "gateway.payment.rejected",
@@ -64,6 +62,18 @@ export default async function GatewayPage({ searchParams }: GatewayPageProps) {
   }
 
   const gatewayAccessResult = await getModuleAccess("gateway", selectedCompanyId);
+  const [providersResult, configsResult] = gatewayAccessResult.data
+    ? await Promise.all([
+        listGatewayProviders(selectedCompanyId),
+        listGatewayProviderConfigs(selectedCompanyId)
+      ])
+    : [
+        { data: null, error: null },
+        { data: null, error: null }
+      ];
+  const providers = providersResult.data ?? [];
+  const configs = configsResult.data ?? [];
+  const smtpConfig = configs.find((config) => config.providerKey === "smtp") ?? null;
   const selectedCompany = access.companies.find(
     (companyAccess) => companyAccess.company.id === selectedCompanyId
   );
@@ -78,6 +88,38 @@ export default async function GatewayPage({ searchParams }: GatewayPageProps) {
         <section className="data-alert" role="status">
           <strong>Nao foi possivel abrir o FP Gateway para esta empresa.</strong>
           <span>{gatewayAccessResult.error}</span>
+        </section>
+      ) : null}
+
+      {providersResult.error || configsResult.error ? (
+        <section className="data-alert" role="status">
+          <strong>Nao foi possivel carregar provedores do FP Gateway.</strong>
+          <span>{providersResult.error ?? configsResult.error}</span>
+        </section>
+      ) : null}
+
+      {query.error ? (
+        <section className="data-alert" role="status">
+          <strong>Nao foi possivel executar a acao solicitada.</strong>
+          <span>{query.error}</span>
+        </section>
+      ) : null}
+
+      {query.smtpSaved ? (
+        <section className="form-alert neutral page-feedback" role="status">
+          Configuracao SMTP salva com sucesso.
+        </section>
+      ) : null}
+
+      {query.smtpTest ? (
+        <section
+          className={query.smtpTest === "succeeded" ? "form-alert neutral page-feedback" : "data-alert"}
+          role="status"
+        >
+          <strong>
+            {query.smtpTest === "succeeded" ? "SMTP validado com sucesso." : "Validacao SMTP falhou."}
+          </strong>
+          <span>{query.message ?? "Validacao concluida."}</span>
         </section>
       ) : null}
 
@@ -103,14 +145,107 @@ export default async function GatewayPage({ searchParams }: GatewayPageProps) {
 
       <section className="section-heading">
         <div>
-          <div className="eyebrow">Shell V0</div>
-          <h2>Fronteiras do modulo</h2>
+          <div className="eyebrow">Catalogo V0</div>
+          <h2>Provedores do Gateway</h2>
         </div>
-        <span className="muted">Sem credenciais reais no V0</span>
+        <span className="muted">{providers.length} provedor(es)</span>
       </section>
 
-      <section className="module-grid" aria-label="Areas iniciais do FP Gateway">
-        {gatewayStages.map((stage) => (
+      <section className="module-grid" aria-label="Provedores iniciais do FP Gateway">
+        {providers.length > 0 ? (
+          providers.map((provider) => (
+            <article className="module-card" key={provider.id}>
+              <div className="module-card-top">
+                <span>{getProviderCategoryLabel(provider.category)}</span>
+                <small>{provider.status === "active" ? "Ativo" : "Inativo"}</small>
+              </div>
+              <h3>{provider.name}</h3>
+              <p>{provider.description ?? "Descricao pendente no catalogo do Gateway."}</p>
+              <div className="tag-list">
+                <span className="tag">{getProviderAuthLabel(provider.authType)}</span>
+              </div>
+            </article>
+          ))
+        ) : (
+          <div className="empty-state">
+            Nenhum provedor retornado. Aplique a migration do catalogo Gateway V0.
+          </div>
+        )}
+      </section>
+
+      <section className="content-panel">
+        <div className="panel-heading">
+          <div>
+            <h1>SMTP</h1>
+            <p>Configuracao simples para validar servidor de e-mail antes de conectar ao Robots.</p>
+          </div>
+          {smtpConfig ? (
+            <form action={testGatewaySmtpConfigAction}>
+              <input name="companyId" type="hidden" value={selectedCompanyId} />
+              <PendingSubmitButton className="secondary-action" pendingLabel="Validando...">
+                Testar SMTP
+              </PendingSubmitButton>
+            </form>
+          ) : (
+            <span>Nao configurado</span>
+          )}
+        </div>
+
+        <SmtpConfigForm companyId={selectedCompanyId} config={smtpConfig} />
+      </section>
+
+      <section className="content-panel">
+        <div className="panel-heading">
+          <div>
+            <h1>Configuracoes ativas</h1>
+            <p>Credenciais sensiveis ficam server-side e nao retornam para a interface.</p>
+          </div>
+          <span>{configs.length} configuracao(oes)</span>
+        </div>
+
+        {configs.length > 0 ? (
+          <div className="data-table" role="table" aria-label="Configuracoes do FP Gateway">
+            <div className="data-row data-row-head" role="row">
+              <span>Provedor</span>
+              <span>Status</span>
+              <span>Validacao</span>
+            </div>
+            {configs.map((config) => (
+              <div className="data-row" role="row" key={config.id}>
+                <span>
+                  <strong>{config.providerName}</strong>
+                  <small>{config.providerKey}</small>
+                </span>
+                <span>{getCompanyProviderStatusLabel(config.status)}</span>
+                <span>
+                  {config.lastValidationStatus
+                    ? getValidationStatusLabel(config.lastValidationStatus)
+                    : "Nao testado"}
+                  {config.lastValidationMessage ? <small>{config.lastValidationMessage}</small> : null}
+                </span>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <div className="empty-state">Nenhuma configuracao de provedor cadastrada ainda.</div>
+        )}
+      </section>
+
+      <section className="module-grid" aria-label="Fronteiras operacionais do FP Gateway">
+        {[
+          {
+            title: "Credenciais",
+            description: "Tokens, senhas e OAuth ficam no Gateway, sem vazar para Food ou Robots."
+          },
+          {
+            title: "Webhooks",
+            description: "Retornos externos serao validados, normalizados e publicados como eventos."
+          },
+          {
+            title: "Consumidores",
+            description: "Food, Billing, Marketing e Robots chamarao contratos internos do Gateway."
+          }
+        ].map((stage) => (
           <article className="module-card" key={stage.title}>
             <div className="module-card-top">
               <span>Gateway</span>
@@ -149,6 +284,78 @@ export default async function GatewayPage({ searchParams }: GatewayPageProps) {
         </div>
       </section>
     </AppShell>
+  );
+}
+
+function SmtpConfigForm({
+  companyId,
+  config
+}: {
+  companyId: string;
+  config: GatewayCompanyProviderConfigContract | null;
+}) {
+  const smtp = readSmtpConfig(config);
+
+  return (
+    <form action={saveGatewaySmtpConfigAction} className="form-grid">
+      <input name="companyId" type="hidden" value={companyId} />
+      <label>
+        Host SMTP
+        <input
+          defaultValue={smtp.host}
+          maxLength={255}
+          name="host"
+          placeholder="smtp.seudominio.com.br"
+          required
+        />
+      </label>
+      <label>
+        Porta
+        <input defaultValue={smtp.port} max={65535} min={1} name="port" required type="number" />
+      </label>
+      <label>
+        Usuario
+        <input defaultValue={smtp.username ?? ""} maxLength={255} name="username" />
+      </label>
+      <label>
+        Senha
+        <input
+          autoComplete="new-password"
+          name="password"
+          placeholder={config?.passwordConfigured ? "Senha ja configurada" : "Senha SMTP"}
+          type="password"
+        />
+      </label>
+      <label>
+        E-mail remetente
+        <input
+          defaultValue={smtp.fromEmail}
+          maxLength={255}
+          name="fromEmail"
+          placeholder="contato@seudominio.com.br"
+          required
+          type="email"
+        />
+      </label>
+      <label>
+        Nome remetente
+        <input defaultValue={smtp.fromName ?? ""} maxLength={120} name="fromName" />
+      </label>
+      <label>
+        Status
+        <select defaultValue={config?.status === "active" ? "active" : "configured"} name="status">
+          <option value="configured">Configurado</option>
+          <option value="active">Ativo</option>
+        </select>
+      </label>
+      <label className="checkbox-field">
+        <input defaultChecked={smtp.secure} name="secure" type="checkbox" />
+        Conexao TLS direta
+      </label>
+      <div className="form-actions">
+        <PendingSubmitButton pendingLabel="Salvando SMTP...">Salvar SMTP</PendingSubmitButton>
+      </div>
+    </form>
   );
 }
 
@@ -253,4 +460,72 @@ function resolveSelectedCompanyId(
   );
 
   return firstGatewayCompany?.company.id ?? null;
+}
+
+function readSmtpConfig(
+  config: GatewayCompanyProviderConfigContract | null
+): GatewaySmtpPublicConfig {
+  if (config?.providerKey === "smtp") {
+    return config.publicConfig as GatewaySmtpPublicConfig;
+  }
+
+  return {
+    fromEmail: "",
+    fromName: null,
+    host: "",
+    port: 587,
+    secure: false,
+    username: null
+  };
+}
+
+function getProviderCategoryLabel(category: GatewayProviderContract["category"]): string {
+  const labels: Record<GatewayProviderContract["category"], string> = {
+    ads: "Ads",
+    email: "E-mail",
+    messaging: "Mensagem",
+    payment: "Pagamento",
+    social: "Social"
+  };
+
+  return labels[category];
+}
+
+function getProviderAuthLabel(authType: GatewayProviderContract["authType"]): string {
+  const labels: Record<GatewayProviderContract["authType"], string> = {
+    api_key: "API key",
+    manual: "Manual",
+    oauth: "OAuth",
+    smtp_credentials: "SMTP"
+  };
+
+  return labels[authType];
+}
+
+function getCompanyProviderStatusLabel(
+  status: GatewayCompanyProviderConfigContract["status"]
+): string {
+  const labels: Record<GatewayCompanyProviderConfigContract["status"], string> = {
+    active: "Ativo",
+    configured: "Configurado",
+    error: "Com erro",
+    inactive: "Inativo",
+    not_configured: "Nao configurado"
+  };
+
+  return labels[status];
+}
+
+function getValidationStatusLabel(
+  status: GatewayCompanyProviderConfigContract["lastValidationStatus"]
+): string {
+  if (status === "succeeded") {
+    return "Sucesso";
+  }
+
+  if (status === "failed") {
+    return "Falhou";
+  }
+
+  return "Nao testado";
 }

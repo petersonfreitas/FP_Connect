@@ -79,6 +79,9 @@ O FP Gateway foi iniciado como shell no FP Console:
 - catalogo, permissao e role no `core`;
 - endpoint interno `/gateway/access` com guard de modulo contratado;
 - tela `/gateway` para selecionar empresa e validar fronteiras do modulo;
+- catalogo inicial de provedores com SMTP, Mercado Pago, WhatsApp e Meta;
+- configuracao SMTP por empresa com segredo server-side;
+- teste basico de conexao SMTP e evento `gateway.smtp.validated` para FP Robots;
 - `gateway` exposto no `supabase/config.toml`.
 
 ## Sequencia recomendada
@@ -181,8 +184,8 @@ Objetivo: iniciar a camada oficial de integracoes externas em ambiente real/test
 
 Escopo inicial:
 
-- catalogo inicial de provedores;
-- configuracao de provedor por empresa;
+- catalogo inicial de provedores: iniciado;
+- configuracao de provedor por empresa: iniciada com SMTP;
 - conexao real/teste com Mercado Pago ou provedor autorizado;
 - abstracao inicial de pagamento para o Food;
 - recebimento e normalizacao de webhook;

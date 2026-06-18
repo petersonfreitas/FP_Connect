@@ -36,4 +36,8 @@ export class SupabaseService {
   get food() {
     return this.client.schema("food");
   }
+
+  get gateway() {
+    return this.client.schema("gateway");
+  }
 }

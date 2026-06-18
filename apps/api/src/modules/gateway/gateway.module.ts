@@ -1,10 +1,13 @@
 import { Module } from "@nestjs/common";
 import { InternalApiGuard } from "../../auth/internal-api.guard";
 import { ModuleAccessGuard } from "../../auth/module-access.guard";
+import { RobotsModule } from "../robots/robots.module";
 import { GatewayController } from "./gateway.controller";
+import { GatewayService } from "./gateway.service";
 
 @Module({
+  imports: [RobotsModule],
   controllers: [GatewayController],
-  providers: [InternalApiGuard, ModuleAccessGuard]
+  providers: [GatewayService, InternalApiGuard, ModuleAccessGuard]
 })
 export class GatewayModule {}

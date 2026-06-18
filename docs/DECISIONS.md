@@ -82,6 +82,7 @@ Este arquivo registra decisoes arquiteturais e operacionais para evitar retrabal
 | DEC-074 | Dashboard operacional V0 do FP Food pode existir dentro do proprio modulo com indicadores simples de pedidos, pagamentos e filas; FP BI permanece futuro para analises consolidadas e cruzadas entre modulos. | Aprovada |
 | DEC-075 | O proximo ciclo deve priorizar FP Gateway real/teste e FP Tracking, deixando configuracoes avancadas do FP Food serem modeladas conforme os contratos reais de pagamento, mensagens e entrega nascerem nesses modulos. | Aprovada |
 | DEC-076 | FP Gateway nasce primeiro como shell operacional no FP Console, com acesso protegido por modulo contratado e permissao; frontend separado so sera avaliado quando volume, operacao ou isolamento justificarem. | Aprovada |
+| DEC-077 | SMTP entra como primeiro provedor configuravel do FP Gateway para validar catalogo, credenciais server-side, teste de conexao e evento `gateway.smtp.validated`; envio transacional completo fica para integracao posterior com FP Robots. | Aprovada |
 
 ---
 

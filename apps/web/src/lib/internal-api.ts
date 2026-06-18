@@ -25,6 +25,9 @@ import type {
   CreateAdminConsoleUserInput,
   CreateAdminUserInput,
   GrantAdminUserRoleInput,
+  GatewayCompanyProviderConfigContract,
+  GatewayProviderContract,
+  GatewayProviderValidationContract,
   LinkAdminCompanySupportInput,
   ModuleAccessContract,
   ModuleApplicationKey,
@@ -44,7 +47,8 @@ import type {
   UpdateAdminCompanyUserInput,
   UpdateAdminCompanyInput,
   UpdateAdminUserInput,
-  UpdateAdminCompanyApplicationInput
+  UpdateAdminCompanyApplicationInput,
+  UpsertGatewaySmtpConfigInput
 } from "@fp/types";
 import { requireCurrentUser } from "./auth";
 import { loadServerEnv } from "./server-env";
@@ -193,6 +197,50 @@ export async function getModuleAccess(
     headers: {
       "X-FP-Company-Id": companyId
     }
+  });
+}
+
+export async function listGatewayProviders(
+  companyId: string
+): Promise<InternalApiResult<GatewayProviderContract[]>> {
+  return fetchInternal<GatewayProviderContract[]>("gateway/providers", {
+    headers: {
+      "X-FP-Company-Id": companyId
+    }
+  });
+}
+
+export async function listGatewayProviderConfigs(
+  companyId: string
+): Promise<InternalApiResult<GatewayCompanyProviderConfigContract[]>> {
+  return fetchInternal<GatewayCompanyProviderConfigContract[]>("gateway/providers/configs", {
+    headers: {
+      "X-FP-Company-Id": companyId
+    }
+  });
+}
+
+export async function upsertGatewaySmtpConfig(
+  companyId: string,
+  input: UpsertGatewaySmtpConfigInput
+): Promise<InternalApiResult<GatewayCompanyProviderConfigContract>> {
+  return fetchInternal<GatewayCompanyProviderConfigContract>("gateway/providers/smtp/config", {
+    body: JSON.stringify(input),
+    headers: {
+      "X-FP-Company-Id": companyId
+    },
+    method: "POST"
+  });
+}
+
+export async function testGatewaySmtpConfig(
+  companyId: string
+): Promise<InternalApiResult<GatewayProviderValidationContract>> {
+  return fetchInternal<GatewayProviderValidationContract>("gateway/providers/smtp/test", {
+    headers: {
+      "X-FP-Company-Id": companyId
+    },
+    method: "POST"
   });
 }
 

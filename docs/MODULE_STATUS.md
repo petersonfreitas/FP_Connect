@@ -26,7 +26,7 @@ Este arquivo controla o avanco dos modulos do ecossistema.
 | FP Tickets | Futura | 0 | Fundacao de acesso preparada | Endpoint interno `/api/tickets/access` ja valida empresa, modulo contratado e permissao; entrara apos base operacional. |
 | FP Sales | Futura | 0 | Fundacao de acesso preparada | Endpoint interno `/api/sales/access` ja valida empresa, modulo contratado e permissao; entrara apos base operacional. |
 | FP Marketing | Futura | 0 | Fundacao de acesso preparada | Endpoint interno `/api/marketing/access` ja valida empresa, modulo contratado e permissao; entrara apos base operacional. |
-| FP Gateway | Alta | 1 | Shell criado | Shell V0 em `/gateway`, schema `gateway`, catalogo/permissao no `core` e endpoint interno `/api/gateway/access` protegidos por empresa, modulo contratado e permissao. |
+| FP Gateway | Alta | 2 | Base funcional inicial | Shell V0 em `/gateway`, schema `gateway`, catalogo de provedores, configuracao SMTP por empresa, teste basico de conexao SMTP e evento `gateway.smtp.validated`; Mercado Pago real/teste permanece como proximo contrato. |
 | FP Fiscal | Alta/Media | 0 | Backlog criado | Modulo fiscal proprio, com foco inicial na evolucao fiscal do FP Food. |
 | FP Sign | Media | 0 | Backlog criado | Aceite simples, contratos, propostas e arquivamento documental; sem assinatura digital avancada no MVP. |
 | FP BI | Media/Baixa | 0 | Backlog criado | Indicadores e dashboards; evoluir apos maturidade dos modulos transacionais. |
@@ -155,12 +155,15 @@ Este arquivo controla o avanco dos modulos do ecossistema.
 - [x] Role `module-admin`
 - [x] Endpoint interno de acesso
 - [x] Menu condicionado por modulo/permissao
-- [ ] Catalogo inicial de provedores
-- [ ] Configuracao de provedor por empresa
+- [x] Catalogo inicial de provedores
+- [x] Configuracao de provedor por empresa
+- [x] Configuracao SMTP V0
+- [x] Teste basico de conexao SMTP
+- [x] Evento `gateway.smtp.validated` para FP Robots
 - [ ] Ambiente real/teste Mercado Pago ou provedor autorizado
 - [ ] Contrato Food -> Gateway para solicitar pagamento
 - [ ] Webhook externo normalizado
-- [ ] Eventos `gateway.*` emitidos para FP Robots
+- [ ] Envio transacional SMTP solicitado pelo FP Robots
 
 ---
 
