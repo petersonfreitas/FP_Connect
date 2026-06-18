@@ -26,7 +26,7 @@ Este arquivo controla o avanco dos modulos do ecossistema.
 | FP Tickets | Futura | 0 | Fundacao de acesso preparada | Endpoint interno `/api/tickets/access` ja valida empresa, modulo contratado e permissao; entrara apos base operacional. |
 | FP Sales | Futura | 0 | Fundacao de acesso preparada | Endpoint interno `/api/sales/access` ja valida empresa, modulo contratado e permissao; entrara apos base operacional. |
 | FP Marketing | Futura | 0 | Fundacao de acesso preparada | Endpoint interno `/api/marketing/access` ja valida empresa, modulo contratado e permissao; entrara apos base operacional. |
-| FP Gateway | Alta | 2 | Base funcional inicial | Shell V0 em `/gateway`, schema `gateway`, catalogo de provedores, configuracao SMTP por empresa, teste basico de conexao SMTP e evento `gateway.smtp.validated`; Mercado Pago real/teste permanece como proximo contrato. |
+| FP Gateway | Alta | 2 | Base funcional inicial | Shell V0 em `/gateway`, schema `gateway`, catalogo de provedores, configuracao SMTP por empresa, teste basico/envio de e-mail SMTP com pendencia de timeout em ambiente/provedor, contrato interno V0 de solicitacao de pagamento e eventos `gateway.*` para Robots. |
 | FP Fiscal | Alta/Media | 0 | Backlog criado | Modulo fiscal proprio, com foco inicial na evolucao fiscal do FP Food. |
 | FP Sign | Media | 0 | Backlog criado | Aceite simples, contratos, propostas e arquivamento documental; sem assinatura digital avancada no MVP. |
 | FP BI | Media/Baixa | 0 | Backlog criado | Indicadores e dashboards; evoluir apos maturidade dos modulos transacionais. |
@@ -160,8 +160,16 @@ Este arquivo controla o avanco dos modulos do ecossistema.
 - [x] Configuracao SMTP V0
 - [x] Teste basico de conexao SMTP
 - [x] Evento `gateway.smtp.validated` para FP Robots
+- [x] Envio real de e-mail SMTP de teste
+- [x] Evento `gateway.smtp.test_email_sent` para FP Robots
+- [x] Evento `gateway.smtp.test_email_failed` para falha de envio SMTP
+- [ ] Estabilizacao operacional SMTP em provedor/rede sem timeout
+- [x] Tabela `gateway.payment_requests`
+- [x] Contrato interno V0 para solicitar pagamento
+- [x] Tela V0 para registrar/listar solicitacoes de pagamento
+- [x] Eventos `gateway.payment.*` iniciais para FP Robots
 - [ ] Ambiente real/teste Mercado Pago ou provedor autorizado
-- [ ] Contrato Food -> Gateway para solicitar pagamento
+- [ ] Integracao Food -> Gateway para solicitar pagamento a partir do pedido
 - [ ] Webhook externo normalizado
 - [ ] Envio transacional SMTP solicitado pelo FP Robots
 
@@ -189,13 +197,14 @@ Este arquivo controla o avanco dos modulos do ecossistema.
 
 Iniciar o ciclo de integracao Gateway + Tracking, usando o FP Food como primeiro consumidor real:
 
-1. definir o contrato minimo Food -> Gateway para solicitar pagamento em ambiente real/teste;
-2. definir o contrato minimo Gateway -> Food para retorno de status normalizado;
-3. definir o contrato minimo Food -> Tracking para criar entrega a partir de pedido pronto;
-4. definir o contrato minimo Tracking -> Food para retorno de status/link de rastreio;
-5. manter FP Robots como trilha de eventos e automacoes dos fluxos integrados;
-6. modelar configuracoes avancadas do Food somente quando o contrato real exigir;
-7. preservar pagamento manual e entrega simples do Food como fallback operacional do MVP.
+1. integrar o pedido do FP Food ao contrato V0 `gateway.payment_requests`;
+2. configurar Mercado Pago real/teste sobre o contrato ja criado;
+3. definir o contrato minimo Gateway -> Food para retorno de status normalizado;
+4. definir o contrato minimo Food -> Tracking para criar entrega a partir de pedido pronto;
+5. definir o contrato minimo Tracking -> Food para retorno de status/link de rastreio;
+6. manter FP Robots como trilha de eventos e automacoes dos fluxos integrados;
+7. modelar configuracoes avancadas do Food somente quando o contrato real exigir;
+8. preservar pagamento manual e entrega simples do Food como fallback operacional do MVP.
 
 ---
 

@@ -82,6 +82,10 @@ O FP Gateway foi iniciado como shell no FP Console:
 - catalogo inicial de provedores com SMTP, Mercado Pago, WhatsApp e Meta;
 - configuracao SMTP por empresa com segredo server-side;
 - teste basico de conexao SMTP e evento `gateway.smtp.validated` para FP Robots;
+- envio real de e-mail SMTP de teste com eventos `gateway.smtp.test_email_sent` e `gateway.smtp.test_email_failed`;
+- SMTP segue com pendencia operacional de timeout em alguns provedores/rede e nao deve travar o MVP;
+- tabela `gateway.payment_requests`, endpoint interno e tela V0 para solicitacoes de pagamento;
+- eventos `gateway.payment.requested`, `gateway.payment.requires_provider_config`, `gateway.payment.failed` e `gateway.payment.paid`;
 - `gateway` exposto no `supabase/config.toml`.
 
 ## Sequencia recomendada
@@ -186,8 +190,9 @@ Escopo inicial:
 
 - catalogo inicial de provedores: iniciado;
 - configuracao de provedor por empresa: iniciada com SMTP;
+- contrato interno de solicitacao de pagamento: iniciado;
 - conexao real/teste com Mercado Pago ou provedor autorizado;
-- abstracao inicial de pagamento para o Food;
+- integracao do Food ao contrato de pagamento;
 - recebimento e normalizacao de webhook;
 - logs tecnicos mascarados;
 - eventos `gateway.*` para FP Robots.

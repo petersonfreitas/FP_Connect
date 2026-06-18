@@ -3,7 +3,11 @@ import { InternalApiGuard } from "../../auth/internal-api.guard";
 import { ModuleAccessGuard } from "../../auth/module-access.guard";
 import { ModuleAccessPolicy } from "../../auth/module-access-policy.decorator";
 import { buildModuleAccessResponse } from "../../auth/module-access-response";
-import type { UpsertGatewaySmtpConfigInput } from "./gateway.contracts";
+import type {
+  CreateGatewayPaymentRequestInput,
+  SendGatewaySmtpTestEmailInput,
+  UpsertGatewaySmtpConfigInput
+} from "./gateway.contracts";
 import { GatewayService } from "./gateway.service";
 
 @Controller("gateway")
@@ -44,6 +48,30 @@ export class GatewayController {
     return this.gatewayService.listCompanyProviderConfigs(companyId);
   }
 
+  @Get("payments/requests")
+  @ModuleAccessPolicy({
+    applicationKey: "gateway",
+    companyHeader: "x-fp-company-id",
+    permissionKey: "gateway.access"
+  })
+  listPaymentRequests(@Headers("x-fp-company-id") companyId: string) {
+    return this.gatewayService.listPaymentRequests(companyId);
+  }
+
+  @Post("payments/requests")
+  @ModuleAccessPolicy({
+    applicationKey: "gateway",
+    companyHeader: "x-fp-company-id",
+    permissionKey: "gateway.access"
+  })
+  createPaymentRequest(
+    @Body() input: CreateGatewayPaymentRequestInput,
+    @Headers("x-fp-company-id") companyId: string,
+    @Headers("x-fp-actor-user-id") actorUserId: string
+  ) {
+    return this.gatewayService.createPaymentRequest(companyId, actorUserId, input);
+  }
+
   @Post("providers/smtp/config")
   @ModuleAccessPolicy({
     applicationKey: "gateway",
@@ -69,5 +97,19 @@ export class GatewayController {
     @Headers("x-fp-actor-user-id") actorUserId: string
   ) {
     return this.gatewayService.validateSmtpConfig(companyId, actorUserId);
+  }
+
+  @Post("providers/smtp/test-email")
+  @ModuleAccessPolicy({
+    applicationKey: "gateway",
+    companyHeader: "x-fp-company-id",
+    permissionKey: "gateway.access"
+  })
+  sendSmtpTestEmail(
+    @Body() input: SendGatewaySmtpTestEmailInput,
+    @Headers("x-fp-company-id") companyId: string,
+    @Headers("x-fp-actor-user-id") actorUserId: string
+  ) {
+    return this.gatewayService.sendSmtpTestEmail(companyId, actorUserId, input);
   }
 }

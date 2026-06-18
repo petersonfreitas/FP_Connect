@@ -61,3 +61,59 @@ export type GatewayProviderValidationContract = {
   message: string;
   status: Extract<GatewayValidationStatus, "failed" | "succeeded">;
 };
+
+export type GatewayPaymentRequestStatus =
+  | "cancelled"
+  | "expired"
+  | "failed"
+  | "paid"
+  | "requested"
+  | "requires_provider_config";
+
+export type GatewayPaymentRequestContract = {
+  amountCents: number;
+  companyId: string;
+  createdAt: string;
+  currency: string;
+  customerEmail: string | null;
+  customerName: string | null;
+  customerPhone: string | null;
+  description: string;
+  errorMessage: string | null;
+  id: string;
+  paymentUrl: string | null;
+  providerKey: string;
+  providerName: string;
+  providerReference: string | null;
+  sourceApplicationKey: string;
+  sourceReferenceId: string;
+  sourceReferenceType: string;
+  status: GatewayPaymentRequestStatus;
+  updatedAt: string;
+};
+
+export type CreateGatewayPaymentRequestInput = {
+  amountCents: number;
+  currency?: string | null;
+  customerEmail?: string | null;
+  customerName?: string | null;
+  customerPhone?: string | null;
+  description: string;
+  idempotencyKey?: string | null;
+  providerKey?: string | null;
+  sourceApplicationKey: string;
+  sourceReferenceId: string;
+  sourceReferenceType: string;
+};
+
+export type SendGatewaySmtpTestEmailInput = {
+  body?: string | null;
+  subject?: string | null;
+  toEmail: string;
+};
+
+export type GatewaySmtpTestEmailContract = {
+  message: string;
+  sent: true;
+  toEmail: string;
+};

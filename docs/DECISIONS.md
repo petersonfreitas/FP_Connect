@@ -83,6 +83,9 @@ Este arquivo registra decisoes arquiteturais e operacionais para evitar retrabal
 | DEC-075 | O proximo ciclo deve priorizar FP Gateway real/teste e FP Tracking, deixando configuracoes avancadas do FP Food serem modeladas conforme os contratos reais de pagamento, mensagens e entrega nascerem nesses modulos. | Aprovada |
 | DEC-076 | FP Gateway nasce primeiro como shell operacional no FP Console, com acesso protegido por modulo contratado e permissao; frontend separado so sera avaliado quando volume, operacao ou isolamento justificarem. | Aprovada |
 | DEC-077 | SMTP entra como primeiro provedor configuravel do FP Gateway para validar catalogo, credenciais server-side, teste de conexao e evento `gateway.smtp.validated`; envio transacional completo fica para integracao posterior com FP Robots. | Aprovada |
+| DEC-078 | FP Gateway pode enviar e-mail SMTP de teste pela propria tela do modulo para validar credenciais ponta a ponta; disparos transacionais automatizados devem ser solicitados posteriormente pelo FP Robots via acao `gateway_external_action`. | Aprovada |
+| DEC-079 | Timeouts SMTP em provedores/rede ficam como pendencia operacional; o FP Gateway deve seguir evoluindo por contratos internos e provedores via HTTPS quando possivel, sem travar o MVP em portas SMTP. | Aprovada |
+| DEC-080 | O primeiro contrato de pagamento do FP Gateway sera uma solicitacao interna idempotente por empresa, com origem, referencia, valor, provedor pretendido e eventos `gateway.payment.*`; a chamada real ao Mercado Pago entra depois sobre o mesmo contrato. | Aprovada |
 
 ---
 

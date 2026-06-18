@@ -2,6 +2,7 @@ import Link from "next/link";
 import type {
   AdminCurrentUserAccessContract,
   GatewayCompanyProviderConfigContract,
+  GatewayPaymentRequestContract,
   GatewayProviderContract,
   GatewaySmtpPublicConfig
 } from "@fp/types";
@@ -10,10 +11,16 @@ import { PendingSubmitButton } from "@/components/pending-submit-button";
 import {
   getCurrentAdminAccess,
   getModuleAccess,
+  listGatewayPaymentRequests,
   listGatewayProviderConfigs,
   listGatewayProviders
 } from "@/lib/internal-api";
-import { saveGatewaySmtpConfigAction, testGatewaySmtpConfigAction } from "./actions";
+import {
+  createGatewayPaymentRequestAction,
+  saveGatewaySmtpConfigAction,
+  sendGatewaySmtpTestEmailAction,
+  testGatewaySmtpConfigAction
+} from "./actions";
 
 export const dynamic = "force-dynamic";
 
@@ -22,6 +29,8 @@ type GatewayPageProps = {
     companyId?: string;
     error?: string;
     message?: string;
+    paymentCreated?: string;
+    smtpEmailSent?: string;
     smtpSaved?: string;
     smtpTest?: string;
   }>;
@@ -30,9 +39,10 @@ type GatewayPageProps = {
 const gatewayEvents = [
   "gateway.provider.connected",
   "gateway.smtp.validated",
-  "gateway.payment.created",
-  "gateway.payment.approved",
-  "gateway.payment.rejected",
+  "gateway.payment.requested",
+  "gateway.payment.requires_provider_config",
+  "gateway.payment.failed",
+  "gateway.payment.paid",
   "gateway.webhook.received",
   "gateway.whatsapp.message.sent"
 ];
@@ -62,18 +72,24 @@ export default async function GatewayPage({ searchParams }: GatewayPageProps) {
   }
 
   const gatewayAccessResult = await getModuleAccess("gateway", selectedCompanyId);
-  const [providersResult, configsResult] = gatewayAccessResult.data
+  const [providersResult, configsResult, paymentRequestsResult] = gatewayAccessResult.data
     ? await Promise.all([
         listGatewayProviders(selectedCompanyId),
-        listGatewayProviderConfigs(selectedCompanyId)
+        listGatewayProviderConfigs(selectedCompanyId),
+        listGatewayPaymentRequests(selectedCompanyId)
       ])
     : [
+        { data: null, error: null },
         { data: null, error: null },
         { data: null, error: null }
       ];
   const providers = providersResult.data ?? [];
   const configs = configsResult.data ?? [];
+  const paymentRequests = paymentRequestsResult.data ?? [];
   const smtpConfig = configs.find((config) => config.providerKey === "smtp") ?? null;
+  const paymentProviders = providers.filter(
+    (provider) => provider.category === "payment" && provider.status === "active"
+  );
   const selectedCompany = access.companies.find(
     (companyAccess) => companyAccess.company.id === selectedCompanyId
   );
@@ -91,10 +107,12 @@ export default async function GatewayPage({ searchParams }: GatewayPageProps) {
         </section>
       ) : null}
 
-      {providersResult.error || configsResult.error ? (
+      {providersResult.error || configsResult.error || paymentRequestsResult.error ? (
         <section className="data-alert" role="status">
           <strong>Nao foi possivel carregar provedores do FP Gateway.</strong>
-          <span>{providersResult.error ?? configsResult.error}</span>
+          <span>
+            {providersResult.error ?? configsResult.error ?? paymentRequestsResult.error}
+          </span>
         </section>
       ) : null}
 
@@ -120,6 +138,20 @@ export default async function GatewayPage({ searchParams }: GatewayPageProps) {
             {query.smtpTest === "succeeded" ? "SMTP validado com sucesso." : "Validacao SMTP falhou."}
           </strong>
           <span>{query.message ?? "Validacao concluida."}</span>
+        </section>
+      ) : null}
+
+      {query.smtpEmailSent ? (
+        <section className="form-alert neutral page-feedback" role="status">
+          <strong>E-mail de teste enviado.</strong>
+          <span>{query.message ?? "Mensagem enviada pelo FP Gateway."}</span>
+        </section>
+      ) : null}
+
+      {query.paymentCreated ? (
+        <section className="form-alert neutral page-feedback" role="status">
+          <strong>Solicitacao de pagamento registrada.</strong>
+          <span>{getPaymentRequestStatusLabel(query.paymentCreated)}</span>
         </section>
       ) : null}
 
@@ -176,6 +208,24 @@ export default async function GatewayPage({ searchParams }: GatewayPageProps) {
       <section className="content-panel">
         <div className="panel-heading">
           <div>
+            <h1>Pagamentos V0</h1>
+            <p>
+              Contrato interno para o Food solicitar pagamento sem falar direto com o provedor.
+            </p>
+          </div>
+          <span>{paymentRequests.length} solicitacao(oes)</span>
+        </div>
+
+        <PaymentRequestForm
+          companyId={selectedCompanyId}
+          paymentProviders={paymentProviders}
+        />
+        <PaymentRequestsTable paymentRequests={paymentRequests} />
+      </section>
+
+      <section className="content-panel">
+        <div className="panel-heading">
+          <div>
             <h1>SMTP</h1>
             <p>Configuracao simples para validar servidor de e-mail antes de conectar ao Robots.</p>
           </div>
@@ -191,8 +241,28 @@ export default async function GatewayPage({ searchParams }: GatewayPageProps) {
           )}
         </div>
 
+        <div className="form-alert neutral inline-alert" role="status">
+          Resend: host `smtp.resend.com`, usuario `resend`, senha com API key. Use porta 587
+          ou 2587 sem TLS direta, ou 465/2465 com TLS direta. Outlook/Office 365 costuma
+          exigir SMTP AUTH habilitado e pode precisar de app password.
+        </div>
+
         <SmtpConfigForm companyId={selectedCompanyId} config={smtpConfig} />
       </section>
+
+      {smtpConfig ? (
+        <section className="content-panel">
+          <div className="panel-heading">
+            <div>
+              <h1>E-mail de teste</h1>
+              <p>Envia uma mensagem real usando a configuracao SMTP salva para esta empresa.</p>
+            </div>
+            <span>{smtpConfig.status === "active" ? "SMTP ativo" : "SMTP configurado"}</span>
+          </div>
+
+          <SmtpTestEmailForm companyId={selectedCompanyId} />
+        </section>
+      ) : null}
 
       <section className="content-panel">
         <div className="panel-heading">
@@ -287,6 +357,109 @@ export default async function GatewayPage({ searchParams }: GatewayPageProps) {
   );
 }
 
+function PaymentRequestForm({
+  companyId,
+  paymentProviders
+}: {
+  companyId: string;
+  paymentProviders: GatewayProviderContract[];
+}) {
+  return (
+    <form action={createGatewayPaymentRequestAction} className="form-grid">
+      <input name="companyId" type="hidden" value={companyId} />
+      <input name="sourceApplicationKey" type="hidden" value="food" />
+      <input name="sourceReferenceType" type="hidden" value="order" />
+      <label>
+        Provedor
+        <select defaultValue={paymentProviders[0]?.key ?? "mercado_pago"} name="providerKey">
+          {paymentProviders.length > 0 ? (
+            paymentProviders.map((provider) => (
+              <option key={provider.id} value={provider.key}>
+                {provider.name}
+              </option>
+            ))
+          ) : (
+            <option value="mercado_pago">Mercado Pago</option>
+          )}
+        </select>
+      </label>
+      <label>
+        Valor
+        <input defaultValue="25,00" inputMode="decimal" maxLength={14} name="amount" required />
+      </label>
+      <label>
+        Referencia do pedido
+        <input maxLength={160} name="sourceReferenceId" placeholder="ex: FOOD-0001" />
+      </label>
+      <label>
+        Cliente
+        <input maxLength={160} name="customerName" placeholder="Nome do cliente" />
+      </label>
+      <label>
+        E-mail do cliente
+        <input maxLength={255} name="customerEmail" placeholder="cliente@email.com" type="email" />
+      </label>
+      <label>
+        Telefone
+        <input maxLength={40} name="customerPhone" placeholder="(00) 00000-0000" />
+      </label>
+      <label className="form-full">
+        Descricao
+        <input
+          defaultValue="Pedido de teste FP Food"
+          maxLength={255}
+          name="description"
+          required
+        />
+      </label>
+      <div className="form-actions">
+        <PendingSubmitButton pendingLabel="Registrando pagamento...">
+          Criar solicitacao V0
+        </PendingSubmitButton>
+      </div>
+    </form>
+  );
+}
+
+function PaymentRequestsTable({
+  paymentRequests
+}: {
+  paymentRequests: GatewayPaymentRequestContract[];
+}) {
+  if (paymentRequests.length === 0) {
+    return <div className="empty-state">Nenhuma solicitacao de pagamento registrada ainda.</div>;
+  }
+
+  return (
+    <div className="data-table" role="table" aria-label="Solicitacoes de pagamento">
+      <div className="data-row data-row-head" role="row">
+        <span>Origem</span>
+        <span>Valor</span>
+        <span>Status</span>
+      </div>
+      {paymentRequests.map((paymentRequest) => (
+        <div className="data-row" role="row" key={paymentRequest.id}>
+          <span>
+            <strong>{paymentRequest.description}</strong>
+            <small>
+              {paymentRequest.sourceApplicationKey}.{paymentRequest.sourceReferenceType} /{" "}
+              {paymentRequest.sourceReferenceId}
+            </small>
+          </span>
+          <span>
+            {formatCurrency(paymentRequest.amountCents, paymentRequest.currency)}
+            <small>{paymentRequest.providerName}</small>
+          </span>
+          <span>
+            {getPaymentRequestStatusLabel(paymentRequest.status)}
+            {paymentRequest.errorMessage ? <small>{paymentRequest.errorMessage}</small> : null}
+          </span>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 function SmtpConfigForm({
   companyId,
   config
@@ -354,6 +527,47 @@ function SmtpConfigForm({
       </label>
       <div className="form-actions">
         <PendingSubmitButton pendingLabel="Salvando SMTP...">Salvar SMTP</PendingSubmitButton>
+      </div>
+    </form>
+  );
+}
+
+function SmtpTestEmailForm({ companyId }: { companyId: string }) {
+  return (
+    <form action={sendGatewaySmtpTestEmailAction} className="form-grid">
+      <input name="companyId" type="hidden" value={companyId} />
+      <label>
+        Destinatario
+        <input
+          maxLength={255}
+          name="toEmail"
+          placeholder="destino@seudominio.com.br"
+          required
+          type="email"
+        />
+      </label>
+      <label>
+        Assunto
+        <input
+          defaultValue="Teste SMTP - FP Gateway"
+          maxLength={160}
+          name="subject"
+          required
+        />
+      </label>
+      <label className="form-full">
+        Mensagem
+        <textarea
+          defaultValue="Este e um e-mail de teste enviado pelo FP Gateway para validar o envio SMTP."
+          maxLength={4000}
+          name="body"
+          rows={5}
+        />
+      </label>
+      <div className="form-actions">
+        <PendingSubmitButton pendingLabel="Enviando e-mail...">
+          Enviar e-mail de teste
+        </PendingSubmitButton>
       </div>
     </form>
   );
@@ -528,4 +742,24 @@ function getValidationStatusLabel(
   }
 
   return "Nao testado";
+}
+
+function getPaymentRequestStatusLabel(status: string): string {
+  const labels: Record<string, string> = {
+    cancelled: "Cancelado",
+    expired: "Expirado",
+    failed: "Falhou",
+    paid: "Pago",
+    requested: "Solicitado",
+    requires_provider_config: "Aguardando configuracao do provedor"
+  };
+
+  return labels[status] ?? status;
+}
+
+function formatCurrency(amountCents: number, currency: string): string {
+  return new Intl.NumberFormat("pt-BR", {
+    currency,
+    style: "currency"
+  }).format(amountCents / 100);
 }

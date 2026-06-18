@@ -21,13 +21,16 @@ import type {
   AdminCurrentUserAccessContract,
   AdminUserApplicationRoleContract,
   AdminUserContract,
+  CreateGatewayPaymentRequestInput,
   CreateAdminCompanyInput,
   CreateAdminConsoleUserInput,
   CreateAdminUserInput,
   GrantAdminUserRoleInput,
   GatewayCompanyProviderConfigContract,
+  GatewayPaymentRequestContract,
   GatewayProviderContract,
   GatewayProviderValidationContract,
+  GatewaySmtpTestEmailContract,
   LinkAdminCompanySupportInput,
   ModuleAccessContract,
   ModuleApplicationKey,
@@ -44,6 +47,7 @@ import type {
   ResendAdminUserInviteContract,
   RevokeAdminUserRoleContract,
   RevokeAdminUserRoleInput,
+  SendGatewaySmtpTestEmailInput,
   UpdateAdminCompanyUserInput,
   UpdateAdminCompanyInput,
   UpdateAdminUserInput,
@@ -220,6 +224,29 @@ export async function listGatewayProviderConfigs(
   });
 }
 
+export async function listGatewayPaymentRequests(
+  companyId: string
+): Promise<InternalApiResult<GatewayPaymentRequestContract[]>> {
+  return fetchInternal<GatewayPaymentRequestContract[]>("gateway/payments/requests", {
+    headers: {
+      "X-FP-Company-Id": companyId
+    }
+  });
+}
+
+export async function createGatewayPaymentRequest(
+  companyId: string,
+  input: CreateGatewayPaymentRequestInput
+): Promise<InternalApiResult<GatewayPaymentRequestContract>> {
+  return fetchInternal<GatewayPaymentRequestContract>("gateway/payments/requests", {
+    body: JSON.stringify(input),
+    headers: {
+      "X-FP-Company-Id": companyId
+    },
+    method: "POST"
+  });
+}
+
 export async function upsertGatewaySmtpConfig(
   companyId: string,
   input: UpsertGatewaySmtpConfigInput
@@ -237,6 +264,19 @@ export async function testGatewaySmtpConfig(
   companyId: string
 ): Promise<InternalApiResult<GatewayProviderValidationContract>> {
   return fetchInternal<GatewayProviderValidationContract>("gateway/providers/smtp/test", {
+    headers: {
+      "X-FP-Company-Id": companyId
+    },
+    method: "POST"
+  });
+}
+
+export async function sendGatewaySmtpTestEmail(
+  companyId: string,
+  input: SendGatewaySmtpTestEmailInput
+): Promise<InternalApiResult<GatewaySmtpTestEmailContract>> {
+  return fetchInternal<GatewaySmtpTestEmailContract>("gateway/providers/smtp/test-email", {
+    body: JSON.stringify(input),
     headers: {
       "X-FP-Company-Id": companyId
     },
