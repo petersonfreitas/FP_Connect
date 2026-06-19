@@ -138,12 +138,14 @@ O build precisa instalar devDependencies, pois `@nestjs/cli` e necessario para `
 
 ```text
 Root Directory: deixe em branco
-Build Command: corepack enable && corepack prepare pnpm@9.0.0 --activate && pnpm install --frozen-lockfile --prod=false && pnpm build:api
+Build Command: pnpm install --frozen-lockfile --prod=false && pnpm build:api
 Start Command: pnpm --filter @fp/api start
 ```
 
 Se o log mostrar `nest: not found`, o install foi executado em modo producao e pulou
 devDependencies do workspace da API. Mantenha `--prod=false` no Build Command.
+No Render, nao use `corepack enable` no Build Command; em alguns ambientes ele tenta alterar
+`/usr/bin/pnpm`, que e read-only.
 
 O login do Admin Console usa Supabase Auth pelo server-side do Next. A sessao fica em cookies HttpOnly e o navegador nao recebe a service role nem o token interno. Quando o access token expira, o proxy do Next renova a sessao com o refresh token HttpOnly antes de liberar a rota protegida.
 
