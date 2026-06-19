@@ -9,6 +9,8 @@ export class AppConfigService {
   readonly supabaseServiceRoleKey: string;
   readonly supabaseAnonKey?: string;
   readonly webUrl: string;
+  readonly mercadoPagoClientId?: string;
+  readonly mercadoPagoClientSecret?: string;
 
   constructor() {
     const env = process.env;
@@ -20,6 +22,8 @@ export class AppConfigService {
     this.supabaseServiceRoleKey = readRequired(env, "SUPABASE_SERVICE_ROLE_KEY");
     this.supabaseAnonKey = readOptional(env, "SUPABASE_ANON_KEY");
     this.webUrl = readRequiredUrl(env, "FP_WEB_URL").replace(/\/$/, "");
+    this.mercadoPagoClientId = readOptional(env, "MERCADO_PAGO_CLIENT_ID");
+    this.mercadoPagoClientSecret = readOptional(env, "MERCADO_PAGO_CLIENT_SECRET");
   }
 }
 

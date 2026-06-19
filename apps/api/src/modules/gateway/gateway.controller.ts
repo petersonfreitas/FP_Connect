@@ -1,11 +1,13 @@
-import { Body, Controller, Get, Headers, Post, UseGuards } from "@nestjs/common";
+import { Body, Controller, Get, Headers, Param, Post, UseGuards } from "@nestjs/common";
 import { InternalApiGuard } from "../../auth/internal-api.guard";
 import { ModuleAccessGuard } from "../../auth/module-access.guard";
 import { ModuleAccessPolicy } from "../../auth/module-access-policy.decorator";
 import { buildModuleAccessResponse } from "../../auth/module-access-response";
 import type {
+  CompleteGatewayMercadoPagoOAuthInput,
   CreateGatewayPaymentRequestInput,
   SendGatewaySmtpTestEmailInput,
+  UpsertGatewayMercadoPagoManualConfigInput,
   UpsertGatewaySmtpConfigInput
 } from "./gateway.contracts";
 import { GatewayService } from "./gateway.service";
@@ -48,6 +50,47 @@ export class GatewayController {
     return this.gatewayService.listCompanyProviderConfigs(companyId);
   }
 
+  @Post("providers/mercado-pago/oauth/start")
+  @ModuleAccessPolicy({
+    applicationKey: "gateway",
+    companyHeader: "x-fp-company-id",
+    permissionKey: "gateway.access"
+  })
+  startMercadoPagoOAuth(
+    @Headers("x-fp-company-id") companyId: string,
+    @Headers("x-fp-actor-user-id") actorUserId: string
+  ) {
+    return this.gatewayService.startMercadoPagoOAuth(companyId, actorUserId);
+  }
+
+  @Post("providers/mercado-pago/oauth/callback")
+  @ModuleAccessPolicy({
+    applicationKey: "gateway",
+    companyHeader: "x-fp-company-id",
+    permissionKey: "gateway.access"
+  })
+  completeMercadoPagoOAuth(
+    @Body() input: CompleteGatewayMercadoPagoOAuthInput,
+    @Headers("x-fp-company-id") companyId: string,
+    @Headers("x-fp-actor-user-id") actorUserId: string
+  ) {
+    return this.gatewayService.completeMercadoPagoOAuth(companyId, actorUserId, input);
+  }
+
+  @Post("providers/mercado-pago/manual-config")
+  @ModuleAccessPolicy({
+    applicationKey: "gateway",
+    companyHeader: "x-fp-company-id",
+    permissionKey: "gateway.access"
+  })
+  upsertMercadoPagoManualConfig(
+    @Body() input: UpsertGatewayMercadoPagoManualConfigInput,
+    @Headers("x-fp-company-id") companyId: string,
+    @Headers("x-fp-actor-user-id") actorUserId: string
+  ) {
+    return this.gatewayService.upsertMercadoPagoManualConfig(companyId, actorUserId, input);
+  }
+
   @Get("payments/requests")
   @ModuleAccessPolicy({
     applicationKey: "gateway",
@@ -70,6 +113,24 @@ export class GatewayController {
     @Headers("x-fp-actor-user-id") actorUserId: string
   ) {
     return this.gatewayService.createPaymentRequest(companyId, actorUserId, input);
+  }
+
+  @Post("payments/requests/:paymentRequestId/sync")
+  @ModuleAccessPolicy({
+    applicationKey: "gateway",
+    companyHeader: "x-fp-company-id",
+    permissionKey: "gateway.access"
+  })
+  syncPaymentRequestStatus(
+    @Param("paymentRequestId") paymentRequestId: string,
+    @Headers("x-fp-company-id") companyId: string,
+    @Headers("x-fp-actor-user-id") actorUserId: string
+  ) {
+    return this.gatewayService.syncPaymentRequestStatus(
+      companyId,
+      actorUserId,
+      paymentRequestId
+    );
   }
 
   @Post("providers/smtp/config")

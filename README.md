@@ -94,6 +94,8 @@ No estado atual do projeto:
 - `FP_INTERNAL_API_TOKEN` fica somente no server-side do Next e no backend.
 - `FP_API_INTERNAL_URL` e usada pelo Next server-side para chamar a API interna.
 - `FP_WEB_URL` define a URL base usada em links server-side, como recuperacao de senha e convite de usuarios.
+- `MERCADO_PAGO_CLIENT_ID` e `MERCADO_PAGO_CLIENT_SECRET` ficam somente na API e habilitam o OAuth do FP Gateway.
+- No app Mercado Pago, cadastre o redirect como `${FP_WEB_URL}/gateway/mercado-pago/callback`.
 - `FP_CNPJ_LOOKUP_USER_AGENT` identifica a chamada server-side para provedores de CNPJ, como BrasilAPI.
 
 O cliente interno do frontend esta em `apps/web/src/lib/internal-api.ts` e usa `server-only`, impedindo importacao por componentes client.

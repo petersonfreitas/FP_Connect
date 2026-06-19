@@ -99,6 +99,41 @@ export type GatewayProviderValidationContract = {
   status: Extract<GatewayValidationStatus, "failed" | "succeeded">;
 };
 
+export type GatewayMercadoPagoPublicConfig = {
+  appId: string | null;
+  authorizedAt: string;
+  expiresAt: string | null;
+  liveMode: boolean | null;
+  mode: "manual_sandbox" | "oauth";
+  publicKeyConfigured: boolean;
+  scope: string | null;
+  tokenType: string | null;
+  userId: number | string | null;
+};
+
+export type UpsertGatewayMercadoPagoManualConfigInput = {
+  accessToken: string;
+  appId?: string | null;
+  publicKey?: string | null;
+  userId?: string | null;
+};
+
+export type GatewayMercadoPagoOAuthStartContract = {
+  authorizationUrl: string;
+  redirectUri: string;
+  state: string;
+};
+
+export type CompleteGatewayMercadoPagoOAuthInput = {
+  code: string;
+  state: string;
+};
+
+export type GatewayMercadoPagoOAuthContract = {
+  config: GatewayCompanyProviderConfigContract;
+  message: string;
+};
+
 export type GatewayPaymentRequestStatus =
   | "cancelled"
   | "expired"

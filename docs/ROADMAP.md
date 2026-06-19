@@ -84,8 +84,12 @@ O FP Gateway foi iniciado como shell no FP Console:
 - teste basico de conexao SMTP e evento `gateway.smtp.validated` para FP Robots;
 - envio real de e-mail SMTP de teste com eventos `gateway.smtp.test_email_sent` e `gateway.smtp.test_email_failed`;
 - SMTP segue com pendencia operacional de timeout em alguns provedores/rede e nao deve travar o MVP;
+- OAuth Mercado Pago por empresa, usando app OAuth, callback no web e troca de token server-side pela API;
+- modo sandbox manual Mercado Pago por empresa para validar PIX no Checkout Transparente em localhost antes de Vercel/webhook;
 - tabela `gateway.payment_requests`, endpoint interno e tela V0 para solicitacoes de pagamento;
+- criacao de PIX Mercado Pago alinhada ao Checkout Transparente via Orders API (`POST /v1/orders`);
 - eventos `gateway.payment.requested`, `gateway.payment.requires_provider_config`, `gateway.payment.failed` e `gateway.payment.paid`;
+- evento `gateway.mercado_pago.oauth_connected`;
 - `gateway` exposto no `supabase/config.toml`.
 
 ## Sequencia recomendada
@@ -191,7 +195,8 @@ Escopo inicial:
 - catalogo inicial de provedores: iniciado;
 - configuracao de provedor por empresa: iniciada com SMTP;
 - contrato interno de solicitacao de pagamento: iniciado;
-- conexao real/teste com Mercado Pago ou provedor autorizado;
+- conexao OAuth com Mercado Pago: iniciada;
+- criacao real/teste de pagamento PIX Mercado Pago via Checkout Transparente: iniciada via sandbox manual;
 - integracao do Food ao contrato de pagamento;
 - recebimento e normalizacao de webhook;
 - logs tecnicos mascarados;

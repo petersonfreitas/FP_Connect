@@ -4,7 +4,10 @@ import { redirect } from "next/navigation";
 import {
   createGatewayPaymentRequest,
   sendGatewaySmtpTestEmail,
+  startGatewayMercadoPagoOAuth,
+  syncGatewayPaymentRequestStatus,
   testGatewaySmtpConfig,
+  upsertGatewayMercadoPagoManualConfig,
   upsertGatewaySmtpConfig
 } from "@/lib/internal-api";
 
@@ -28,10 +31,10 @@ export async function saveGatewaySmtpConfigAction(formData: FormData) {
   });
 
   if (result.error) {
-    redirect(`/gateway?companyId=${companyId}&error=${encodeURIComponent(result.error)}`);
+    redirect(`/gateway?companyId=${companyId}&tab=smtp&error=${encodeURIComponent(result.error)}`);
   }
 
-  redirect(`/gateway?companyId=${companyId}&smtpSaved=1`);
+  redirect(`/gateway?companyId=${companyId}&tab=smtp&smtpSaved=1`);
 }
 
 export async function testGatewaySmtpConfigAction(formData: FormData) {
@@ -44,14 +47,14 @@ export async function testGatewaySmtpConfigAction(formData: FormData) {
   const result = await testGatewaySmtpConfig(companyId);
 
   if (result.error) {
-    redirect(`/gateway?companyId=${companyId}&error=${encodeURIComponent(result.error)}`);
+    redirect(`/gateway?companyId=${companyId}&tab=smtp&error=${encodeURIComponent(result.error)}`);
   }
 
   const status = result.data?.status ?? "failed";
   const message = result.data?.message ?? "Validacao SMTP concluida.";
 
   redirect(
-    `/gateway?companyId=${companyId}&smtpTest=${status}&message=${encodeURIComponent(message)}`
+    `/gateway?companyId=${companyId}&tab=smtp&smtpTest=${status}&message=${encodeURIComponent(message)}`
   );
 }
 
@@ -69,13 +72,13 @@ export async function sendGatewaySmtpTestEmailAction(formData: FormData) {
   });
 
   if (result.error) {
-    redirect(`/gateway?companyId=${companyId}&error=${encodeURIComponent(result.error)}`);
+    redirect(`/gateway?companyId=${companyId}&tab=smtp&error=${encodeURIComponent(result.error)}`);
   }
 
   const message = result.data?.message ?? "E-mail de teste enviado.";
 
   redirect(
-    `/gateway?companyId=${companyId}&smtpEmailSent=1&message=${encodeURIComponent(message)}`
+    `/gateway?companyId=${companyId}&tab=smtp&smtpEmailSent=1&message=${encodeURIComponent(message)}`
   );
 }
 
@@ -102,12 +105,74 @@ export async function createGatewayPaymentRequestAction(formData: FormData) {
   });
 
   if (result.error) {
-    redirect(`/gateway?companyId=${companyId}&error=${encodeURIComponent(result.error)}`);
+    redirect(`/gateway?companyId=${companyId}&tab=payments&error=${encodeURIComponent(result.error)}`);
   }
 
   const status = result.data?.status ?? "requested";
 
-  redirect(`/gateway?companyId=${companyId}&paymentCreated=${status}`);
+  redirect(`/gateway?companyId=${companyId}&tab=payments&paymentCreated=${status}`);
+}
+
+export async function startGatewayMercadoPagoOAuthAction(formData: FormData) {
+  const companyId = readFormString(formData, "companyId");
+
+  if (!companyId) {
+    redirect("/gateway?error=company");
+  }
+
+  const result = await startGatewayMercadoPagoOAuth(companyId);
+
+  if (result.error || !result.data) {
+    redirect(
+      `/gateway?companyId=${companyId}&error=${encodeURIComponent(
+        result.error ?? "Nao foi possivel iniciar OAuth Mercado Pago."
+      )}&tab=payments`
+    );
+  }
+
+  redirect(result.data.authorizationUrl);
+}
+
+export async function saveGatewayMercadoPagoManualConfigAction(formData: FormData) {
+  const companyId = readFormString(formData, "companyId");
+
+  if (!companyId) {
+    redirect("/gateway?error=company");
+  }
+
+  const result = await upsertGatewayMercadoPagoManualConfig(companyId, {
+    accessToken: readFormString(formData, "accessToken"),
+    appId: readFormString(formData, "appId") || null,
+    publicKey: readFormString(formData, "publicKey") || null,
+    userId: readFormString(formData, "userId") || null
+  });
+
+  if (result.error) {
+    redirect(`/gateway?companyId=${companyId}&tab=payments&error=${encodeURIComponent(result.error)}`);
+  }
+
+  redirect(`/gateway?companyId=${companyId}&tab=payments&mpManualSaved=1`);
+}
+
+export async function syncGatewayPaymentRequestStatusAction(formData: FormData) {
+  const companyId = readFormString(formData, "companyId");
+  const paymentRequestId = readFormString(formData, "paymentRequestId");
+
+  if (!companyId || !paymentRequestId) {
+    redirect("/gateway?tab=payments&error=payment");
+  }
+
+  const result = await syncGatewayPaymentRequestStatus(companyId, paymentRequestId);
+
+  if (result.error) {
+    redirect(
+      `/gateway?companyId=${companyId}&tab=payments&error=${encodeURIComponent(result.error)}`
+    );
+  }
+
+  const status = result.data?.status ?? "requested";
+
+  redirect(`/gateway?companyId=${companyId}&tab=payments&paymentSynced=${status}`);
 }
 
 function readFormString(formData: FormData, key: string): string {

@@ -86,6 +86,13 @@ Este arquivo registra decisoes arquiteturais e operacionais para evitar retrabal
 | DEC-078 | FP Gateway pode enviar e-mail SMTP de teste pela propria tela do modulo para validar credenciais ponta a ponta; disparos transacionais automatizados devem ser solicitados posteriormente pelo FP Robots via acao `gateway_external_action`. | Aprovada |
 | DEC-079 | Timeouts SMTP em provedores/rede ficam como pendencia operacional; o FP Gateway deve seguir evoluindo por contratos internos e provedores via HTTPS quando possivel, sem travar o MVP em portas SMTP. | Aprovada |
 | DEC-080 | O primeiro contrato de pagamento do FP Gateway sera uma solicitacao interna idempotente por empresa, com origem, referencia, valor, provedor pretendido e eventos `gateway.payment.*`; a chamada real ao Mercado Pago entra depois sobre o mesmo contrato. | Aprovada |
+| DEC-081 | Mercado Pago deve ser conectado por OAuth por empresa: o cliente autoriza a integracao, o FP Gateway troca o `code` por tokens server-side e os modulos consumidores nunca recebem credenciais do provedor. | Aprovada |
+| DEC-082 | Enquanto OAuth/webhook exigirem URL publica, o FP Gateway pode oferecer modo sandbox manual por empresa com Access Token de teste server-side para validar pagamentos PIX via Checkout Transparente em localhost. | Aprovada |
+| DEC-083 | PIX Mercado Pago no FP Gateway deve seguir Checkout Transparente via Orders API (`POST /v1/orders`), guardando o ID `ORD...`, `ticket_url`, QR Code e payload completo em `gateway.payment_requests` para conciliacao e futuras notificacoes. | Aprovada |
+| DEC-084 | No modo sandbox manual Mercado Pago, o FP Gateway pode enviar `payer.first_name = APRO` no payload da order PIX para seguir o roteiro oficial de teste e obter status `action_required/waiting_transfer`. | Aprovada |
+| DEC-085 | A correlacao FP Gateway -> Mercado Pago Orders deve usar `external_reference` com o ID da `gateway.payment_requests`; campos internos customizados nao devem ser enviados em `additional_info`, pois a Orders API rejeita propriedades nao suportadas. | Aprovada |
+| DEC-086 | No sandbox manual Mercado Pago, o FP Gateway deve validar e-mail de pagador com dominio `@testuser.com` antes da chamada externa, evitando falha `invalid_email_for_sandbox`. | Aprovada |
+| DEC-087 | Ao criar uma order Mercado Pago, o FP Gateway deve normalizar o status retornado imediatamente; se a order ja nascer paga no sandbox, grava `paid` e emite `gateway.payment.requested` seguido de `gateway.payment.paid`. | Aprovada |
 
 ---
 

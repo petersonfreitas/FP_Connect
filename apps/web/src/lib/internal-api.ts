@@ -21,12 +21,15 @@ import type {
   AdminCurrentUserAccessContract,
   AdminUserApplicationRoleContract,
   AdminUserContract,
+  CompleteGatewayMercadoPagoOAuthInput,
   CreateGatewayPaymentRequestInput,
   CreateAdminCompanyInput,
   CreateAdminConsoleUserInput,
   CreateAdminUserInput,
   GrantAdminUserRoleInput,
   GatewayCompanyProviderConfigContract,
+  GatewayMercadoPagoOAuthContract,
+  GatewayMercadoPagoOAuthStartContract,
   GatewayPaymentRequestContract,
   GatewayProviderContract,
   GatewayProviderValidationContract,
@@ -52,6 +55,7 @@ import type {
   UpdateAdminCompanyInput,
   UpdateAdminUserInput,
   UpdateAdminCompanyApplicationInput,
+  UpsertGatewayMercadoPagoManualConfigInput,
   UpsertGatewaySmtpConfigInput
 } from "@fp/types";
 import { requireCurrentUser } from "./auth";
@@ -245,6 +249,67 @@ export async function createGatewayPaymentRequest(
     },
     method: "POST"
   });
+}
+
+export async function syncGatewayPaymentRequestStatus(
+  companyId: string,
+  paymentRequestId: string
+): Promise<InternalApiResult<GatewayPaymentRequestContract>> {
+  return fetchInternal<GatewayPaymentRequestContract>(
+    `gateway/payments/requests/${paymentRequestId}/sync`,
+    {
+      headers: {
+        "X-FP-Company-Id": companyId
+      },
+      method: "POST"
+    }
+  );
+}
+
+export async function startGatewayMercadoPagoOAuth(
+  companyId: string
+): Promise<InternalApiResult<GatewayMercadoPagoOAuthStartContract>> {
+  return fetchInternal<GatewayMercadoPagoOAuthStartContract>(
+    "gateway/providers/mercado-pago/oauth/start",
+    {
+      headers: {
+        "X-FP-Company-Id": companyId
+      },
+      method: "POST"
+    }
+  );
+}
+
+export async function completeGatewayMercadoPagoOAuth(
+  companyId: string,
+  input: CompleteGatewayMercadoPagoOAuthInput
+): Promise<InternalApiResult<GatewayMercadoPagoOAuthContract>> {
+  return fetchInternal<GatewayMercadoPagoOAuthContract>(
+    "gateway/providers/mercado-pago/oauth/callback",
+    {
+      body: JSON.stringify(input),
+      headers: {
+        "X-FP-Company-Id": companyId
+      },
+      method: "POST"
+    }
+  );
+}
+
+export async function upsertGatewayMercadoPagoManualConfig(
+  companyId: string,
+  input: UpsertGatewayMercadoPagoManualConfigInput
+): Promise<InternalApiResult<GatewayCompanyProviderConfigContract>> {
+  return fetchInternal<GatewayCompanyProviderConfigContract>(
+    "gateway/providers/mercado-pago/manual-config",
+    {
+      body: JSON.stringify(input),
+      headers: {
+        "X-FP-Company-Id": companyId
+      },
+      method: "POST"
+    }
+  );
 }
 
 export async function upsertGatewaySmtpConfig(

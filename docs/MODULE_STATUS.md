@@ -26,7 +26,7 @@ Este arquivo controla o avanco dos modulos do ecossistema.
 | FP Tickets | Futura | 0 | Fundacao de acesso preparada | Endpoint interno `/api/tickets/access` ja valida empresa, modulo contratado e permissao; entrara apos base operacional. |
 | FP Sales | Futura | 0 | Fundacao de acesso preparada | Endpoint interno `/api/sales/access` ja valida empresa, modulo contratado e permissao; entrara apos base operacional. |
 | FP Marketing | Futura | 0 | Fundacao de acesso preparada | Endpoint interno `/api/marketing/access` ja valida empresa, modulo contratado e permissao; entrara apos base operacional. |
-| FP Gateway | Alta | 2 | Base funcional inicial | Shell V0 em `/gateway`, schema `gateway`, catalogo de provedores, configuracao SMTP por empresa, teste basico/envio de e-mail SMTP com pendencia de timeout em ambiente/provedor, contrato interno V0 de solicitacao de pagamento e eventos `gateway.*` para Robots. |
+| FP Gateway | Alta | 2 | Base funcional inicial | Shell V0 em `/gateway`, schema `gateway`, catalogo de provedores, configuracao SMTP por empresa, teste basico/envio de e-mail SMTP com pendencia de timeout em ambiente/provedor, OAuth Mercado Pago por empresa iniciado, sandbox manual Mercado Pago para localhost, contrato interno V0 de solicitacao de pagamento e eventos `gateway.*` para Robots. |
 | FP Fiscal | Alta/Media | 0 | Backlog criado | Modulo fiscal proprio, com foco inicial na evolucao fiscal do FP Food. |
 | FP Sign | Media | 0 | Backlog criado | Aceite simples, contratos, propostas e arquivamento documental; sem assinatura digital avancada no MVP. |
 | FP BI | Media/Baixa | 0 | Backlog criado | Indicadores e dashboards; evoluir apos maturidade dos modulos transacionais. |
@@ -149,6 +149,7 @@ Este arquivo controla o avanco dos modulos do ecossistema.
 ## Checklist - FP Gateway
 
 - [x] Shell visual V0 no FP Console
+- [x] Shell visual V0 organizado por subareas internas no FP Console
 - [x] Schema `gateway`
 - [x] Catalogo do modulo no `core`
 - [x] Permissao `gateway.access`
@@ -168,7 +169,17 @@ Este arquivo controla o avanco dos modulos do ecossistema.
 - [x] Contrato interno V0 para solicitar pagamento
 - [x] Tela V0 para registrar/listar solicitacoes de pagamento
 - [x] Eventos `gateway.payment.*` iniciais para FP Robots
-- [ ] Ambiente real/teste Mercado Pago ou provedor autorizado
+- [x] SDK oficial Mercado Pago instalada na API
+- [x] Inicio OAuth Mercado Pago por empresa
+- [x] Callback OAuth Mercado Pago com tokens server-side
+- [x] Evento `gateway.mercado_pago.oauth_connected` para FP Robots
+- [x] Configuracao manual sandbox Mercado Pago por empresa
+- [x] Criacao real de order PIX Mercado Pago via Checkout Transparente Orders API a partir de `gateway.payment_requests`
+- [x] Roteiro sandbox PIX ajustado com nome `APRO` e valor sugerido `200,00`
+- [x] Validacao sandbox PIX para e-mail de pagador com dominio `@testuser.com`
+- [x] Consulta manual de status Mercado Pago Orders na tela de Pagamentos V0
+- [x] Status inicial da order Mercado Pago normalizado na criacao, com `gateway.payment.paid` imediato quando sandbox nascer pago
+- [ ] Smoke test com PIX Mercado Pago sandbox
 - [ ] Integracao Food -> Gateway para solicitar pagamento a partir do pedido
 - [ ] Webhook externo normalizado
 - [ ] Envio transacional SMTP solicitado pelo FP Robots

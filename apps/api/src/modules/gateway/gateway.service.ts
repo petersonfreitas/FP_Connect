@@ -1,13 +1,20 @@
 import { BadRequestException, Injectable, NotFoundException } from "@nestjs/common";
+import { createHmac, randomBytes, timingSafeEqual } from "node:crypto";
 import net from "node:net";
 import readline from "node:readline";
 import tls from "node:tls";
+import { MercadoPagoConfig, Order } from "mercadopago";
 import { RobotsService } from "../robots/robots.service";
+import { AppConfigService } from "../../config/app-config.service";
 import { SupabaseService } from "../../supabase/supabase.service";
 import type {
+  CompleteGatewayMercadoPagoOAuthInput,
   CreateGatewayPaymentRequestInput,
   GatewayCompanyProviderConfigContract,
   GatewayCompanyProviderStatus,
+  GatewayMercadoPagoOAuthContract,
+  GatewayMercadoPagoOAuthStartContract,
+  GatewayMercadoPagoPublicConfig,
   GatewayPaymentRequestContract,
   GatewayPaymentRequestStatus,
   GatewayProviderAuthType,
@@ -19,6 +26,7 @@ import type {
   GatewaySmtpTestEmailContract,
   GatewayValidationStatus,
   SendGatewaySmtpTestEmailInput,
+  UpsertGatewayMercadoPagoManualConfigInput,
   UpsertGatewaySmtpConfigInput
 } from "./gateway.contracts";
 
@@ -77,6 +85,61 @@ type SmtpResponse = {
   text: string;
 };
 
+type MercadoPagoOAuthConfig = {
+  clientId: string;
+  clientSecret: string;
+  redirectUri: string;
+};
+
+type MercadoPagoOAuthState = {
+  actorUserId: string;
+  companyId: string;
+  exp: number;
+  nonce: string;
+};
+
+type MercadoPagoOAuthTokenResponse = {
+  access_token?: string;
+  expires_in?: number;
+  live_mode?: boolean;
+  public_key?: string;
+  refresh_token?: string;
+  scope?: string;
+  token_type?: string;
+  user_id?: number | string;
+};
+
+type MercadoPagoOrderResponse = {
+  id?: string;
+  status?: string;
+  status_detail?: string;
+  transactions?: {
+    payments?: Array<{
+      id?: string;
+      payment_method?: {
+        id?: string;
+        type?: string;
+        ticket_url?: string;
+        qr_code?: string;
+        qr_code_base64?: string;
+      };
+      status?: string;
+      status_detail?: string;
+    }>;
+  };
+  type_response?: {
+    payment_method?: {
+      qr_code?: string;
+      qr_code_base64?: string;
+      ticket_url?: string;
+    };
+  };
+};
+
+type MercadoPagoPixOrderOptions = {
+  useManualSandbox: boolean;
+};
+
 const providerSelect = [
   "id",
   "key",
@@ -125,6 +188,7 @@ const paymentRequestSelect = [
 @Injectable()
 export class GatewayService {
   constructor(
+    private readonly config: AppConfigService,
     private readonly robotsService: RobotsService,
     private readonly supabase: SupabaseService
   ) {}
@@ -249,6 +313,16 @@ export class GatewayService {
         ? "gateway.payment.requires_provider_config"
         : "gateway.payment.requested";
 
+    if (status === "requested" && provider.key === "mercado_pago" && providerConfig) {
+      return this.createMercadoPagoPixPaymentForPaymentRequest(
+        companyId,
+        actorUserId,
+        paymentRequest,
+        provider,
+        providerConfig
+      );
+    }
+
     await this.safeCreateGatewayEvent(companyId, actorUserId, {
       eventCode,
       payload: {
@@ -265,6 +339,282 @@ export class GatewayService {
     });
 
     return paymentRequest;
+  }
+
+  async syncPaymentRequestStatus(
+    companyId: string,
+    actorUserId: string,
+    paymentRequestId: string
+  ): Promise<GatewayPaymentRequestContract> {
+    const paymentRequestRow = await this.getPaymentRequestRowById(companyId, paymentRequestId);
+
+    if (!paymentRequestRow) {
+      throw new NotFoundException("Solicitacao de pagamento nao encontrada");
+    }
+
+    const provider = await this.getProviderById(paymentRequestRow.provider_id);
+
+    if (provider.key !== "mercado_pago") {
+      throw new BadRequestException("Consulta de status V0 disponivel apenas para Mercado Pago");
+    }
+
+    if (!paymentRequestRow.provider_reference) {
+      throw new BadRequestException("Solicitacao ainda nao possui referencia no Mercado Pago");
+    }
+
+    const providerConfig = await this.getConfigRow(companyId, provider.id);
+    const accessToken =
+      typeof providerConfig?.secret_config.accessToken === "string"
+        ? providerConfig.secret_config.accessToken
+        : null;
+
+    if (!accessToken) {
+      throw new BadRequestException("Access Token Mercado Pago nao configurado.");
+    }
+
+    const order = await getMercadoPagoOrder(accessToken, paymentRequestRow.provider_reference);
+    const nextStatus = mapMercadoPagoOrderStatus(order);
+    const pixPaymentMethod = getMercadoPagoPixPaymentMethod(order);
+    const paymentUrl = pixPaymentMethod?.ticket_url ?? paymentRequestRow.payment_url;
+    const errorMessage =
+      nextStatus === "failed"
+        ? [
+            order.status,
+            order.status_detail,
+            order.transactions?.payments?.[0]?.status,
+            order.transactions?.payments?.[0]?.status_detail
+          ]
+            .filter(Boolean)
+            .join(" / ") || "Pagamento rejeitado pelo Mercado Pago"
+        : null;
+
+    const { data, error } = await this.supabase.gateway
+      .from("payment_requests")
+      .update({
+        error_message: errorMessage,
+        payment_url: paymentUrl,
+        response_payload: order,
+        status: nextStatus,
+        updated_by: actorUserId
+      })
+      .eq("id", paymentRequestId)
+      .eq("company_id", companyId)
+      .select(paymentRequestSelect)
+      .single();
+
+    if (error) {
+      throwSupabaseError(error);
+    }
+
+    const mappedPaymentRequest = mapPaymentRequest(data as unknown as PaymentRequestRow, provider);
+
+    if (paymentRequestRow.status !== "paid" && mappedPaymentRequest.status === "paid") {
+      await this.safeCreateGatewayEvent(companyId, actorUserId, {
+        eventCode: "gateway.payment.paid",
+        payload: {
+          amountCents: mappedPaymentRequest.amountCents,
+          currency: mappedPaymentRequest.currency,
+          providerKey: mappedPaymentRequest.providerKey,
+          providerReference: mappedPaymentRequest.providerReference,
+          sourceApplicationKey: mappedPaymentRequest.sourceApplicationKey,
+          sourceReferenceId: mappedPaymentRequest.sourceReferenceId,
+          sourceReferenceType: mappedPaymentRequest.sourceReferenceType,
+          status: mappedPaymentRequest.status
+        },
+        providerKey: provider.key,
+        sourceEventId: mappedPaymentRequest.id
+      });
+    }
+
+    return mappedPaymentRequest;
+  }
+
+  async upsertMercadoPagoManualConfig(
+    companyId: string,
+    actorUserId: string,
+    input: UpsertGatewayMercadoPagoManualConfigInput
+  ): Promise<GatewayCompanyProviderConfigContract> {
+    const provider = await this.getProviderByKey("mercado_pago");
+    const existing = await this.getConfigRow(companyId, provider.id);
+    const normalized = normalizeMercadoPagoManualConfigInput(input);
+    const now = new Date().toISOString();
+    const publicConfig: GatewayMercadoPagoPublicConfig = {
+      appId: normalized.appId,
+      authorizedAt: now,
+      expiresAt: null,
+      liveMode: false,
+      mode: "manual_sandbox",
+      publicKeyConfigured: Boolean(normalized.publicKey),
+      scope: "manual_sandbox",
+      tokenType: "Bearer",
+      userId: normalized.userId
+    };
+    const secretConfig = {
+      ...(existing?.secret_config ?? {}),
+      accessToken: normalized.accessToken,
+      publicKey: normalized.publicKey
+    };
+    const payload = {
+      company_id: companyId,
+      last_validated_at: now,
+      last_validation_message: "Mercado Pago sandbox configurado manualmente.",
+      last_validation_status: "succeeded",
+      provider_id: provider.id,
+      public_config: publicConfig,
+      secret_config: secretConfig,
+      status: "active",
+      updated_by: actorUserId
+    };
+
+    const { data, error } = existing
+      ? await this.supabase.gateway
+          .from("company_provider_configs")
+          .update(payload)
+          .eq("id", existing.id)
+          .select(configSelect)
+          .single()
+      : await this.supabase.gateway
+          .from("company_provider_configs")
+          .insert({ ...payload, created_by: actorUserId })
+          .select(configSelect)
+          .single();
+
+    if (error) {
+      throwSupabaseError(error);
+    }
+
+    return mapCompanyProviderConfig(data as unknown as CompanyProviderConfigRow, provider);
+  }
+
+  async startMercadoPagoOAuth(
+    companyId: string,
+    actorUserId: string
+  ): Promise<GatewayMercadoPagoOAuthStartContract> {
+    const oauthConfig = this.getMercadoPagoOAuthConfig();
+    const state = signMercadoPagoOAuthState(
+      {
+        actorUserId,
+        companyId,
+        exp: Math.floor(Date.now() / 1000) + 15 * 60,
+        nonce: randomBytes(16).toString("hex")
+      },
+      this.config.internalApiToken
+    );
+    const authorizationUrl = new URL("https://auth.mercadopago.com.br/authorization");
+
+    authorizationUrl.searchParams.set("client_id", oauthConfig.clientId);
+    authorizationUrl.searchParams.set("response_type", "code");
+    authorizationUrl.searchParams.set("platform_id", "mp");
+    authorizationUrl.searchParams.set("redirect_uri", oauthConfig.redirectUri);
+    authorizationUrl.searchParams.set("state", state);
+
+    return {
+      authorizationUrl: authorizationUrl.toString(),
+      redirectUri: oauthConfig.redirectUri,
+      state
+    };
+  }
+
+  async completeMercadoPagoOAuth(
+    companyId: string,
+    actorUserId: string,
+    input: CompleteGatewayMercadoPagoOAuthInput
+  ): Promise<GatewayMercadoPagoOAuthContract> {
+    const code = input.code.trim();
+
+    if (!code) {
+      throw new BadRequestException("Codigo OAuth do Mercado Pago nao informado");
+    }
+
+    const state = verifyMercadoPagoOAuthState(input.state, this.config.internalApiToken);
+
+    if (state.companyId !== companyId || state.actorUserId !== actorUserId) {
+      throw new BadRequestException("Estado OAuth do Mercado Pago nao pertence a sessao atual");
+    }
+
+    if (state.exp < Math.floor(Date.now() / 1000)) {
+      throw new BadRequestException("Estado OAuth do Mercado Pago expirou");
+    }
+
+    const provider = await this.getProviderByKey("mercado_pago");
+    const oauthConfig = this.getMercadoPagoOAuthConfig();
+    const token = await exchangeMercadoPagoOAuthCode(oauthConfig, code);
+    const existing = await this.getConfigRow(companyId, provider.id);
+    const now = new Date();
+    const expiresAt =
+      typeof token.expires_in === "number"
+        ? new Date(now.getTime() + token.expires_in * 1000).toISOString()
+        : null;
+    const publicConfig: GatewayMercadoPagoPublicConfig = {
+      appId: null,
+      authorizedAt: now.toISOString(),
+      expiresAt,
+      liveMode: typeof token.live_mode === "boolean" ? token.live_mode : null,
+      mode: "oauth",
+      publicKeyConfigured: typeof token.public_key === "string" && token.public_key.length > 0,
+      scope: typeof token.scope === "string" ? token.scope : null,
+      tokenType: typeof token.token_type === "string" ? token.token_type : null,
+      userId:
+        typeof token.user_id === "number" || typeof token.user_id === "string"
+          ? token.user_id
+          : null
+    };
+    const secretConfig = {
+      ...(existing?.secret_config ?? {}),
+      accessToken: token.access_token,
+      publicKey: token.public_key ?? null,
+      refreshToken: token.refresh_token ?? null
+    };
+    const payload = {
+      company_id: companyId,
+      last_validated_at: now.toISOString(),
+      last_validation_message: "Mercado Pago autorizado via OAuth.",
+      last_validation_status: "succeeded",
+      provider_id: provider.id,
+      public_config: publicConfig,
+      secret_config: secretConfig,
+      status: "active",
+      updated_by: actorUserId
+    };
+
+    const { data, error } = existing
+      ? await this.supabase.gateway
+          .from("company_provider_configs")
+          .update(payload)
+          .eq("id", existing.id)
+          .select(configSelect)
+          .single()
+      : await this.supabase.gateway
+          .from("company_provider_configs")
+          .insert({ ...payload, created_by: actorUserId })
+          .select(configSelect)
+          .single();
+
+    if (error) {
+      throwSupabaseError(error);
+    }
+
+    const mappedConfig = mapCompanyProviderConfig(
+      data as unknown as CompanyProviderConfigRow,
+      provider
+    );
+
+    await this.safeCreateGatewayEvent(companyId, actorUserId, {
+      eventCode: "gateway.mercado_pago.oauth_connected",
+      payload: {
+        liveMode: publicConfig.liveMode,
+        providerKey: provider.key,
+        scope: publicConfig.scope,
+        userId: publicConfig.userId
+      },
+      providerKey: provider.key,
+      sourceEventId: mappedConfig.id
+    });
+
+    return {
+      config: mappedConfig,
+      message: "Mercado Pago conectado com sucesso."
+    };
   }
 
   async upsertSmtpConfig(
@@ -466,6 +816,25 @@ export class GatewayService {
     return mapProvider(data as unknown as ProviderRow);
   }
 
+  private async getProviderById(providerId: string): Promise<GatewayProviderContract> {
+    const { data, error } = await this.supabase.gateway
+      .from("provider_catalog")
+      .select(providerSelect)
+      .eq("id", providerId)
+      .is("deleted_at", null)
+      .maybeSingle();
+
+    if (error) {
+      throwSupabaseError(error);
+    }
+
+    if (!data) {
+      throw new NotFoundException("Provedor do FP Gateway nao encontrado");
+    }
+
+    return mapProvider(data as unknown as ProviderRow);
+  }
+
   private async getConfigRow(
     companyId: string,
     providerId: string
@@ -535,6 +904,173 @@ export class GatewayService {
     return (data as PaymentRequestRow | null) ?? null;
   }
 
+  private async getPaymentRequestRowById(
+    companyId: string,
+    paymentRequestId: string
+  ): Promise<PaymentRequestRow | null> {
+    const { data, error } = await this.supabase.gateway
+      .from("payment_requests")
+      .select(paymentRequestSelect)
+      .eq("company_id", companyId)
+      .eq("id", paymentRequestId)
+      .is("deleted_at", null)
+      .maybeSingle();
+
+    if (error) {
+      throwSupabaseError(error);
+    }
+
+    return (data as PaymentRequestRow | null) ?? null;
+  }
+
+  private async createMercadoPagoPixPaymentForPaymentRequest(
+    companyId: string,
+    actorUserId: string,
+    paymentRequest: GatewayPaymentRequestContract,
+    provider: GatewayProviderContract,
+    providerConfig: CompanyProviderConfigRow
+  ): Promise<GatewayPaymentRequestContract> {
+    const accessToken =
+      typeof providerConfig.secret_config.accessToken === "string"
+        ? providerConfig.secret_config.accessToken
+        : null;
+
+    if (!accessToken) {
+      return this.markPaymentRequestAsFailed(companyId, actorUserId, paymentRequest, provider, {
+        errorMessage: "Access Token Mercado Pago nao configurado.",
+        responsePayload: {}
+      });
+    }
+
+    try {
+      const order = await createMercadoPagoPixOrder(accessToken, paymentRequest, {
+        useManualSandbox: providerConfig.public_config.mode === "manual_sandbox"
+      });
+      const pixPaymentMethod = getMercadoPagoPixPaymentMethod(order);
+      const paymentUrl = pixPaymentMethod?.ticket_url ?? null;
+      const initialStatus = mapMercadoPagoOrderStatus(order);
+
+      if (!order.id) {
+        return this.markPaymentRequestAsFailed(companyId, actorUserId, paymentRequest, provider, {
+          errorMessage: "Mercado Pago nao retornou identificador da order.",
+          responsePayload: order as Record<string, unknown>
+        });
+      }
+
+      const { data, error } = await this.supabase.gateway
+        .from("payment_requests")
+        .update({
+          payment_url: paymentUrl,
+          provider_reference: order.id,
+          response_payload: order,
+          status: initialStatus,
+          updated_by: actorUserId
+        })
+        .eq("id", paymentRequest.id)
+        .select(paymentRequestSelect)
+        .single();
+
+      if (error) {
+        throwSupabaseError(error);
+      }
+
+      const mappedPaymentRequest = mapPaymentRequest(
+        data as unknown as PaymentRequestRow,
+        provider
+      );
+
+      await this.safeCreateGatewayEvent(companyId, actorUserId, {
+        eventCode: "gateway.payment.requested",
+        payload: {
+          amountCents: mappedPaymentRequest.amountCents,
+          currency: mappedPaymentRequest.currency,
+          paymentUrl: mappedPaymentRequest.paymentUrl,
+          providerKey: mappedPaymentRequest.providerKey,
+          providerReference: mappedPaymentRequest.providerReference,
+          sourceApplicationKey: mappedPaymentRequest.sourceApplicationKey,
+          sourceReferenceId: mappedPaymentRequest.sourceReferenceId,
+          sourceReferenceType: mappedPaymentRequest.sourceReferenceType,
+          status: mappedPaymentRequest.status
+        },
+        providerKey: provider.key,
+        sourceEventId: mappedPaymentRequest.id
+      });
+
+      if (mappedPaymentRequest.status === "paid") {
+        await this.safeCreateGatewayEvent(companyId, actorUserId, {
+          eventCode: "gateway.payment.paid",
+          payload: {
+            amountCents: mappedPaymentRequest.amountCents,
+            currency: mappedPaymentRequest.currency,
+            paymentUrl: mappedPaymentRequest.paymentUrl,
+            providerKey: mappedPaymentRequest.providerKey,
+            providerReference: mappedPaymentRequest.providerReference,
+            sourceApplicationKey: mappedPaymentRequest.sourceApplicationKey,
+            sourceReferenceId: mappedPaymentRequest.sourceReferenceId,
+            sourceReferenceType: mappedPaymentRequest.sourceReferenceType,
+            status: mappedPaymentRequest.status
+          },
+          providerKey: provider.key,
+          sourceEventId: mappedPaymentRequest.id
+        });
+      }
+
+      return mappedPaymentRequest;
+    } catch (error) {
+      return this.markPaymentRequestAsFailed(companyId, actorUserId, paymentRequest, provider, {
+        errorMessage: normalizeMercadoPagoError(error),
+        responsePayload: serializeMercadoPagoError(error)
+      });
+    }
+  }
+
+  private async markPaymentRequestAsFailed(
+    companyId: string,
+    actorUserId: string,
+    paymentRequest: GatewayPaymentRequestContract,
+    provider: GatewayProviderContract,
+    failure: {
+      errorMessage: string;
+      responsePayload: Record<string, unknown>;
+    }
+  ): Promise<GatewayPaymentRequestContract> {
+    const { data, error } = await this.supabase.gateway
+      .from("payment_requests")
+      .update({
+        error_message: failure.errorMessage,
+        response_payload: failure.responsePayload,
+        status: "failed",
+        updated_by: actorUserId
+      })
+      .eq("id", paymentRequest.id)
+      .select(paymentRequestSelect)
+      .single();
+
+    if (error) {
+      throwSupabaseError(error);
+    }
+
+    const mappedPaymentRequest = mapPaymentRequest(data as unknown as PaymentRequestRow, provider);
+
+    await this.safeCreateGatewayEvent(companyId, actorUserId, {
+      eventCode: "gateway.payment.failed",
+      payload: {
+        amountCents: mappedPaymentRequest.amountCents,
+        currency: mappedPaymentRequest.currency,
+        error: mappedPaymentRequest.errorMessage,
+        providerKey: mappedPaymentRequest.providerKey,
+        sourceApplicationKey: mappedPaymentRequest.sourceApplicationKey,
+        sourceReferenceId: mappedPaymentRequest.sourceReferenceId,
+        sourceReferenceType: mappedPaymentRequest.sourceReferenceType,
+        status: mappedPaymentRequest.status
+      },
+      providerKey: provider.key,
+      sourceEventId: mappedPaymentRequest.id
+    });
+
+    return mappedPaymentRequest;
+  }
+
   private async safeCreateGatewayEvent(
     companyId: string,
     actorUserId: string,
@@ -559,6 +1095,23 @@ export class GatewayService {
         sourceEventId: input.sourceEventId
       })
       .catch(() => undefined);
+  }
+
+  private getMercadoPagoOAuthConfig(): MercadoPagoOAuthConfig {
+    const clientId = this.config.mercadoPagoClientId;
+    const clientSecret = this.config.mercadoPagoClientSecret;
+
+    if (!clientId || !clientSecret) {
+      throw new BadRequestException(
+        "Configure MERCADO_PAGO_CLIENT_ID e MERCADO_PAGO_CLIENT_SECRET na API antes de conectar."
+      );
+    }
+
+    return {
+      clientId,
+      clientSecret,
+      redirectUri: `${this.config.webUrl}/gateway/mercado-pago/callback`
+    };
   }
 }
 
@@ -717,6 +1270,30 @@ function normalizePaymentRequestInput(
     sourceApplicationKey,
     sourceReferenceId,
     sourceReferenceType
+  };
+}
+
+function normalizeMercadoPagoManualConfigInput(
+  input: UpsertGatewayMercadoPagoManualConfigInput
+): Required<UpsertGatewayMercadoPagoManualConfigInput> {
+  const accessToken = input.accessToken.trim();
+  const appId = input.appId?.trim() || null;
+  const publicKey = input.publicKey?.trim() || null;
+  const userId = input.userId?.trim() || null;
+
+  if (!accessToken || accessToken.length < 20) {
+    throw new BadRequestException("Access Token Mercado Pago invalido");
+  }
+
+  if (publicKey && publicKey.length < 10) {
+    throw new BadRequestException("Public Key Mercado Pago invalida");
+  }
+
+  return {
+    accessToken,
+    appId,
+    publicKey,
+    userId
   };
 }
 
@@ -1137,6 +1714,299 @@ function normalizeSmtpSendError(error: unknown): string {
   return message || "Falha ao enviar e-mail SMTP de teste";
 }
 
+async function createMercadoPagoPixOrder(
+  accessToken: string,
+  paymentRequest: GatewayPaymentRequestContract,
+  options: MercadoPagoPixOrderOptions
+): Promise<MercadoPagoOrderResponse> {
+  const client = new MercadoPagoConfig({
+    accessToken,
+    options: {
+      timeout: 10000
+    }
+  });
+  const order = new Order(client);
+  const amount = formatMercadoPagoAmount(paymentRequest.amountCents);
+
+  if (!paymentRequest.customerEmail) {
+    throw new BadRequestException(
+      "Informe um e-mail de pagador para criar PIX no Mercado Pago."
+    );
+  }
+
+  if (options.useManualSandbox && !paymentRequest.customerEmail.endsWith("@testuser.com")) {
+    throw new BadRequestException(
+      "No sandbox Mercado Pago, use um e-mail de pagador com dominio @testuser.com."
+    );
+  }
+
+  return (await order.create({
+    body: {
+      description: paymentRequest.description,
+      external_reference: paymentRequest.id,
+      payer: {
+        email: paymentRequest.customerEmail,
+        first_name: options.useManualSandbox
+          ? "APRO"
+          : paymentRequest.customerName ?? undefined
+      },
+      processing_mode: "automatic",
+      total_amount: amount,
+      transactions: {
+        payments: [
+          {
+            amount,
+            payment_method: {
+              id: "pix",
+              type: "bank_transfer"
+            }
+          }
+        ]
+      },
+      type: "online"
+    },
+    requestOptions: {
+      idempotencyKey: `gateway-payment:${paymentRequest.companyId}:${paymentRequest.id}`
+    }
+  })) as MercadoPagoOrderResponse;
+}
+
+async function getMercadoPagoOrder(
+  accessToken: string,
+  orderId: string
+): Promise<MercadoPagoOrderResponse> {
+  const client = new MercadoPagoConfig({
+    accessToken,
+    options: {
+      timeout: 10000
+    }
+  });
+  const order = new Order(client);
+
+  return (await order.get({ id: orderId })) as MercadoPagoOrderResponse;
+}
+
+function mapMercadoPagoOrderStatus(order: MercadoPagoOrderResponse): GatewayPaymentRequestStatus {
+  const orderStatus = normalizeStatusText(order.status);
+  const orderStatusDetail = normalizeStatusText(order.status_detail);
+  const payment = order.transactions?.payments?.[0];
+  const paymentStatus = normalizeStatusText(payment?.status);
+  const paymentStatusDetail = normalizeStatusText(payment?.status_detail);
+  const statusValues = [orderStatus, orderStatusDetail, paymentStatus, paymentStatusDetail];
+
+  if (statusValues.some((status) => ["accredited", "approved", "paid", "processed"].includes(status))) {
+    return "paid";
+  }
+
+  if (statusValues.some((status) => ["cancelled", "canceled"].includes(status))) {
+    return "cancelled";
+  }
+
+  if (statusValues.includes("expired")) {
+    return "expired";
+  }
+
+  if (statusValues.some((status) => ["failed", "rejected"].includes(status))) {
+    return "failed";
+  }
+
+  return "requested";
+}
+
+function normalizeStatusText(value: unknown): string {
+  return typeof value === "string" ? value.trim().toLowerCase() : "";
+}
+
+function formatMercadoPagoAmount(amountCents: number): string {
+  return (amountCents / 100).toFixed(2);
+}
+
+function getMercadoPagoPixPaymentMethod(order: MercadoPagoOrderResponse):
+  | {
+      qr_code?: string;
+      qr_code_base64?: string;
+      ticket_url?: string;
+    }
+  | null {
+  const transactionPaymentMethod = order.transactions?.payments?.[0]?.payment_method;
+
+  if (transactionPaymentMethod) {
+    return {
+      qr_code: transactionPaymentMethod.qr_code,
+      qr_code_base64: transactionPaymentMethod.qr_code_base64,
+      ticket_url: transactionPaymentMethod.ticket_url
+    };
+  }
+
+  return order.type_response?.payment_method ?? null;
+}
+
+function normalizeMercadoPagoError(error: unknown): string {
+  if (error instanceof BadRequestException) {
+    const response = error.getResponse();
+
+    if (typeof response === "string") {
+      return response;
+    }
+
+    if (typeof response === "object" && response && "message" in response) {
+      const message = (response as { message?: unknown }).message;
+      return Array.isArray(message) ? message.join(" ") : String(message);
+    }
+  }
+
+  if (error instanceof Error) {
+    const serialized = serializeMercadoPagoError(error);
+    const detailedMessage = buildMercadoPagoErrorMessage(serialized);
+
+    return (
+      detailedMessage ||
+      error.message ||
+      "Falha ao criar pagamento PIX Mercado Pago"
+    );
+  }
+
+  if (typeof error === "object" && error) {
+    const serialized = serializeMercadoPagoError(error);
+
+    return (
+      buildMercadoPagoErrorMessage(serialized) ||
+      "Falha ao criar pagamento PIX Mercado Pago"
+    );
+  }
+
+  return "Falha ao criar pagamento PIX Mercado Pago";
+}
+
+function serializeMercadoPagoError(error: unknown): Record<string, unknown> {
+  if (error instanceof Error) {
+    const serialized: Record<string, unknown> = {
+      message: error.message,
+      name: error.name
+    };
+    const detailedError = error as Error & Record<string, unknown>;
+
+    for (const key of Object.getOwnPropertyNames(error)) {
+      if (key === "stack") {
+        continue;
+      }
+
+      serialized[key] = detailedError[key];
+    }
+
+    if (detailedError.cause instanceof Error) {
+      serialized.cause = {
+        message: detailedError.cause.message,
+        name: detailedError.cause.name
+      };
+    }
+
+    return serialized;
+  }
+
+  if (typeof error === "object" && error) {
+    return error as Record<string, unknown>;
+  }
+
+  return {
+    message: String(error)
+  };
+}
+
+function buildMercadoPagoErrorMessage(serialized: Record<string, unknown>): string {
+  const status = readErrorString(serialized.status);
+  const message = readErrorString(serialized.message);
+  const apiError = readErrorString(serialized.error);
+  const apiResponse = extractMercadoPagoApiResponseMessage(serialized.api_response);
+  const cause = extractMercadoPagoCauseMessage(serialized.cause);
+  const errors = extractMercadoPagoErrorsMessage(serialized.errors);
+
+  return [status ? `HTTP ${status}` : "", apiError, message, apiResponse, cause, errors]
+    .filter(Boolean)
+    .join(" - ");
+}
+
+function extractMercadoPagoApiResponseMessage(value: unknown): string {
+  if (typeof value !== "object" || !value) {
+    return "";
+  }
+
+  const record = value as Record<string, unknown>;
+  const content = typeof record.content === "object" && record.content
+    ? (record.content as Record<string, unknown>)
+    : record;
+
+  return [
+    readErrorString(content.error),
+    readErrorString(content.message),
+    extractMercadoPagoCauseMessage(content.cause)
+  ]
+    .filter(Boolean)
+    .join(" - ");
+}
+
+function extractMercadoPagoCauseMessage(value: unknown): string {
+  if (Array.isArray(value)) {
+    return value
+      .map((item) => {
+        if (typeof item === "object" && item) {
+          const description = readErrorString((item as Record<string, unknown>).description);
+          const code = readErrorString((item as Record<string, unknown>).code);
+          return [code, description].filter(Boolean).join(": ");
+        }
+
+        return String(item);
+      })
+      .filter(Boolean)
+      .join(" | ");
+  }
+
+  if (typeof value === "object" && value) {
+    const record = value as Record<string, unknown>;
+    return [readErrorString(record.name), readErrorString(record.message)]
+      .filter(Boolean)
+      .join(": ");
+  }
+
+  return readErrorString(value);
+}
+
+function extractMercadoPagoErrorsMessage(value: unknown): string {
+  if (!Array.isArray(value)) {
+    return "";
+  }
+
+  return value
+    .map((item) => {
+      if (typeof item !== "object" || !item) {
+        return String(item);
+      }
+
+      const record = item as Record<string, unknown>;
+      const details = Array.isArray(record.details)
+        ? record.details.map(String).join(" | ")
+        : readErrorString(record.details);
+
+      return [readErrorString(record.code), readErrorString(record.message), details]
+        .filter(Boolean)
+        .join(": ");
+    })
+    .filter(Boolean)
+    .join(" | ");
+}
+
+function readErrorString(value: unknown): string {
+  if (typeof value === "string") {
+    return value;
+  }
+
+  if (typeof value === "number") {
+    return String(value);
+  }
+
+  return "";
+}
+
 function getSmtpSecurityHint(config: Pick<GatewaySmtpPublicConfig, "port" | "secure">): string | null {
   if ([465, 2465].includes(config.port) && !config.secure) {
     return "Portas 465/2465 usam TLS direta. Marque 'Conexao TLS direta' para este provedor.";
@@ -1163,6 +2033,110 @@ function buildSmtpConnectionFailureMessage(
   ]
     .filter(Boolean)
     .join(" ");
+}
+
+function signMercadoPagoOAuthState(
+  payload: MercadoPagoOAuthState,
+  secret: string
+): string {
+  const encodedPayload = base64UrlEncode(JSON.stringify(payload));
+  const signature = createHmac("sha256", secret).update(encodedPayload).digest("base64url");
+
+  return `${encodedPayload}.${signature}`;
+}
+
+function verifyMercadoPagoOAuthState(
+  state: string,
+  secret: string
+): MercadoPagoOAuthState {
+  const [encodedPayload, signature] = state.split(".");
+
+  if (!encodedPayload || !signature) {
+    throw new BadRequestException("Estado OAuth do Mercado Pago invalido");
+  }
+
+  const expectedSignature = createHmac("sha256", secret)
+    .update(encodedPayload)
+    .digest("base64url");
+
+  if (!safeEqual(signature, expectedSignature)) {
+    throw new BadRequestException("Assinatura OAuth do Mercado Pago invalida");
+  }
+
+  const parsed = JSON.parse(Buffer.from(encodedPayload, "base64url").toString("utf8")) as
+    | Partial<MercadoPagoOAuthState>
+    | undefined;
+
+  if (
+    !parsed ||
+    typeof parsed.actorUserId !== "string" ||
+    typeof parsed.companyId !== "string" ||
+    typeof parsed.exp !== "number" ||
+    typeof parsed.nonce !== "string"
+  ) {
+    throw new BadRequestException("Payload OAuth do Mercado Pago invalido");
+  }
+
+  return {
+    actorUserId: parsed.actorUserId,
+    companyId: parsed.companyId,
+    exp: parsed.exp,
+    nonce: parsed.nonce
+  };
+}
+
+async function exchangeMercadoPagoOAuthCode(
+  config: MercadoPagoOAuthConfig,
+  code: string
+): Promise<Required<Pick<MercadoPagoOAuthTokenResponse, "access_token">> & MercadoPagoOAuthTokenResponse> {
+  const response = await fetch("https://api.mercadopago.com/oauth/token", {
+    body: JSON.stringify({
+      client_id: config.clientId,
+      client_secret: config.clientSecret,
+      code,
+      grant_type: "authorization_code",
+      redirect_uri: config.redirectUri
+    }),
+    headers: {
+      Accept: "application/json",
+      "Content-Type": "application/json"
+    },
+    method: "POST"
+  }).catch((error: Error): Error => error);
+
+  if (response instanceof Error) {
+    throw new BadRequestException(`Falha ao conectar ao Mercado Pago OAuth: ${response.message}`);
+  }
+
+  const body = (await response.json().catch(() => ({}))) as
+    | (MercadoPagoOAuthTokenResponse & { error?: string; message?: string })
+    | undefined;
+
+  if (!response.ok) {
+    throw new BadRequestException(
+      body?.message ?? body?.error ?? "Mercado Pago recusou a autorizacao OAuth"
+    );
+  }
+
+  if (!body?.access_token) {
+    throw new BadRequestException("Mercado Pago nao retornou access_token no OAuth");
+  }
+
+  return {
+    ...body,
+    access_token: body.access_token
+  };
+}
+
+function base64UrlEncode(value: string): string {
+  return Buffer.from(value, "utf8").toString("base64url");
+}
+
+function safeEqual(left: string, right: string): boolean {
+  const leftBuffer = Buffer.from(left);
+  const rightBuffer = Buffer.from(right);
+
+  return leftBuffer.length === rightBuffer.length && timingSafeEqual(leftBuffer, rightBuffer);
 }
 
 function throwSupabaseError(error: { message?: string }): never {

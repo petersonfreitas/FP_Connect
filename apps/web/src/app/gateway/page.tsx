@@ -17,8 +17,11 @@ import {
 } from "@/lib/internal-api";
 import {
   createGatewayPaymentRequestAction,
+  saveGatewayMercadoPagoManualConfigAction,
   saveGatewaySmtpConfigAction,
   sendGatewaySmtpTestEmailAction,
+  startGatewayMercadoPagoOAuthAction,
+  syncGatewayPaymentRequestStatusAction,
   testGatewaySmtpConfigAction
 } from "./actions";
 
@@ -29,12 +32,50 @@ type GatewayPageProps = {
     companyId?: string;
     error?: string;
     message?: string;
-    paymentCreated?: string;
+    mpManualSaved?: string;
+    mpOAuth?: string;
+  paymentCreated?: string;
+  paymentSynced?: string;
     smtpEmailSent?: string;
     smtpSaved?: string;
     smtpTest?: string;
+    tab?: string;
   }>;
 };
+
+type GatewayTab = "events" | "overview" | "payments" | "providers" | "smtp";
+
+const gatewayTabs: Array<{
+  description: string;
+  key: GatewayTab;
+  label: string;
+}> = [
+  {
+    description: "Status, fronteiras e contratos do modulo.",
+    key: "overview",
+    label: "Visao geral"
+  },
+  {
+    description: "Mercado Pago, PIX e solicitacoes internas.",
+    key: "payments",
+    label: "Pagamentos V0"
+  },
+  {
+    description: "Servidor de e-mail e envio de teste.",
+    key: "smtp",
+    label: "SMTP"
+  },
+  {
+    description: "Catalogo e configuracoes por empresa.",
+    key: "providers",
+    label: "Provedores"
+  },
+  {
+    description: "Eventos publicados para o FP Robots.",
+    key: "events",
+    label: "Eventos"
+  }
+];
 
 const gatewayEvents = [
   "gateway.provider.connected",
@@ -52,6 +93,7 @@ export default async function GatewayPage({ searchParams }: GatewayPageProps) {
   const accessResult = await getCurrentAdminAccess();
   const access = accessResult.data;
   const selectedCompanyId = resolveSelectedCompanyId(query.companyId, access);
+  const selectedTab = resolveGatewayTab(query.tab);
 
   if (!access || !selectedCompanyId) {
     return (
@@ -86,6 +128,8 @@ export default async function GatewayPage({ searchParams }: GatewayPageProps) {
   const providers = providersResult.data ?? [];
   const configs = configsResult.data ?? [];
   const paymentRequests = paymentRequestsResult.data ?? [];
+  const mercadoPagoConfig =
+    configs.find((config) => config.providerKey === "mercado_pago") ?? null;
   const smtpConfig = configs.find((config) => config.providerKey === "smtp") ?? null;
   const paymentProviders = providers.filter(
     (provider) => provider.category === "payment" && provider.status === "active"
@@ -148,19 +192,92 @@ export default async function GatewayPage({ searchParams }: GatewayPageProps) {
         </section>
       ) : null}
 
-      {query.paymentCreated ? (
+      {query.paymentCreated || query.paymentSynced ? (
         <section className="form-alert neutral page-feedback" role="status">
-          <strong>Solicitacao de pagamento registrada.</strong>
-          <span>{getPaymentRequestStatusLabel(query.paymentCreated)}</span>
+          <strong>
+            {query.paymentSynced
+              ? "Status de pagamento sincronizado."
+              : "Solicitacao de pagamento registrada."}
+          </strong>
+          <span>{getPaymentRequestStatusLabel(query.paymentSynced ?? query.paymentCreated ?? "")}</span>
+        </section>
+      ) : null}
+
+      {query.mpOAuth === "connected" ? (
+        <section className="form-alert neutral page-feedback" role="status">
+          <strong>Mercado Pago conectado.</strong>
+          <span>OAuth concluido e credenciais salvas no FP Gateway.</span>
+        </section>
+      ) : null}
+
+      {query.mpManualSaved ? (
+        <section className="form-alert neutral page-feedback" role="status">
+          <strong>Mercado Pago sandbox salvo.</strong>
+          <span>Credencial de teste configurada para gerar pagamentos PIX.</span>
         </section>
       ) : null}
 
       <GatewayIntro />
 
+      <GatewaySubnav companyId={selectedCompanyId} selectedTab={selectedTab} />
+
+      {selectedTab === "overview" ? (
+        <GatewayOverview gatewayAccessGranted={Boolean(gatewayAccessResult.data)} />
+      ) : null}
+
+      {selectedTab === "payments" ? (
+        <GatewayPaymentsPanel
+          companyId={selectedCompanyId}
+          mercadoPagoConfig={mercadoPagoConfig}
+          paymentProviders={paymentProviders}
+          paymentRequests={paymentRequests}
+        />
+      ) : null}
+
+      {selectedTab === "smtp" ? (
+        <GatewaySmtpPanel companyId={selectedCompanyId} smtpConfig={smtpConfig} />
+      ) : null}
+
+      {selectedTab === "providers" ? (
+        <GatewayProvidersPanel configs={configs} providers={providers} />
+      ) : null}
+
+      {selectedTab === "events" ? <GatewayEventsPanel /> : null}
+    </AppShell>
+  );
+}
+
+function GatewaySubnav({
+  companyId,
+  selectedTab
+}: {
+  companyId: string;
+  selectedTab: GatewayTab;
+}) {
+  return (
+    <nav className="module-subnav" aria-label="Areas do FP Gateway">
+      {gatewayTabs.map((tab) => (
+        <Link
+          aria-current={selectedTab === tab.key ? "page" : undefined}
+          className={selectedTab === tab.key ? "active" : undefined}
+          href={`/gateway?companyId=${companyId}&tab=${tab.key}`}
+          key={tab.key}
+        >
+          <strong>{tab.label}</strong>
+          <span>{tab.description}</span>
+        </Link>
+      ))}
+    </nav>
+  );
+}
+
+function GatewayOverview({ gatewayAccessGranted }: { gatewayAccessGranted: boolean }) {
+  return (
+    <>
       <section className="summary-strip" aria-label="Resumo inicial do FP Gateway">
         <div className="summary-item">
           <span>Status</span>
-          <strong>{gatewayAccessResult.data ? "Liberado" : "Pendente"}</strong>
+          <strong>{gatewayAccessGranted ? "Liberado" : "Pendente"}</strong>
           <small>Valido pelo guard de modulo contratado e permissao.</small>
         </div>
         <div className="summary-item">
@@ -175,6 +292,128 @@ export default async function GatewayPage({ searchParams }: GatewayPageProps) {
         </div>
       </section>
 
+      <section className="module-grid" aria-label="Fronteiras operacionais do FP Gateway">
+        {[
+          {
+            title: "Credenciais",
+            description: "Tokens, senhas e OAuth ficam no Gateway, sem vazar para Food ou Robots."
+          },
+          {
+            title: "Webhooks",
+            description: "Retornos externos serao validados, normalizados e publicados como eventos."
+          },
+          {
+            title: "Consumidores",
+            description: "Food, Billing, Marketing e Robots chamarao contratos internos do Gateway."
+          }
+        ].map((stage) => (
+          <article className="module-card" key={stage.title}>
+            <div className="module-card-top">
+              <span>Gateway</span>
+              <small>Planejado</small>
+            </div>
+            <h3>{stage.title}</h3>
+            <p>{stage.description}</p>
+          </article>
+        ))}
+      </section>
+    </>
+  );
+}
+
+function GatewayPaymentsPanel({
+  companyId,
+  mercadoPagoConfig,
+  paymentProviders,
+  paymentRequests
+}: {
+  companyId: string;
+  mercadoPagoConfig: GatewayCompanyProviderConfigContract | null;
+  paymentProviders: GatewayProviderContract[];
+  paymentRequests: GatewayPaymentRequestContract[];
+}) {
+  return (
+    <section className="content-panel">
+      <div className="panel-heading">
+        <div>
+          <h1>Pagamentos V0</h1>
+          <p>Contrato interno para o Food solicitar pagamento sem falar direto com o provedor.</p>
+        </div>
+        <span>{paymentRequests.length} solicitacao(oes)</span>
+      </div>
+
+      <PaymentRequestForm
+        companyId={companyId}
+        mercadoPagoConfig={mercadoPagoConfig}
+        paymentProviders={paymentProviders}
+      />
+      <PaymentRequestsTable companyId={companyId} paymentRequests={paymentRequests} />
+    </section>
+  );
+}
+
+function GatewaySmtpPanel({
+  companyId,
+  smtpConfig
+}: {
+  companyId: string;
+  smtpConfig: GatewayCompanyProviderConfigContract | null;
+}) {
+  return (
+    <>
+      <section className="content-panel">
+        <div className="panel-heading">
+          <div>
+            <h1>SMTP</h1>
+            <p>Configuracao simples para validar servidor de e-mail antes de conectar ao Robots.</p>
+          </div>
+          {smtpConfig ? (
+            <form action={testGatewaySmtpConfigAction}>
+              <input name="companyId" type="hidden" value={companyId} />
+              <PendingSubmitButton className="secondary-action" pendingLabel="Validando...">
+                Testar SMTP
+              </PendingSubmitButton>
+            </form>
+          ) : (
+            <span>Nao configurado</span>
+          )}
+        </div>
+
+        <div className="form-alert neutral inline-alert" role="status">
+          Resend: host `smtp.resend.com`, usuario `resend`, senha com API key. Use porta 587 ou
+          2587 sem TLS direta, ou 465/2465 com TLS direta. Outlook/Office 365 costuma exigir SMTP
+          AUTH habilitado e pode precisar de app password.
+        </div>
+
+        <SmtpConfigForm companyId={companyId} config={smtpConfig} />
+      </section>
+
+      {smtpConfig ? (
+        <section className="content-panel stack-panel">
+          <div className="panel-heading">
+            <div>
+              <h1>E-mail de teste</h1>
+              <p>Envia uma mensagem real usando a configuracao SMTP salva para esta empresa.</p>
+            </div>
+            <span>{smtpConfig.status === "active" ? "SMTP ativo" : "SMTP configurado"}</span>
+          </div>
+
+          <SmtpTestEmailForm companyId={companyId} />
+        </section>
+      ) : null}
+    </>
+  );
+}
+
+function GatewayProvidersPanel({
+  configs,
+  providers
+}: {
+  configs: GatewayCompanyProviderConfigContract[];
+  providers: GatewayProviderContract[];
+}) {
+  return (
+    <>
       <section className="section-heading">
         <div>
           <div className="eyebrow">Catalogo V0</div>
@@ -204,65 +443,6 @@ export default async function GatewayPage({ searchParams }: GatewayPageProps) {
           </div>
         )}
       </section>
-
-      <section className="content-panel">
-        <div className="panel-heading">
-          <div>
-            <h1>Pagamentos V0</h1>
-            <p>
-              Contrato interno para o Food solicitar pagamento sem falar direto com o provedor.
-            </p>
-          </div>
-          <span>{paymentRequests.length} solicitacao(oes)</span>
-        </div>
-
-        <PaymentRequestForm
-          companyId={selectedCompanyId}
-          paymentProviders={paymentProviders}
-        />
-        <PaymentRequestsTable paymentRequests={paymentRequests} />
-      </section>
-
-      <section className="content-panel">
-        <div className="panel-heading">
-          <div>
-            <h1>SMTP</h1>
-            <p>Configuracao simples para validar servidor de e-mail antes de conectar ao Robots.</p>
-          </div>
-          {smtpConfig ? (
-            <form action={testGatewaySmtpConfigAction}>
-              <input name="companyId" type="hidden" value={selectedCompanyId} />
-              <PendingSubmitButton className="secondary-action" pendingLabel="Validando...">
-                Testar SMTP
-              </PendingSubmitButton>
-            </form>
-          ) : (
-            <span>Nao configurado</span>
-          )}
-        </div>
-
-        <div className="form-alert neutral inline-alert" role="status">
-          Resend: host `smtp.resend.com`, usuario `resend`, senha com API key. Use porta 587
-          ou 2587 sem TLS direta, ou 465/2465 com TLS direta. Outlook/Office 365 costuma
-          exigir SMTP AUTH habilitado e pode precisar de app password.
-        </div>
-
-        <SmtpConfigForm companyId={selectedCompanyId} config={smtpConfig} />
-      </section>
-
-      {smtpConfig ? (
-        <section className="content-panel">
-          <div className="panel-heading">
-            <div>
-              <h1>E-mail de teste</h1>
-              <p>Envia uma mensagem real usando a configuracao SMTP salva para esta empresa.</p>
-            </div>
-            <span>{smtpConfig.status === "active" ? "SMTP ativo" : "SMTP configurado"}</span>
-          </div>
-
-          <SmtpTestEmailForm companyId={selectedCompanyId} />
-        </section>
-      ) : null}
 
       <section className="content-panel">
         <div className="panel-heading">
@@ -300,130 +480,184 @@ export default async function GatewayPage({ searchParams }: GatewayPageProps) {
           <div className="empty-state">Nenhuma configuracao de provedor cadastrada ainda.</div>
         )}
       </section>
+    </>
+  );
+}
 
-      <section className="module-grid" aria-label="Fronteiras operacionais do FP Gateway">
-        {[
-          {
-            title: "Credenciais",
-            description: "Tokens, senhas e OAuth ficam no Gateway, sem vazar para Food ou Robots."
-          },
-          {
-            title: "Webhooks",
-            description: "Retornos externos serao validados, normalizados e publicados como eventos."
-          },
-          {
-            title: "Consumidores",
-            description: "Food, Billing, Marketing e Robots chamarao contratos internos do Gateway."
-          }
-        ].map((stage) => (
-          <article className="module-card" key={stage.title}>
-            <div className="module-card-top">
-              <span>Gateway</span>
-              <small>Planejado</small>
-            </div>
-            <h3>{stage.title}</h3>
-            <p>{stage.description}</p>
-          </article>
+function GatewayEventsPanel() {
+  return (
+    <section className="content-panel">
+      <div className="panel-heading">
+        <div>
+          <h1>Contratos do proximo bloco</h1>
+          <p>Eventos catalogados para o FP Robots consumir o rastro operacional do Gateway.</p>
+        </div>
+        <span>{gatewayEvents.length} evento(s)</span>
+      </div>
+
+      <div className="data-table" role="table" aria-label="Eventos planejados do FP Gateway">
+        <div className="data-row data-row-head" role="row">
+          <span>Evento</span>
+          <span>Destino</span>
+          <span>Status</span>
+        </div>
+        {gatewayEvents.map((eventCode) => (
+          <div className="data-row" role="row" key={eventCode}>
+            <span>
+              <strong>{eventCode}</strong>
+            </span>
+            <span>FP Robots</span>
+            <span>Catalogado</span>
+          </div>
         ))}
-      </section>
-
-      <section className="content-panel">
-        <div className="panel-heading">
-          <div>
-            <h1>Contratos do proximo bloco</h1>
-            <p>O proximo passo tecnico e criar o contrato minimo para pagamento real/teste.</p>
-          </div>
-          <span>{gatewayEvents.length} evento(s)</span>
-        </div>
-
-        <div className="data-table" role="table" aria-label="Eventos planejados do FP Gateway">
-          <div className="data-row data-row-head" role="row">
-            <span>Evento</span>
-            <span>Destino</span>
-            <span>Status</span>
-          </div>
-          {gatewayEvents.map((eventCode) => (
-            <div className="data-row" role="row" key={eventCode}>
-              <span>
-                <strong>{eventCode}</strong>
-              </span>
-              <span>FP Robots</span>
-              <span>Catalogado</span>
-            </div>
-          ))}
-        </div>
-      </section>
-    </AppShell>
+      </div>
+    </section>
   );
 }
 
 function PaymentRequestForm({
   companyId,
+  mercadoPagoConfig,
   paymentProviders
 }: {
   companyId: string;
+  mercadoPagoConfig: GatewayCompanyProviderConfigContract | null;
   paymentProviders: GatewayProviderContract[];
 }) {
+  const mercadoPagoStatus =
+    mercadoPagoConfig?.status === "active" ? "Conectado via OAuth" : "Nao conectado";
+  const mercadoPagoPublicConfig = mercadoPagoConfig?.publicConfig as
+    | { mode?: string | null; userId?: number | string | null }
+    | undefined;
+  const mercadoPagoMode =
+    mercadoPagoPublicConfig?.mode === "manual_sandbox" ? "Sandbox manual" : mercadoPagoStatus;
+
   return (
-    <form action={createGatewayPaymentRequestAction} className="form-grid">
-      <input name="companyId" type="hidden" value={companyId} />
-      <input name="sourceApplicationKey" type="hidden" value="food" />
-      <input name="sourceReferenceType" type="hidden" value="order" />
-      <label>
-        Provedor
-        <select defaultValue={paymentProviders[0]?.key ?? "mercado_pago"} name="providerKey">
-          {paymentProviders.length > 0 ? (
-            paymentProviders.map((provider) => (
-              <option key={provider.id} value={provider.key}>
-                {provider.name}
-              </option>
-            ))
-          ) : (
-            <option value="mercado_pago">Mercado Pago</option>
-          )}
-        </select>
-      </label>
-      <label>
-        Valor
-        <input defaultValue="25,00" inputMode="decimal" maxLength={14} name="amount" required />
-      </label>
-      <label>
-        Referencia do pedido
-        <input maxLength={160} name="sourceReferenceId" placeholder="ex: FOOD-0001" />
-      </label>
-      <label>
-        Cliente
-        <input maxLength={160} name="customerName" placeholder="Nome do cliente" />
-      </label>
-      <label>
-        E-mail do cliente
-        <input maxLength={255} name="customerEmail" placeholder="cliente@email.com" type="email" />
-      </label>
-      <label>
-        Telefone
-        <input maxLength={40} name="customerPhone" placeholder="(00) 00000-0000" />
-      </label>
-      <label className="form-full">
-        Descricao
-        <input
-          defaultValue="Pedido de teste FP Food"
-          maxLength={255}
-          name="description"
-          required
-        />
-      </label>
-      <div className="form-actions">
-        <PendingSubmitButton pendingLabel="Registrando pagamento...">
-          Criar solicitacao V0
-        </PendingSubmitButton>
+    <>
+      <div className="form-alert neutral inline-alert" role="status">
+        Mercado Pago: {mercadoPagoMode}
+        {mercadoPagoPublicConfig?.userId ? ` / Conta ${mercadoPagoPublicConfig.userId}` : ""}
       </div>
-    </form>
+      <div className="form-alert neutral inline-alert" role="status">
+        Para teste local, use credenciais de teste ou credenciais de producao de uma conta de
+        teste do Mercado Pago. Para PIX, informe um e-mail valido de pagador diferente da conta
+        vendedora usada no Access Token. No sandbox manual, o Gateway usa o nome APRO no payload
+        enviado ao Mercado Pago e exige e-mail com dominio @testuser.com, conforme o roteiro
+        oficial de teste de Pix.
+      </div>
+
+      <form action={startGatewayMercadoPagoOAuthAction} className="form-actions">
+        <input name="companyId" type="hidden" value={companyId} />
+        <PendingSubmitButton className="secondary-action" pendingLabel="Abrindo OAuth...">
+          Conectar Mercado Pago
+        </PendingSubmitButton>
+      </form>
+
+      <form action={saveGatewayMercadoPagoManualConfigAction} className="form-grid">
+        <input name="companyId" type="hidden" value={companyId} />
+        <label>
+          Access Token de teste ou conta de teste
+          <input
+            autoComplete="new-password"
+            maxLength={255}
+            name="accessToken"
+            placeholder="TEST-... ou APP_USR-... de conta de teste"
+            required
+            type="password"
+          />
+        </label>
+        <label>
+          Public Key
+          <input maxLength={255} name="publicKey" placeholder="TEST-..." />
+        </label>
+        <label>
+          N. da aplicacao
+          <input maxLength={80} name="appId" />
+        </label>
+        <label>
+          User ID
+          <input maxLength={80} name="userId" />
+        </label>
+        <div className="form-actions">
+          <PendingSubmitButton className="secondary-action" pendingLabel="Salvando sandbox...">
+            Salvar sandbox manual
+          </PendingSubmitButton>
+        </div>
+      </form>
+
+      <form action={createGatewayPaymentRequestAction} className="form-grid">
+        <input name="companyId" type="hidden" value={companyId} />
+        <input name="sourceApplicationKey" type="hidden" value="food" />
+        <input name="sourceReferenceType" type="hidden" value="order" />
+        <label>
+          Provedor
+          <select defaultValue={paymentProviders[0]?.key ?? "mercado_pago"} name="providerKey">
+            {paymentProviders.length > 0 ? (
+              paymentProviders.map((provider) => (
+                <option key={provider.id} value={provider.key}>
+                  {provider.name}
+                </option>
+              ))
+            ) : (
+              <option value="mercado_pago">Mercado Pago</option>
+            )}
+          </select>
+        </label>
+        <label>
+          Valor
+          <input defaultValue="200,00" inputMode="decimal" maxLength={14} name="amount" required />
+        </label>
+        <label>
+          Referencia do pedido
+          <input maxLength={160} name="sourceReferenceId" placeholder="ex: FOOD-0001" />
+        </label>
+        <label>
+          Cliente
+          <input
+            defaultValue="APRO"
+            maxLength={160}
+            name="customerName"
+            placeholder="Nome do cliente"
+          />
+        </label>
+        <label>
+          E-mail do pagador
+          <input
+            maxLength={255}
+            name="customerEmail"
+            placeholder="test_user_br@testuser.com"
+            required
+            type="email"
+          />
+        </label>
+        <label>
+          Telefone
+          <input maxLength={40} name="customerPhone" placeholder="(00) 00000-0000" />
+        </label>
+        <label className="form-full">
+          Descricao
+          <input
+            defaultValue="Pedido de teste FP Food"
+            maxLength={255}
+            name="description"
+            required
+          />
+        </label>
+        <div className="form-actions">
+          <PendingSubmitButton pendingLabel="Registrando pagamento...">
+            Criar solicitacao V0
+          </PendingSubmitButton>
+        </div>
+      </form>
+    </>
   );
 }
 
 function PaymentRequestsTable({
+  companyId,
   paymentRequests
 }: {
+  companyId: string;
   paymentRequests: GatewayPaymentRequestContract[];
 }) {
   if (paymentRequests.length === 0) {
@@ -432,13 +666,14 @@ function PaymentRequestsTable({
 
   return (
     <div className="data-table" role="table" aria-label="Solicitacoes de pagamento">
-      <div className="data-row data-row-head" role="row">
+      <div className="data-row data-row-head payment-request-row" role="row">
         <span>Origem</span>
         <span>Valor</span>
         <span>Status</span>
+        <span>Acao</span>
       </div>
       {paymentRequests.map((paymentRequest) => (
-        <div className="data-row" role="row" key={paymentRequest.id}>
+        <div className="data-row payment-request-row" role="row" key={paymentRequest.id}>
           <span>
             <strong>{paymentRequest.description}</strong>
             <small>
@@ -453,6 +688,26 @@ function PaymentRequestsTable({
           <span>
             {getPaymentRequestStatusLabel(paymentRequest.status)}
             {paymentRequest.errorMessage ? <small>{paymentRequest.errorMessage}</small> : null}
+            {paymentRequest.paymentUrl ? (
+              <small>
+                <a href={paymentRequest.paymentUrl} rel="noreferrer" target="_blank">
+                  Abrir PIX
+                </a>
+              </small>
+            ) : null}
+          </span>
+          <span>
+            {paymentRequest.providerReference ? (
+              <form action={syncGatewayPaymentRequestStatusAction} className="inline-form">
+                <input name="companyId" type="hidden" value={companyId} />
+                <input name="paymentRequestId" type="hidden" value={paymentRequest.id} />
+                <PendingSubmitButton className="secondary-action" pendingLabel="Consultando...">
+                  Consultar status
+                </PendingSubmitButton>
+              </form>
+            ) : (
+              <small>Aguardando provedor</small>
+            )}
           </span>
         </div>
       ))}
@@ -674,6 +929,12 @@ function resolveSelectedCompanyId(
   );
 
   return firstGatewayCompany?.company.id ?? null;
+}
+
+function resolveGatewayTab(value: string | undefined): GatewayTab {
+  const tab = gatewayTabs.find((item) => item.key === value);
+
+  return tab?.key ?? "overview";
 }
 
 function readSmtpConfig(
