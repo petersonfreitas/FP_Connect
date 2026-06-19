@@ -110,7 +110,7 @@ FP Console/Web:
 ```text
 Root Directory: apps/web
 Framework Preset: Next.js
-Install Command: corepack enable && corepack prepare pnpm@9.0.0 --activate && pnpm --dir ../.. install --frozen-lockfile
+Install Command: corepack enable && corepack prepare pnpm@9.0.0 --activate && pnpm --dir ../.. install --frozen-lockfile --prod=false
 Build Command: pnpm vercel-build
 Output Directory: deixe em branco
 ```
@@ -120,13 +120,16 @@ FP Food:
 ```text
 Root Directory: apps/food
 Framework Preset: Next.js
-Install Command: corepack enable && corepack prepare pnpm@9.0.0 --activate && pnpm --dir ../.. install --frozen-lockfile
+Install Command: corepack enable && corepack prepare pnpm@9.0.0 --activate && pnpm --dir ../.. install --frozen-lockfile --prod=false
 Build Command: pnpm vercel-build
 Output Directory: deixe em branco
 ```
 
 O erro `now-next-routes-manifest` normalmente indica que a Vercel nao encontrou o output `.next`.
 Neste repo, `turbo.json` precisa manter o output de build com `.next/**` e `!.next/cache/**`.
+Se o log mostrar `devDependencies: skipped because NODE_ENV is set to production`, mantenha
+`--prod=false` no Install Command ou remova `NODE_ENV=production` das variaveis manuais do projeto
+na Vercel. O build Next.js precisa de devDependencies.
 
 O login do Admin Console usa Supabase Auth pelo server-side do Next. A sessao fica em cookies HttpOnly e o navegador nao recebe a service role nem o token interno. Quando o access token expira, o proxy do Next renova a sessao com o refresh token HttpOnly antes de liberar a rota protegida.
 
