@@ -652,7 +652,8 @@ async function fetchInternal<T>(
 
 function getInternalApiBaseUrl(): string {
   const value = process.env.FP_API_INTERNAL_URL?.trim() || DEFAULT_INTERNAL_API_BASE_URL;
-  return value.replace(/\/$/, "");
+  const baseUrl = value.replace(/\/+$/, "");
+  return baseUrl.endsWith("/api") ? baseUrl : `${baseUrl}/api`;
 }
 
 function formatPaginationSearch({ page, pageSize, scope }: PaginationParams): string {

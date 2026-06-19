@@ -82,6 +82,30 @@ pnpm dev:stack
 
 Copie `.env.example` para `.env` e preencha as variaveis antes de iniciar web/API.
 
+### Teste local em modo producao
+
+Use este fluxo antes de publicar em Vercel, Railway ou outro provedor:
+
+```bash
+pnpm prod:build
+pnpm start:api
+pnpm start:web
+pnpm start:food
+```
+
+Execute cada `start:*` em um terminal separado. Portas padrao:
+
+- API Nest: `http://localhost:3001/api`
+- FP Console/Web: `http://localhost:3000`
+- FP Food: `http://localhost:3002`
+
+`FP_API_INTERNAL_URL` pode ser configurada com ou sem `/api`; os frontends normalizam o
+prefixo automaticamente. Ainda assim, prefira deixar explicito em producao, por exemplo:
+
+```text
+FP_API_INTERNAL_URL=https://sua-api.up.railway.app/api
+```
+
 ## Variaveis de ambiente e navegador
 
 Regra atual: variaveis sem prefixo `NEXT_PUBLIC_` nao devem ser expostas ao navegador.
@@ -92,7 +116,7 @@ No estado atual do projeto:
 - `SUPABASE_ANON_KEY` e opcional na API e nao e usada pelo frontend no navegador.
 - `SUPABASE_SERVICE_ROLE_KEY` fica somente no backend e nunca deve ir para o frontend.
 - `FP_INTERNAL_API_TOKEN` fica somente no server-side do Next e no backend.
-- `FP_API_INTERNAL_URL` e usada pelo Next server-side para chamar a API interna.
+- `FP_API_INTERNAL_URL` e usada pelo Next server-side para chamar a API interna. Prefira informar a URL com `/api`.
 - `FP_WEB_URL` define a URL base usada em links server-side, como recuperacao de senha e convite de usuarios.
 - `MERCADO_PAGO_CLIENT_ID` e `MERCADO_PAGO_CLIENT_SECRET` ficam somente na API e habilitam o OAuth do FP Gateway.
 - No app Mercado Pago, cadastre o redirect como `${FP_WEB_URL}/gateway/mercado-pago/callback`.
@@ -148,6 +172,21 @@ No Render, nao use `corepack enable` no Build Command; em alguns ambientes ele t
 `/usr/bin/pnpm`, que e read-only.
 Se o log mostrar `Cannot find module .../apps/api/dist/main.js`, use o `start:render` acima:
 ele recompila a API antes de iniciar o processo Node.
+
+## Deploy Railway - API
+
+Para publicar a API Nest no Railway durante o MVP, aponte o servico para a raiz do monorepo.
+Use os mesmos comandos de build/start da API:
+
+```text
+Root Directory: deixe em branco
+Build Command: pnpm install --frozen-lockfile --prod=false && pnpm build:api
+Start Command: pnpm --filter @fp/api start
+```
+
+O Railway injeta `PORT` automaticamente; nao fixe `PORT=3001` no ambiente de producao.
+Nas variaveis do Vercel Web/Food, configure `FP_API_INTERNAL_URL` com a URL publica da API
+incluindo `/api`.
 
 O login do Admin Console usa Supabase Auth pelo server-side do Next. A sessao fica em cookies HttpOnly e o navegador nao recebe a service role nem o token interno. Quando o access token expira, o proxy do Next renova a sessao com o refresh token HttpOnly antes de liberar a rota protegida.
 
