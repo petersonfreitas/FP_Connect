@@ -6,7 +6,8 @@
     "dev": "next dev",
     "build": "next build",
     "lint": "eslint .",
-    "typecheck": "tsc --noEmit -p tsconfig.json"
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "vercel-build": "pnpm --dir ../.. build:web"
   },
   "devDependencies": {
     "@types/node": "25.9.2",

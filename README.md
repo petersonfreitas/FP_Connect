@@ -100,6 +100,34 @@ No estado atual do projeto:
 
 O cliente interno do frontend esta em `apps/web/src/lib/internal-api.ts` e usa `server-only`, impedindo importacao por componentes client.
 
+## Deploy Vercel - Web e Food
+
+Para projetos Next.js em monorepo, configure cada app no Vercel com o root do proprio app.
+Nao sobrescreva o Output Directory; deixe em branco para a Vercel detectar `.next`.
+
+FP Console/Web:
+
+```text
+Root Directory: apps/web
+Framework Preset: Next.js
+Install Command: corepack enable && corepack prepare pnpm@9.0.0 --activate && pnpm --dir ../.. install --frozen-lockfile
+Build Command: pnpm vercel-build
+Output Directory: deixe em branco
+```
+
+FP Food:
+
+```text
+Root Directory: apps/food
+Framework Preset: Next.js
+Install Command: corepack enable && corepack prepare pnpm@9.0.0 --activate && pnpm --dir ../.. install --frozen-lockfile
+Build Command: pnpm vercel-build
+Output Directory: deixe em branco
+```
+
+O erro `now-next-routes-manifest` normalmente indica que a Vercel nao encontrou o output `.next`.
+Neste repo, `turbo.json` precisa manter o output de build com `.next/**` e `!.next/cache/**`.
+
 O login do Admin Console usa Supabase Auth pelo server-side do Next. A sessao fica em cookies HttpOnly e o navegador nao recebe a service role nem o token interno. Quando o access token expira, o proxy do Next renova a sessao com o refresh token HttpOnly antes de liberar a rota protegida.
 
 Para recuperacao de senha e aceite de convite, cadastre a URL abaixo em Supabase Dashboard > Authentication > URL Configuration > Redirect URLs:
