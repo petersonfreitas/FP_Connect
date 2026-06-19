@@ -131,6 +131,20 @@ Se o log mostrar `devDependencies: skipped because NODE_ENV is set to production
 `--prod=false` no Install Command ou remova `NODE_ENV=production` das variaveis manuais do projeto
 na Vercel. O build Next.js precisa de devDependencies.
 
+## Deploy Render - API
+
+Para a API Nest, crie um Web Service Node no Render apontando para a raiz do monorepo.
+O build precisa instalar devDependencies, pois `@nestjs/cli` e necessario para `nest build`.
+
+```text
+Root Directory: deixe em branco
+Build Command: corepack enable && corepack prepare pnpm@9.0.0 --activate && pnpm install --frozen-lockfile --prod=false && pnpm build:api
+Start Command: pnpm --filter @fp/api start
+```
+
+Se o log mostrar `nest: not found`, o install foi executado em modo producao e pulou
+devDependencies do workspace da API. Mantenha `--prod=false` no Build Command.
+
 O login do Admin Console usa Supabase Auth pelo server-side do Next. A sessao fica em cookies HttpOnly e o navegador nao recebe a service role nem o token interno. Quando o access token expira, o proxy do Next renova a sessao com o refresh token HttpOnly antes de liberar a rota protegida.
 
 Para recuperacao de senha e aceite de convite, cadastre a URL abaixo em Supabase Dashboard > Authentication > URL Configuration > Redirect URLs:
