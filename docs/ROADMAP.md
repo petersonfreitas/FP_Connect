@@ -90,6 +90,8 @@ O FP Gateway foi iniciado como shell no FP Console:
 - tabela `gateway.payment_requests`, endpoint interno e tela V0 para solicitacoes de pagamento;
 - criacao de PIX Mercado Pago alinhada ao Checkout Transparente via Orders API (`POST /v1/orders`);
 - contrato V0 de cartao de credito/debito Mercado Pago usando token gerado por MercadoPago.js/Card Payment Brick, sem coletar dados sensiveis de cartao no FP Console;
+- webhook Mercado Pago V0 para conciliacao assincrona de orders;
+- debito permanece pendente de smoke test por falta de cartao de teste no momento;
 - eventos `gateway.payment.requested`, `gateway.payment.requires_provider_config`, `gateway.payment.failed` e `gateway.payment.paid`;
 - evento `gateway.mercado_pago.oauth_connected`;
 - `gateway` exposto no `supabase/config.toml`.
@@ -201,7 +203,7 @@ Escopo inicial:
 - conexao OAuth com Mercado Pago: iniciada;
 - criacao real/teste de pagamento PIX Mercado Pago via Checkout Transparente: iniciada via sandbox manual;
 - integracao do Food ao contrato de pagamento;
-- recebimento e normalizacao de webhook;
+- recebimento e normalizacao de webhook: implementado como V0, pendente de smoke test online;
 - logs tecnicos mascarados;
 - eventos `gateway.*` para FP Robots.
 

@@ -142,6 +142,7 @@ Este arquivo controla o avanco dos modulos do ecossistema.
 - [x] Pagamento manual V0
 - [x] Checkout publico com cartao Mercado Pago via FP Gateway V0
 - [x] Smoke test publico com cartao Mercado Pago sandbox
+- [ ] Smoke test publico com cartao de debito Mercado Pago sandbox
 - [x] Retentativa publica de pagamento com cartao sem duplicar pedido
 - [ ] Realtime futuro para pedidos, cozinha e acompanhamento publico
 - [x] Eventos de pedido para Robots
@@ -167,6 +168,7 @@ Este arquivo controla o avanco dos modulos do ecossistema.
 - [x] Envio real de e-mail SMTP de teste
 - [x] Evento `gateway.smtp.test_email_sent` para FP Robots
 - [x] Evento `gateway.smtp.test_email_failed` para falha de envio SMTP
+- [x] Tratamento de erro TLS/SMTP para evitar queda do processo da API em provedor mal configurado
 - [ ] Estabilizacao operacional SMTP em provedor/rede sem timeout
 - [x] Tabela `gateway.payment_requests`
 - [x] Contrato interno V0 para solicitar pagamento
@@ -187,7 +189,8 @@ Este arquivo controla o avanco dos modulos do ecossistema.
 - [x] Nova tentativa de pagamento para pedido existente gerando nova `gateway.payment_requests`
 - [x] Smoke test com cartao Mercado Pago sandbox
 - [x] Smoke test com PIX Mercado Pago sandbox
-- [ ] Webhook externo normalizado
+- [x] Webhook Mercado Pago V0 para conciliacao assincrona de orders
+- [ ] Smoke test webhook Mercado Pago sandbox
 - [ ] Envio transacional SMTP solicitado pelo FP Robots
 
 ---

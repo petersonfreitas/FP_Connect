@@ -11,6 +11,7 @@ export class AppConfigService {
   readonly webUrl: string;
   readonly mercadoPagoClientId?: string;
   readonly mercadoPagoClientSecret?: string;
+  readonly mercadoPagoWebhookSecret?: string;
 
   constructor() {
     const env = process.env;
@@ -24,6 +25,7 @@ export class AppConfigService {
     this.webUrl = readRequiredUrl(env, "FP_WEB_URL").replace(/\/$/, "");
     this.mercadoPagoClientId = readOptional(env, "MERCADO_PAGO_CLIENT_ID");
     this.mercadoPagoClientSecret = readOptional(env, "MERCADO_PAGO_CLIENT_SECRET");
+    this.mercadoPagoWebhookSecret = readOptional(env, "MERCADO_PAGO_WEBHOOK_SECRET");
   }
 }
 

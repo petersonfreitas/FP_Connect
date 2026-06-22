@@ -155,6 +155,9 @@ export type GatewayPaymentRequestContract = {
   description: string;
   errorMessage: string | null;
   id: string;
+  paymentMethodId: string | null;
+  paymentMethodType: GatewayPaymentMethodType;
+  paymentTypeId: GatewayPaymentMethodType;
   paymentUrl: string | null;
   providerKey: string;
   providerName: string;
