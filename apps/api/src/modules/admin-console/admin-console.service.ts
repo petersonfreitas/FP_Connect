@@ -252,99 +252,7 @@ export class AdminConsoleService {
       profile.global_role === "support" ||
       profile.is_internal_user;
     const memberships = await this.listUserMembershipRows(actorUserId);
-    const companyIds = unique(memberships.map((membership) => membership.company_id));
-    const [companiesById, grantRows, companyApplicationRows] = await Promise.all([
-      this.listCompaniesById(companyIds),
-      this.listUserApplicationRoleRowsByUserId(actorUserId, companyIds),
-      this.listCompanyApplicationRowsByCompanyIds(companyIds)
-    ]);
-    const applicationIds = unique([
-      ...grantRows.map((grant) => grant.application_id),
-      ...companyApplicationRows.map((companyApplication) => companyApplication.application_id)
-    ]);
-    const [applicationsById, roleRows] = await Promise.all([
-      this.listApplicationsById(applicationIds),
-      this.listRoleRowsByApplicationIds(unique(grantRows.map((grant) => grant.application_id)))
-    ]);
-    const rolePermissionsByRoleId = await this.listPermissionsByRoleId(roleRows);
-    const rolesById = new Map(roleRows.map((role) => [role.id, role]));
-    const companyApplicationsByCompanyAndApplication = new Map(
-      companyApplicationRows.map((row) => [
-        `${row.company_id}:${row.application_id}`,
-        row
-      ])
-    );
-    const grantsByCompanyId = new Map<string, UserApplicationRoleRow[]>();
-
-    for (const grant of grantRows) {
-      const grants = grantsByCompanyId.get(grant.company_id) ?? [];
-      grants.push(grant);
-      grantsByCompanyId.set(grant.company_id, grants);
-    }
-
-    const companies = memberships.flatMap((membership): AdminCurrentUserCompanyAccessContract[] => {
-      const company = companiesById.get(membership.company_id);
-
-      if (!company) {
-        return [];
-      }
-
-      const grants = grantsByCompanyId.get(membership.company_id) ?? [];
-      const adminPermissions = new Set<string>();
-      const modulesByCompanyAndApplication = new Map<string, AdminCurrentUserModuleAccessContract>();
-
-      for (const grant of grants) {
-        const application = applicationsById.get(grant.application_id);
-        const role = rolesById.get(grant.role_id);
-
-        if (!application || !role || application.status !== "active") {
-          continue;
-        }
-
-        const permissions = rolePermissionsByRoleId.get(role.id) ?? [];
-        const permissionKeys = permissions.map((permission) => permission.key);
-        const companyApplication = companyApplicationsByCompanyAndApplication.get(
-          `${membership.company_id}:${grant.application_id}`
-        );
-        const isAccessibleContractedModule = isGrantableCompanyApplicationStatus(
-          companyApplication?.status ?? null
-        );
-
-        if (application.key === "admin-console" && isAccessibleContractedModule) {
-          for (const permissionKey of permissionKeys) {
-            adminPermissions.add(permissionKey);
-          }
-          continue;
-        }
-
-        if (!isAccessibleContractedModule || permissionKeys.length === 0) {
-          continue;
-        }
-
-        modulesByCompanyAndApplication.set(`${membership.company_id}:${application.id}`, {
-          applicationId: application.id,
-          applicationKey: application.key,
-          applicationName: application.name,
-          companyId: membership.company_id,
-          companyName: getCompanyDisplayName(company),
-          entryPath: application.entry_path,
-          permissions: permissionKeys
-        });
-      }
-
-      return [
-        {
-          company: mapCompany(company),
-          membershipId: membership.id,
-          membershipStatus: membership.status,
-          isPrimaryContact: membership.is_primary_contact,
-          adminPermissions: Array.from(adminPermissions).sort(),
-          modules: Array.from(modulesByCompanyAndApplication.values()).sort((first, second) =>
-            first.applicationName.localeCompare(second.applicationName, "pt-BR")
-          )
-        }
-      ];
-    });
+    const companies = await this.buildCompanyAccessForMemberships(actorUserId, memberships);
 
     return {
       user: {
@@ -357,6 +265,39 @@ export class AdminConsoleService {
       companies,
       navigation: buildCurrentUserNavigation(profile.global_role, isSuperAdmin, companies)
     };
+  }
+
+  async listCurrentUserCompanies(
+    context: InternalApiContext = emptyInternalApiContext,
+    options: PaginationOptions = {}
+  ): Promise<PaginatedContract<AdminCurrentUserCompanyAccessContract>> {
+    if (!context.actorUserId) {
+      throw new UnauthorizedException("Authenticated actor is required");
+    }
+
+    const actorUserId = normalizeUuid(context.actorUserId, "actorUserId");
+    await this.getCurrentUserProfile(actorUserId);
+
+    const pagination = normalizePagination(options);
+    const { from, to } = getPaginationRange(pagination);
+    const { count, data, error } = await this.supabase.core
+      .from("company_memberships")
+      .select("id,company_id,user_id,status,is_primary_contact", { count: "exact" })
+      .eq("user_id", actorUserId)
+      .is("deleted_at", null)
+      .order("created_at", { ascending: false })
+      .range(from, to);
+
+    if (error) {
+      throwSupabaseError(error);
+    }
+
+    const companies = await this.buildCompanyAccessForMemberships(
+      actorUserId,
+      (data ?? []) as CompanyUserRow[]
+    );
+
+    return mapPaginatedResult(companies, count, pagination);
   }
 
   async getOverview(): Promise<AdminConsoleOverviewContract> {
@@ -1892,6 +1833,102 @@ export class AdminConsoleService {
     );
   }
 
+  private async buildCompanyAccessForMemberships(
+    userId: string,
+    memberships: CompanyUserRow[]
+  ): Promise<AdminCurrentUserCompanyAccessContract[]> {
+    const companyIds = unique(memberships.map((membership) => membership.company_id));
+    const [companiesById, grantRows, companyApplicationRows] = await Promise.all([
+      this.listCompaniesById(companyIds),
+      this.listUserApplicationRoleRowsByUserId(userId, companyIds),
+      this.listCompanyApplicationRowsByCompanyIds(companyIds)
+    ]);
+    const applicationIds = unique([
+      ...grantRows.map((grant) => grant.application_id),
+      ...companyApplicationRows.map((companyApplication) => companyApplication.application_id)
+    ]);
+    const [applicationsById, roleRows] = await Promise.all([
+      this.listApplicationsById(applicationIds),
+      this.listRoleRowsByApplicationIds(unique(grantRows.map((grant) => grant.application_id)))
+    ]);
+    const rolePermissionsByRoleId = await this.listPermissionsByRoleId(roleRows);
+    const rolesById = new Map(roleRows.map((role) => [role.id, role]));
+    const companyApplicationsByCompanyAndApplication = new Map(
+      companyApplicationRows.map((row) => [`${row.company_id}:${row.application_id}`, row])
+    );
+    const grantsByCompanyId = new Map<string, UserApplicationRoleRow[]>();
+
+    for (const grant of grantRows) {
+      const grants = grantsByCompanyId.get(grant.company_id) ?? [];
+      grants.push(grant);
+      grantsByCompanyId.set(grant.company_id, grants);
+    }
+
+    return memberships.flatMap((membership): AdminCurrentUserCompanyAccessContract[] => {
+      const company = companiesById.get(membership.company_id);
+
+      if (!company) {
+        return [];
+      }
+
+      const grants = grantsByCompanyId.get(membership.company_id) ?? [];
+      const adminPermissions = new Set<string>();
+      const modulesByCompanyAndApplication = new Map<string, AdminCurrentUserModuleAccessContract>();
+
+      for (const grant of grants) {
+        const application = applicationsById.get(grant.application_id);
+        const role = rolesById.get(grant.role_id);
+
+        if (!application || !role || application.status !== "active") {
+          continue;
+        }
+
+        const permissions = rolePermissionsByRoleId.get(role.id) ?? [];
+        const permissionKeys = permissions.map((permission) => permission.key);
+        const companyApplication = companyApplicationsByCompanyAndApplication.get(
+          `${membership.company_id}:${grant.application_id}`
+        );
+        const isAccessibleContractedModule = isGrantableCompanyApplicationStatus(
+          companyApplication?.status ?? null
+        );
+
+        if (application.key === "admin-console" && isAccessibleContractedModule) {
+          for (const permissionKey of permissionKeys) {
+            adminPermissions.add(permissionKey);
+          }
+          continue;
+        }
+
+        if (!isAccessibleContractedModule || permissionKeys.length === 0) {
+          continue;
+        }
+
+        modulesByCompanyAndApplication.set(`${membership.company_id}:${application.id}`, {
+          applicationId: application.id,
+          applicationKey: application.key,
+          applicationName: application.name,
+          companyId: membership.company_id,
+          companyName: getCompanyDisplayName(company),
+          entryPath: application.entry_path,
+          permissions: permissionKeys
+        });
+      }
+
+      return [
+        {
+          company: mapCompany(company),
+          membershipId: membership.id,
+          membershipStatus: membership.status,
+          isPrimaryContact: membership.is_primary_contact,
+          adminPermissions: Array.from(adminPermissions).sort(),
+          modules: Array.from(modulesByCompanyAndApplication.values()).sort((first, second) =>
+            first.applicationName.localeCompare(second.applicationName, "pt-BR")
+          )
+        }
+      ];
+    });
+  }
+
   private async listCompaniesById(companyIds: string[]): Promise<Map<string, CompanyRow>> {
     if (companyIds.length === 0) {
       return new Map();
@@ -2782,12 +2819,15 @@ function buildCurrentUserNavigation(
     globalRole === "fp_admin"
       ? [{ href: "/cadastro/usuarios-console", label: "Usuarios do Console" }]
       : [];
-  const companyItems = companies
-    .filter((company) => company.adminPermissions.includes("admin.companies.read"))
-    .map((company) => ({
-      href: `/cadastro/empresas/${company.company.id}`,
-      label: company.company.tradeName ?? company.company.legalName
-    }));
+  const companyItems =
+    companies.length > 0
+      ? [
+          {
+            href: "/carteira/empresas",
+            label: "Carteira de empresas"
+          }
+        ]
+      : [];
   const moduleItems = buildModuleNavigationItems(companies);
 
   if (companyItems.length > 0) {
@@ -2818,30 +2858,24 @@ function buildCurrentUserNavigation(
 }
 
 function buildModuleNavigationItems(companies: AdminCurrentUserCompanyAccessContract[]) {
-  const modules = companies.flatMap((company) =>
-    company.modules.filter((module) => module.entryPath)
-  );
-  const pathCounts = new Map<string, number>();
+  const modulesByApplication = new Map<string, AdminCurrentUserModuleAccessContract>();
 
-  for (const module of modules) {
-    const path = module.entryPath ?? "";
-    pathCounts.set(path, (pathCounts.get(path) ?? 0) + 1);
+  for (const company of companies) {
+    for (const module of company.modules) {
+      if (!module.entryPath || modulesByApplication.has(module.applicationId)) {
+        continue;
+      }
+
+      modulesByApplication.set(module.applicationId, module);
+    }
   }
 
-  return modules.map((module) => {
-    const path = module.entryPath ?? "/";
-    const shouldShowCompany = (pathCounts.get(path) ?? 0) > 1;
-    const href = path.includes("?")
-      ? `${path}&companyId=${module.companyId}`
-      : `${path}?companyId=${module.companyId}`;
-
-    return {
-      href,
-      label: shouldShowCompany
-        ? `${module.applicationName} - ${module.companyName}`
-        : module.applicationName
-    };
-  });
+  return Array.from(modulesByApplication.values())
+    .sort((first, second) => first.applicationName.localeCompare(second.applicationName, "pt-BR"))
+    .map((module) => ({
+      href: module.entryPath ?? "/",
+      label: module.applicationName
+    }));
 }
 
 function isGrantableCompanyApplication(application: AdminCompanyApplicationContract): boolean {

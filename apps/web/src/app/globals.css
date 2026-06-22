@@ -675,6 +675,12 @@ button.primary-action {
   grid-template-columns: minmax(220px, 1.3fr) minmax(180px, 1fr) 120px 90px minmax(180px, 0.9fr);
 }
 
+.portfolio-company-row {
+  grid-template-columns:
+    minmax(220px, 1.3fr) minmax(150px, 0.75fr) minmax(210px, 1fr)
+    minmax(150px, 0.65fr) 130px;
+}
+
 .payment-request-row {
   grid-template-columns: minmax(240px, 1.2fr) minmax(150px, 0.7fr) minmax(220px, 1fr) 170px;
 }

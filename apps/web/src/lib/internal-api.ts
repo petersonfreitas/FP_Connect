@@ -99,6 +99,14 @@ export async function listAdminCompanies(
   );
 }
 
+export async function listCurrentUserCompanies(
+  pagination: PaginationParams = {}
+): Promise<InternalApiResult<PaginatedContract<AdminCurrentUserAccessContract["companies"][number]>>> {
+  return fetchInternal<PaginatedContract<AdminCurrentUserAccessContract["companies"][number]>>(
+    `admin-console/users/me/companies${formatPaginationSearch(pagination)}`
+  );
+}
+
 export async function getAdminCompany(
   id: string
 ): Promise<InternalApiResult<AdminCompanyContract>> {

@@ -36,6 +36,19 @@ export class AdminConsoleController {
     return this.adminConsole.getCurrentUserAccess(readInternalApiContext(headers));
   }
 
+  @Get("users/me/companies")
+  @AdminConsoleAuthenticatedOnly()
+  listCurrentUserCompanies(
+    @Query("page") page: string | undefined,
+    @Query("pageSize") pageSize: string | undefined,
+    @Headers() headers: Record<string, string | string[] | undefined>
+  ) {
+    return this.adminConsole.listCurrentUserCompanies(readInternalApiContext(headers), {
+      page,
+      pageSize
+    });
+  }
+
   @Get("overview")
   @AdminConsoleSuperAdminOnly()
   getOverview() {
