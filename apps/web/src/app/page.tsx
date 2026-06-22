@@ -253,7 +253,15 @@ function ContextualPortal({ access }: { access: AdminCurrentUserAccessContract }
   );
 }
 
-function getModuleHref(module: { companyId: string; entryPath: string | null }): string {
+function getModuleHref(module: {
+  applicationKey: string;
+  companyId: string;
+  entryPath: string | null;
+}): string {
+  if (module.applicationKey === "food") {
+    return `/sistemas/food?companyId=${module.companyId}`;
+  }
+
   const path = module.entryPath ?? "/";
   return path.includes("?")
     ? `${path}&companyId=${module.companyId}`

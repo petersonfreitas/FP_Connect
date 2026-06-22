@@ -2797,6 +2797,7 @@ function buildCurrentUserNavigation(
           label: "Sistemas",
           items: [
             { href: "/robots", label: "FP Robots" },
+            { href: "/sistemas/food", label: "FP Food" },
             { href: "/gateway", label: "FP Gateway" }
           ]
         },
@@ -2873,9 +2874,17 @@ function buildModuleNavigationItems(companies: AdminCurrentUserCompanyAccessCont
   return Array.from(modulesByApplication.values())
     .sort((first, second) => first.applicationName.localeCompare(second.applicationName, "pt-BR"))
     .map((module) => ({
-      href: module.entryPath ?? "/",
+      href: getModuleNavigationHref(module),
       label: module.applicationName
     }));
+}
+
+function getModuleNavigationHref(module: AdminCurrentUserModuleAccessContract): string {
+  if (module.applicationKey === "food") {
+    return "/sistemas/food";
+  }
+
+  return module.entryPath ?? "/";
 }
 
 function isGrantableCompanyApplication(application: AdminCompanyApplicationContract): boolean {

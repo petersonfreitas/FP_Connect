@@ -34,6 +34,7 @@ import type {
   GatewayProviderContract,
   GatewayProviderValidationContract,
   GatewaySmtpTestEmailContract,
+  FoodStoreContract,
   LinkAdminCompanySupportInput,
   ModuleAccessContract,
   ModuleApplicationKey,
@@ -105,6 +106,16 @@ export async function listCurrentUserCompanies(
   return fetchInternal<PaginatedContract<AdminCurrentUserAccessContract["companies"][number]>>(
     `admin-console/users/me/companies${formatPaginationSearch(pagination)}`
   );
+}
+
+export async function getFoodStore(
+  companyId: string
+): Promise<InternalApiResult<FoodStoreContract>> {
+  return fetchInternal<FoodStoreContract>("food/store", {
+    headers: {
+      "X-FP-Company-Id": companyId
+    }
+  });
 }
 
 export async function getAdminCompany(

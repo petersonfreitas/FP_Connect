@@ -1137,6 +1137,11 @@ button:disabled {
   padding: 20px;
 }
 
+.selected-module-card {
+  border-color: #c6d8df;
+  box-shadow: inset 0 0 0 2px var(--accent-soft);
+}
+
 .module-card-top {
   align-items: center;
   display: flex;
