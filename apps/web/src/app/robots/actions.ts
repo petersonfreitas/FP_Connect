@@ -17,13 +17,13 @@ export async function createRobotsTestEventAction(formData: FormData) {
   const result = await createRobotsTestEvent(companyId);
 
   if (result.error) {
-    redirect(`/robots?companyId=${companyId}&error=${encodeURIComponent(result.error)}`);
+    redirect(buildRobotsUrl({ companyId, error: result.error }));
   }
 
   const data = result.data;
 
   if (!data) {
-    redirect(`/robots?companyId=${companyId}&error=${encodeURIComponent("Resposta vazia da API")}`);
+    redirect(buildRobotsUrl({ companyId, error: "Resposta vazia da API" }));
   }
 
   redirect(`/robots?companyId=${companyId}&eventCreated=1&executions=${data.executionsCreated}`);
@@ -39,7 +39,7 @@ export async function createRobotsTestFailureAction(formData: FormData) {
   const result = await createRobotsTestFailure(companyId);
 
   if (result.error) {
-    redirect(`/robots?companyId=${companyId}&error=${encodeURIComponent(result.error)}`);
+    redirect(buildRobotsUrl({ companyId, error: result.error }));
   }
 
   redirect(`/robots?companyId=${companyId}&failureCreated=1`);
@@ -56,8 +56,22 @@ export async function reprocessRobotsExecutionAction(formData: FormData) {
   const result = await reprocessRobotsExecution(companyId, executionId);
 
   if (result.error) {
-    redirect(`/robots?companyId=${companyId}&error=${encodeURIComponent(result.error)}`);
+    redirect(buildRobotsUrl({ companyId, error: result.error }));
   }
 
   redirect(`/robots?companyId=${companyId}&reprocessed=1`);
+}
+
+function buildRobotsUrl(params: Record<string, string>): string {
+  const search = new URLSearchParams();
+
+  for (const [key, value] of Object.entries(params)) {
+    search.set(key, truncateQueryValue(value));
+  }
+
+  return `/robots?${search.toString()}`;
+}
+
+function truncateQueryValue(value: string): string {
+  return value.length > 500 ? `${value.slice(0, 497)}...` : value;
 }

@@ -15,6 +15,7 @@ import type {
   GatewayMercadoPagoOAuthContract,
   GatewayMercadoPagoOAuthStartContract,
   GatewayMercadoPagoPublicConfig,
+  GatewayPaymentMethodType,
   GatewayPaymentRequestContract,
   GatewayPaymentRequestStatus,
   GatewayProviderAuthType,
@@ -138,6 +139,15 @@ type MercadoPagoOrderResponse = {
 
 type MercadoPagoPixOrderOptions = {
   useManualSandbox: boolean;
+};
+
+type NormalizedPaymentRequestInput = Required<
+  Omit<CreateGatewayPaymentRequestInput, "cardToken" | "paymentMethodId" | "paymentMethodType">
+> & {
+  cardToken: string | null;
+  installments: number | null;
+  paymentMethodId: string | null;
+  paymentMethodType: GatewayPaymentMethodType;
 };
 
 const providerSelect = [
@@ -290,6 +300,9 @@ export class GatewayService {
         idempotency_key: normalized.idempotencyKey,
         provider_id: provider.id,
         request_payload: {
+          installments: normalized.installments,
+          paymentMethodId: normalized.paymentMethodId,
+          paymentMethodType: normalized.paymentMethodType,
           sourceApplicationKey: normalized.sourceApplicationKey,
           sourceReferenceId: normalized.sourceReferenceId,
           sourceReferenceType: normalized.sourceReferenceType
@@ -314,9 +327,10 @@ export class GatewayService {
         : "gateway.payment.requested";
 
     if (status === "requested" && provider.key === "mercado_pago" && providerConfig) {
-      return this.createMercadoPagoPixPaymentForPaymentRequest(
+      return this.createMercadoPagoPaymentForPaymentRequest(
         companyId,
         actorUserId,
+        normalized,
         paymentRequest,
         provider,
         providerConfig
@@ -923,9 +937,10 @@ export class GatewayService {
     return (data as PaymentRequestRow | null) ?? null;
   }
 
-  private async createMercadoPagoPixPaymentForPaymentRequest(
+  private async createMercadoPagoPaymentForPaymentRequest(
     companyId: string,
     actorUserId: string,
+    input: NormalizedPaymentRequestInput,
     paymentRequest: GatewayPaymentRequestContract,
     provider: GatewayProviderContract,
     providerConfig: CompanyProviderConfigRow
@@ -943,7 +958,7 @@ export class GatewayService {
     }
 
     try {
-      const order = await createMercadoPagoPixOrder(accessToken, paymentRequest, {
+      const order = await createMercadoPagoOrder(accessToken, paymentRequest, input, {
         useManualSandbox: providerConfig.public_config.mode === "manual_sandbox"
       });
       const pixPaymentMethod = getMercadoPagoPixPaymentMethod(order);
@@ -1213,14 +1228,18 @@ function normalizeSmtpInput(input: UpsertGatewaySmtpConfigInput): UpsertGatewayS
 
 function normalizePaymentRequestInput(
   input: CreateGatewayPaymentRequestInput
-): Required<CreateGatewayPaymentRequestInput> {
+): NormalizedPaymentRequestInput {
   const amountCents = Number(input.amountCents);
+  const cardToken = input.cardToken?.trim() || null;
   const currency = (input.currency?.trim().toUpperCase() || "BRL").slice(0, 3);
   const customerEmail = input.customerEmail?.trim().toLowerCase() || null;
   const customerName = input.customerName?.trim() || null;
   const customerPhone = input.customerPhone?.trim() || null;
   const description = input.description.trim();
   const idempotencyKey = input.idempotencyKey?.trim() || null;
+  const installments = input.installments == null ? null : Number(input.installments);
+  const paymentMethodId = input.paymentMethodId?.trim().toLowerCase() || null;
+  const paymentMethodType = input.paymentMethodType ?? "pix";
   const providerKey = input.providerKey?.trim().toLowerCase() || "mercado_pago";
   const sourceApplicationKey = input.sourceApplicationKey.trim().toLowerCase();
   const sourceReferenceId = input.sourceReferenceId.trim();
@@ -1242,6 +1261,28 @@ function normalizePaymentRequestInput(
     throw new BadRequestException("E-mail do cliente invalido");
   }
 
+  if (!["credit_card", "debit_card", "pix"].includes(paymentMethodType)) {
+    throw new BadRequestException("Metodo de pagamento invalido");
+  }
+
+  if (paymentMethodType === "pix" && (cardToken || paymentMethodId || installments)) {
+    throw new BadRequestException("Dados de cartao nao devem ser enviados para PIX");
+  }
+
+  if (paymentMethodType !== "pix") {
+    if (!cardToken || cardToken.length > 255) {
+      throw new BadRequestException("Token do cartao invalido");
+    }
+
+    if (!paymentMethodId || !/^[a-z0-9_-]{2,40}$/.test(paymentMethodId)) {
+      throw new BadRequestException("Bandeira do cartao invalida");
+    }
+
+    if (installments === null || installments < 1 || installments > 24) {
+      throw new BadRequestException("Numero de parcelas invalido");
+    }
+  }
+
   if (!/^[a-z0-9]+(?:_[a-z0-9]+)*$/.test(providerKey)) {
     throw new BadRequestException("Provedor de pagamento invalido");
   }
@@ -1260,12 +1301,16 @@ function normalizePaymentRequestInput(
 
   return {
     amountCents,
+    cardToken,
     currency,
     customerEmail,
     customerName,
     customerPhone,
     description,
     idempotencyKey,
+    installments,
+    paymentMethodId,
+    paymentMethodType,
     providerKey,
     sourceApplicationKey,
     sourceReferenceId,
@@ -1665,6 +1710,11 @@ class SmtpSession {
     }
 
     return new Promise((resolve, reject) => {
+      const timeout = setTimeout(() => {
+        cleanup();
+        this.socket.destroy();
+        reject(new BadRequestException("Tempo limite na conexao SMTP"));
+      }, 12000);
       const onConnected = () => {
         cleanup();
         resolve();
@@ -1673,13 +1723,21 @@ class SmtpSession {
         cleanup();
         reject(new BadRequestException(`Falha ao conectar ao SMTP: ${error.message}`));
       };
+      const onTimeout = () => {
+        cleanup();
+        this.socket.destroy();
+        reject(new BadRequestException("Tempo limite na conexao SMTP"));
+      };
       const cleanup = () => {
+        clearTimeout(timeout);
         this.socket.off(eventName, onConnected);
         this.socket.off("error", onError);
+        this.socket.off("timeout", onTimeout);
       };
 
       this.socket.once(eventName, onConnected);
       this.socket.once("error", onError);
+      this.socket.once("timeout", onTimeout);
     });
   }
 }
@@ -1714,9 +1772,10 @@ function normalizeSmtpSendError(error: unknown): string {
   return message || "Falha ao enviar e-mail SMTP de teste";
 }
 
-async function createMercadoPagoPixOrder(
+async function createMercadoPagoOrder(
   accessToken: string,
   paymentRequest: GatewayPaymentRequestContract,
+  input: NormalizedPaymentRequestInput,
   options: MercadoPagoPixOrderOptions
 ): Promise<MercadoPagoOrderResponse> {
   const client = new MercadoPagoConfig({
@@ -1740,6 +1799,14 @@ async function createMercadoPagoPixOrder(
     );
   }
 
+  const paymentMethod =
+    input.paymentMethodType === "pix"
+      ? {
+          id: "pix",
+          type: "bank_transfer"
+        }
+      : buildMercadoPagoCardPaymentMethod(input);
+
   return (await order.create({
     body: {
       description: paymentRequest.description,
@@ -1756,10 +1823,7 @@ async function createMercadoPagoPixOrder(
         payments: [
           {
             amount,
-            payment_method: {
-              id: "pix",
-              type: "bank_transfer"
-            }
+            payment_method: paymentMethod
           }
         ]
       },
@@ -1769,6 +1833,29 @@ async function createMercadoPagoPixOrder(
       idempotencyKey: `gateway-payment:${paymentRequest.companyId}:${paymentRequest.id}`
     }
   })) as MercadoPagoOrderResponse;
+}
+
+function buildMercadoPagoCardPaymentMethod(input: NormalizedPaymentRequestInput): {
+  id: string;
+  installments: number;
+  token: string;
+  type: "credit_card" | "debit_card";
+} {
+  if (
+    input.paymentMethodType === "pix" ||
+    !input.paymentMethodId ||
+    !input.cardToken ||
+    !input.installments
+  ) {
+    throw new BadRequestException("Dados de cartao incompletos");
+  }
+
+  return {
+    id: input.paymentMethodId,
+    installments: input.installments,
+    token: input.cardToken,
+    type: input.paymentMethodType
+  };
 }
 
 async function getMercadoPagoOrder(

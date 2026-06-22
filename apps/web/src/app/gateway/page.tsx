@@ -97,7 +97,7 @@ export default async function GatewayPage({ searchParams }: GatewayPageProps) {
 
   if (!access || !selectedCompanyId) {
     return (
-      <AppShell access={access ?? null} activePath="/gateway">
+      <AppShell access={access ?? null} accessError={accessResult.error} activePath="/gateway">
         <GatewayHeader badge="Shell V0" />
 
         {accessResult.error ? (
@@ -543,7 +543,8 @@ function PaymentRequestForm({
         teste do Mercado Pago. Para PIX, informe um e-mail valido de pagador diferente da conta
         vendedora usada no Access Token. No sandbox manual, o Gateway usa o nome APRO no payload
         enviado ao Mercado Pago e exige e-mail com dominio @testuser.com, conforme o roteiro
-        oficial de teste de Pix.
+        oficial de teste de Pix. Para cartao, informe apenas o token gerado pelo MercadoPago.js ou
+        Card Payment Brick; nunca informe numero/CVV no FP Console.
       </div>
 
       <form action={startGatewayMercadoPagoOAuthAction} className="form-actions">
@@ -604,6 +605,14 @@ function PaymentRequestForm({
           </select>
         </label>
         <label>
+          Meio de pagamento
+          <select defaultValue="pix" name="paymentMethodType">
+            <option value="pix">Pix</option>
+            <option value="credit_card">Cartao de credito</option>
+            <option value="debit_card">Cartao de debito</option>
+          </select>
+        </label>
+        <label>
           Valor
           <input defaultValue="200,00" inputMode="decimal" maxLength={14} name="amount" required />
         </label>
@@ -633,6 +642,24 @@ function PaymentRequestForm({
         <label>
           Telefone
           <input maxLength={40} name="customerPhone" placeholder="(00) 00000-0000" />
+        </label>
+        <label>
+          Bandeira do cartao
+          <input maxLength={40} name="paymentMethodId" placeholder="master, visa, elo" />
+        </label>
+        <label>
+          Parcelas
+          <input defaultValue="1" max={24} min={1} name="installments" type="number" />
+        </label>
+        <label className="form-full">
+          Token do cartao
+          <input
+            autoComplete="off"
+            maxLength={255}
+            name="cardToken"
+            placeholder="Token criado pelo MercadoPago.js/Card Payment Brick"
+            type="password"
+          />
         </label>
         <label className="form-full">
           Descricao
@@ -691,7 +718,7 @@ function PaymentRequestsTable({
             {paymentRequest.paymentUrl ? (
               <small>
                 <a href={paymentRequest.paymentUrl} rel="noreferrer" target="_blank">
-                  Abrir PIX
+                  Abrir pagamento
                 </a>
               </small>
             ) : null}

@@ -8,6 +8,7 @@ import { requireCurrentUser } from "@/lib/auth";
 import { getCurrentAdminAccess } from "@/lib/internal-api";
 
 type AppShellProps = {
+  accessError?: string | null;
   activePath?: string;
   access?: AdminCurrentUserAccessContract | null;
   children: ReactNode;
@@ -18,10 +19,12 @@ const fallbackNavigation: AdminNavigationContract = {
   groups: []
 };
 
-export async function AppShell({ access, activePath = "/", children }: AppShellProps) {
+export async function AppShell({ access, accessError, activePath = "/", children }: AppShellProps) {
   const user = await requireCurrentUser();
   const accessResult = access === undefined ? await getCurrentAdminAccess() : null;
   const navigation = access?.navigation ?? accessResult?.data?.navigation ?? fallbackNavigation;
+  const navigationError = accessError ?? accessResult?.error ?? null;
+  const isFallbackNavigation = navigation === fallbackNavigation;
 
   return (
     <main className="app-shell">
@@ -58,6 +61,13 @@ export async function AppShell({ access, activePath = "/", children }: AppShellP
               </div>
             </details>
           ))}
+
+          {isFallbackNavigation && navigationError ? (
+            <div className="nav-status" role="status">
+              <strong>Navegacao indisponivel</strong>
+              <span>Permissoes nao carregadas agora. Recarregue a pagina em instantes.</span>
+            </div>
+          ) : null}
         </nav>
       </aside>
 

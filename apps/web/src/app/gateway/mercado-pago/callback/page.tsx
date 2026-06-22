@@ -20,17 +20,20 @@ export default async function MercadoPagoCallbackPage({
 
   if (!companyId) {
     redirect(
-      `/gateway?tab=payments&error=${encodeURIComponent(
-        query.error_description ?? query.error ?? "Callback Mercado Pago sem empresa valida."
-      )}`
+      buildGatewayUrl({
+        error: query.error_description ?? query.error ?? "Callback Mercado Pago sem empresa valida.",
+        tab: "payments"
+      })
     );
   }
 
   if (query.error || !query.code || !query.state) {
     redirect(
-      `/gateway?companyId=${companyId}&tab=payments&error=${encodeURIComponent(
-        query.error_description ?? query.error ?? "Mercado Pago nao retornou codigo OAuth."
-      )}`
+      buildGatewayUrl({
+        companyId,
+        error: query.error_description ?? query.error ?? "Mercado Pago nao retornou codigo OAuth.",
+        tab: "payments"
+      })
     );
   }
 
@@ -40,10 +43,20 @@ export default async function MercadoPagoCallbackPage({
   });
 
   if (result.error) {
-    redirect(`/gateway?companyId=${companyId}&tab=payments&error=${encodeURIComponent(result.error)}`);
+    redirect(buildGatewayUrl({ companyId, error: result.error, tab: "payments" }));
   }
 
   redirect(`/gateway?companyId=${companyId}&tab=payments&mpOAuth=connected`);
+}
+
+function buildGatewayUrl(params: Record<string, string>): string {
+  const search = new URLSearchParams();
+
+  for (const [key, value] of Object.entries(params)) {
+    search.set(key, value.length > 500 ? `${value.slice(0, 497)}...` : value);
+  }
+
+  return `/gateway?${search.toString()}`;
 }
 
 function readCompanyIdFromState(state: string | undefined): string | null {

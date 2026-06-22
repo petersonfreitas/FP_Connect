@@ -34,7 +34,11 @@ export default async function RobotsEventDetailPage({
   const event = eventResult.data;
 
   return (
-    <AppShell access={accessResult.data ?? null} activePath="/robots">
+    <AppShell
+      access={accessResult.data ?? null}
+      accessError={accessResult.error}
+      activePath="/robots"
+    >
       <header className="topbar">
         <div>
           <div className="eyebrow">FP Robots</div>

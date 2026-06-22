@@ -31,10 +31,10 @@ export async function saveGatewaySmtpConfigAction(formData: FormData) {
   });
 
   if (result.error) {
-    redirect(`/gateway?companyId=${companyId}&tab=smtp&error=${encodeURIComponent(result.error)}`);
+    redirect(buildGatewayUrl({ companyId, error: result.error, tab: "smtp" }));
   }
 
-  redirect(`/gateway?companyId=${companyId}&tab=smtp&smtpSaved=1`);
+  redirect(buildGatewayUrl({ companyId, smtpSaved: "1", tab: "smtp" }));
 }
 
 export async function testGatewaySmtpConfigAction(formData: FormData) {
@@ -47,15 +47,13 @@ export async function testGatewaySmtpConfigAction(formData: FormData) {
   const result = await testGatewaySmtpConfig(companyId);
 
   if (result.error) {
-    redirect(`/gateway?companyId=${companyId}&tab=smtp&error=${encodeURIComponent(result.error)}`);
+    redirect(buildGatewayUrl({ companyId, error: result.error, tab: "smtp" }));
   }
 
   const status = result.data?.status ?? "failed";
   const message = result.data?.message ?? "Validacao SMTP concluida.";
 
-  redirect(
-    `/gateway?companyId=${companyId}&tab=smtp&smtpTest=${status}&message=${encodeURIComponent(message)}`
-  );
+  redirect(buildGatewayUrl({ companyId, message, smtpTest: status, tab: "smtp" }));
 }
 
 export async function sendGatewaySmtpTestEmailAction(formData: FormData) {
@@ -72,14 +70,12 @@ export async function sendGatewaySmtpTestEmailAction(formData: FormData) {
   });
 
   if (result.error) {
-    redirect(`/gateway?companyId=${companyId}&tab=smtp&error=${encodeURIComponent(result.error)}`);
+    redirect(buildGatewayUrl({ companyId, error: result.error, tab: "smtp" }));
   }
 
   const message = result.data?.message ?? "E-mail de teste enviado.";
 
-  redirect(
-    `/gateway?companyId=${companyId}&tab=smtp&smtpEmailSent=1&message=${encodeURIComponent(message)}`
-  );
+  redirect(buildGatewayUrl({ companyId, message, smtpEmailSent: "1", tab: "smtp" }));
 }
 
 export async function createGatewayPaymentRequestAction(formData: FormData) {
@@ -91,13 +87,21 @@ export async function createGatewayPaymentRequestAction(formData: FormData) {
 
   const sourceReferenceId =
     readFormString(formData, "sourceReferenceId") || `manual-${Date.now()}`;
+  const paymentMethodType = readFormString(formData, "paymentMethodType") || "pix";
   const result = await createGatewayPaymentRequest(companyId, {
     amountCents: parseMoneyToCents(readFormString(formData, "amount")),
+    cardToken: readFormString(formData, "cardToken") || null,
     customerEmail: readFormString(formData, "customerEmail") || null,
     customerName: readFormString(formData, "customerName") || null,
     customerPhone: readFormString(formData, "customerPhone") || null,
     description: readFormString(formData, "description"),
-    idempotencyKey: `gateway-payment-v0:${companyId}:${sourceReferenceId}`,
+    idempotencyKey: `gateway-payment-v0:${companyId}:${sourceReferenceId}:${paymentMethodType}`,
+    installments: parseOptionalInteger(readFormString(formData, "installments")),
+    paymentMethodId: readFormString(formData, "paymentMethodId") || null,
+    paymentMethodType:
+      paymentMethodType === "credit_card" || paymentMethodType === "debit_card"
+        ? paymentMethodType
+        : "pix",
     providerKey: readFormString(formData, "providerKey") || "mercado_pago",
     sourceApplicationKey: readFormString(formData, "sourceApplicationKey") || "food",
     sourceReferenceId,
@@ -105,12 +109,12 @@ export async function createGatewayPaymentRequestAction(formData: FormData) {
   });
 
   if (result.error) {
-    redirect(`/gateway?companyId=${companyId}&tab=payments&error=${encodeURIComponent(result.error)}`);
+    redirect(buildGatewayUrl({ companyId, error: result.error, tab: "payments" }));
   }
 
   const status = result.data?.status ?? "requested";
 
-  redirect(`/gateway?companyId=${companyId}&tab=payments&paymentCreated=${status}`);
+  redirect(buildGatewayUrl({ companyId, paymentCreated: status, tab: "payments" }));
 }
 
 export async function startGatewayMercadoPagoOAuthAction(formData: FormData) {
@@ -124,9 +128,11 @@ export async function startGatewayMercadoPagoOAuthAction(formData: FormData) {
 
   if (result.error || !result.data) {
     redirect(
-      `/gateway?companyId=${companyId}&error=${encodeURIComponent(
-        result.error ?? "Nao foi possivel iniciar OAuth Mercado Pago."
-      )}&tab=payments`
+      buildGatewayUrl({
+        companyId,
+        error: result.error ?? "Nao foi possivel iniciar OAuth Mercado Pago.",
+        tab: "payments"
+      })
     );
   }
 
@@ -148,10 +154,10 @@ export async function saveGatewayMercadoPagoManualConfigAction(formData: FormDat
   });
 
   if (result.error) {
-    redirect(`/gateway?companyId=${companyId}&tab=payments&error=${encodeURIComponent(result.error)}`);
+    redirect(buildGatewayUrl({ companyId, error: result.error, tab: "payments" }));
   }
 
-  redirect(`/gateway?companyId=${companyId}&tab=payments&mpManualSaved=1`);
+  redirect(buildGatewayUrl({ companyId, mpManualSaved: "1", tab: "payments" }));
 }
 
 export async function syncGatewayPaymentRequestStatusAction(formData: FormData) {
@@ -165,14 +171,12 @@ export async function syncGatewayPaymentRequestStatusAction(formData: FormData) 
   const result = await syncGatewayPaymentRequestStatus(companyId, paymentRequestId);
 
   if (result.error) {
-    redirect(
-      `/gateway?companyId=${companyId}&tab=payments&error=${encodeURIComponent(result.error)}`
-    );
+    redirect(buildGatewayUrl({ companyId, error: result.error, tab: "payments" }));
   }
 
   const status = result.data?.status ?? "requested";
 
-  redirect(`/gateway?companyId=${companyId}&tab=payments&paymentSynced=${status}`);
+  redirect(buildGatewayUrl({ companyId, paymentSynced: status, tab: "payments" }));
 }
 
 function readFormString(formData: FormData, key: string): string {
@@ -188,4 +192,27 @@ function parseMoneyToCents(value: string): number {
   }
 
   return Math.round(amount * 100);
+}
+
+function parseOptionalInteger(value: string): number | null {
+  if (!value) {
+    return null;
+  }
+
+  const parsed = Number(value);
+  return Number.isInteger(parsed) ? parsed : null;
+}
+
+function buildGatewayUrl(params: Record<string, string>): string {
+  const search = new URLSearchParams();
+
+  for (const [key, value] of Object.entries(params)) {
+    search.set(key, truncateQueryValue(value));
+  }
+
+  return `/gateway?${search.toString()}`;
+}
+
+function truncateQueryValue(value: string): string {
+  return value.length > 500 ? `${value.slice(0, 497)}...` : value;
 }

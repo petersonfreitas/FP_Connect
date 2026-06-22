@@ -74,7 +74,7 @@ export async function saveFoodStoreAction(formData: FormData): Promise<void> {
   const searchCompany = `companyId=${encodeURIComponent(companyId)}`;
 
   if (result.error) {
-    redirect(`/cadastro/loja?${searchCompany}&error=${encodeURIComponent(result.error)}`);
+    redirect(`/cadastro/loja?${searchCompany}&error=${encodeURIComponent(truncateQueryValue(result.error))}`);
   }
 
   redirect(`/cadastro/loja?${searchCompany}&saved=1`);
@@ -250,7 +250,9 @@ export async function createPublicFoodOrderAction(formData: FormData): Promise<v
 
   if (result.error || !result.data) {
     redirect(
-      `${basePath}?error=${encodeURIComponent(result.error ?? "Pedido nao foi criado.")}`
+      `${basePath}?error=${encodeURIComponent(
+        truncateQueryValue(result.error ?? "Pedido nao foi criado.")
+      )}`
     );
   }
 
@@ -265,7 +267,7 @@ export async function trackPublicFoodOrderAction(formData: FormData): Promise<vo
   const basePath = `/l/${encodeURIComponent(publicSlug)}`;
 
   if (!orderNumber) {
-    redirect(`${basePath}?error=${encodeURIComponent("Informe o numero do pedido.")}`);
+    redirect(`${basePath}?error=${encodeURIComponent(truncateQueryValue("Informe o numero do pedido."))}`);
   }
 
   redirect(`${basePath}/pedido/${encodeURIComponent(orderNumber)}`);
@@ -309,12 +311,16 @@ function redirectWithResult(
   }
 
   if (error) {
-    search.set("error", error);
+    search.set("error", truncateQueryValue(error));
     redirect(`${basePath}?${search.toString()}`);
   }
 
   search.set(successKey, "1");
   redirect(`${basePath}?${search.toString()}`);
+}
+
+function truncateQueryValue(value: string): string {
+  return value.length > 500 ? `${value.slice(0, 497)}...` : value;
 }
 
 function optionalText(value: FormDataEntryValue | null): string | null {

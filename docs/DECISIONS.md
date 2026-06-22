@@ -93,6 +93,7 @@ Este arquivo registra decisoes arquiteturais e operacionais para evitar retrabal
 | DEC-085 | A correlacao FP Gateway -> Mercado Pago Orders deve usar `external_reference` com o ID da `gateway.payment_requests`; campos internos customizados nao devem ser enviados em `additional_info`, pois a Orders API rejeita propriedades nao suportadas. | Aprovada |
 | DEC-086 | No sandbox manual Mercado Pago, o FP Gateway deve validar e-mail de pagador com dominio `@testuser.com` antes da chamada externa, evitando falha `invalid_email_for_sandbox`. | Aprovada |
 | DEC-087 | Ao criar uma order Mercado Pago, o FP Gateway deve normalizar o status retornado imediatamente; se a order ja nascer paga no sandbox, grava `paid` e emite `gateway.payment.requested` seguido de `gateway.payment.paid`. | Aprovada |
+| DEC-088 | Cartoes de credito/debito Mercado Pago no FP Gateway devem usar Checkout Transparente via Orders API com token gerado por MercadoPago.js/Card Payment Brick; o FP Console e a API nao devem coletar nem armazenar numero, validade ou CVV do cartao. | Aprovada |
 
 ---
 

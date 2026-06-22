@@ -44,7 +44,7 @@ export default async function Home() {
 
   if (!access) {
     return (
-      <AppShell access={null} activePath="/">
+      <AppShell access={null} accessError={accessResult.error} activePath="/">
         <header className="topbar">
           <div>
             <div className="eyebrow">Portal principal</div>

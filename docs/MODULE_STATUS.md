@@ -26,7 +26,7 @@ Este arquivo controla o avanco dos modulos do ecossistema.
 | FP Tickets | Futura | 0 | Fundacao de acesso preparada | Endpoint interno `/api/tickets/access` ja valida empresa, modulo contratado e permissao; entrara apos base operacional. |
 | FP Sales | Futura | 0 | Fundacao de acesso preparada | Endpoint interno `/api/sales/access` ja valida empresa, modulo contratado e permissao; entrara apos base operacional. |
 | FP Marketing | Futura | 0 | Fundacao de acesso preparada | Endpoint interno `/api/marketing/access` ja valida empresa, modulo contratado e permissao; entrara apos base operacional. |
-| FP Gateway | Alta | 2 | Base funcional inicial | Shell V0 em `/gateway`, schema `gateway`, catalogo de provedores, configuracao SMTP por empresa, teste basico/envio de e-mail SMTP com pendencia de timeout em ambiente/provedor, OAuth Mercado Pago por empresa iniciado, sandbox manual Mercado Pago para localhost, contrato interno V0 de solicitacao de pagamento e eventos `gateway.*` para Robots. |
+| FP Gateway | Alta | 2 | Base funcional inicial | Shell V0 em `/gateway`, schema `gateway`, catalogo de provedores, configuracao SMTP por empresa, teste/envio SMTP com timeout controlado, OAuth Mercado Pago por empresa iniciado, sandbox manual Mercado Pago, contrato interno V0 de solicitacao de pagamento, PIX e cartao tokenizado via Orders API, e eventos `gateway.*` para Robots. |
 | FP Fiscal | Alta/Media | 0 | Backlog criado | Modulo fiscal proprio, com foco inicial na evolucao fiscal do FP Food. |
 | FP Sign | Media | 0 | Backlog criado | Aceite simples, contratos, propostas e arquivamento documental; sem assinatura digital avancada no MVP. |
 | FP BI | Media/Baixa | 0 | Backlog criado | Indicadores e dashboards; evoluir apos maturidade dos modulos transacionais. |
@@ -179,6 +179,8 @@ Este arquivo controla o avanco dos modulos do ecossistema.
 - [x] Validacao sandbox PIX para e-mail de pagador com dominio `@testuser.com`
 - [x] Consulta manual de status Mercado Pago Orders na tela de Pagamentos V0
 - [x] Status inicial da order Mercado Pago normalizado na criacao, com `gateway.payment.paid` imediato quando sandbox nascer pago
+- [x] Contrato V0 preparado para cartao de credito/debito Mercado Pago com token gerado por MercadoPago.js/Card Payment Brick
+- [ ] Smoke test com cartao Mercado Pago sandbox
 - [ ] Smoke test com PIX Mercado Pago sandbox
 - [ ] Integracao Food -> Gateway para solicitar pagamento a partir do pedido
 - [ ] Webhook externo normalizado

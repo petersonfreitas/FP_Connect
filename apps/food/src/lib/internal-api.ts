@@ -452,9 +452,19 @@ async function readErrorDetail(response: Response): Promise<string | undefined> 
     const detail = typeof body?.detail === "string" ? body.detail : undefined;
     const message = typeof body?.message === "string" ? body.message : undefined;
 
-    return detail ?? message;
+    return truncateErrorDetail(detail ?? message);
   }
 
   const text = await response.text().catch(() => "");
-  return text || undefined;
+  return truncateErrorDetail(text);
+}
+
+function truncateErrorDetail(value: string | undefined): string | undefined {
+  const normalized = value?.replace(/\s+/g, " ").trim();
+
+  if (!normalized) {
+    return undefined;
+  }
+
+  return normalized.length > 500 ? `${normalized.slice(0, 497)}...` : normalized;
 }

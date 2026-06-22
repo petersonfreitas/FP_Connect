@@ -61,7 +61,7 @@ export default async function RobotsPage({ searchParams }: RobotsPageProps) {
 
   if (!access || !selectedCompanyId) {
     return (
-      <AppShell access={access ?? null} activePath="/robots">
+      <AppShell access={access ?? null} accessError={accessResult.error} activePath="/robots">
         <RobotsHeader badge="V0" />
 
         {accessResult.error ? (

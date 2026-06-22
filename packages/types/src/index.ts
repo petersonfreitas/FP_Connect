@@ -142,6 +142,8 @@ export type GatewayPaymentRequestStatus =
   | "requested"
   | "requires_provider_config";
 
+export type GatewayPaymentMethodType = "credit_card" | "debit_card" | "pix";
+
 export type GatewayPaymentRequestContract = {
   amountCents: number;
   companyId: string;
@@ -166,12 +168,16 @@ export type GatewayPaymentRequestContract = {
 
 export type CreateGatewayPaymentRequestInput = {
   amountCents: number;
+  cardToken?: string | null;
   currency?: string | null;
   customerEmail?: string | null;
   customerName?: string | null;
   customerPhone?: string | null;
   description: string;
   idempotencyKey?: string | null;
+  installments?: number | null;
+  paymentMethodId?: string | null;
+  paymentMethodType?: GatewayPaymentMethodType | null;
   providerKey?: string | null;
   sourceApplicationKey: string;
   sourceReferenceId: string;

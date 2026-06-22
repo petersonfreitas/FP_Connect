@@ -88,6 +88,7 @@ O FP Gateway foi iniciado como shell no FP Console:
 - modo sandbox manual Mercado Pago por empresa para validar PIX no Checkout Transparente em localhost antes de Vercel/webhook;
 - tabela `gateway.payment_requests`, endpoint interno e tela V0 para solicitacoes de pagamento;
 - criacao de PIX Mercado Pago alinhada ao Checkout Transparente via Orders API (`POST /v1/orders`);
+- contrato V0 de cartao de credito/debito Mercado Pago usando token gerado por MercadoPago.js/Card Payment Brick, sem coletar dados sensiveis de cartao no FP Console;
 - eventos `gateway.payment.requested`, `gateway.payment.requires_provider_config`, `gateway.payment.failed` e `gateway.payment.paid`;
 - evento `gateway.mercado_pago.oauth_connected`;
 - `gateway` exposto no `supabase/config.toml`.
