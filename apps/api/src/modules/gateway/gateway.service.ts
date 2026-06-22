@@ -802,7 +802,7 @@ export class GatewayService {
         testMessage
       );
     } catch (error) {
-      const message = normalizeSmtpSendError(error);
+      const message = normalizeSmtpSendError(error, smtpConfig);
 
       await this.safeCreateGatewayEvent(companyId, actorUserId, {
         eventCode: "gateway.smtp.test_email_failed",
@@ -1792,6 +1792,12 @@ async function sendSmtpEmail(
     throw new BadRequestException("Senha SMTP obrigatoria para usuario configurado");
   }
 
+  const securityHint = getSmtpSecurityHint(config);
+
+  if (securityHint) {
+    throw new BadRequestException(securityHint);
+  }
+
   const session = await SmtpSession.connect(config);
 
   try {
@@ -2090,7 +2096,10 @@ function assertExpectedResponse(response: SmtpResponse, expectedCodes: number[])
   }
 }
 
-function normalizeSmtpSendError(error: unknown): string {
+function normalizeSmtpSendError(
+  error: unknown,
+  config?: Pick<GatewaySmtpPublicConfig, "port" | "secure">
+): string {
   const message = error instanceof Error ? error.message : String(error);
 
   if (message.includes("535")) {
@@ -2098,6 +2107,16 @@ function normalizeSmtpSendError(error: unknown): string {
       "SMTP respondeu 535: autenticacao recusada pelo provedor.",
       "Confirme usuario completo, senha/app password e se o SMTP AUTH esta habilitado para a caixa/tenant."
     ].join(" ");
+  }
+
+  if (message.includes("wrong version number") || message.includes("ERR_SSL_WRONG_VERSION_NUMBER")) {
+    return [
+      "Falha TLS/SMTP: a porta configurada nao combina com o modo de seguranca.",
+      config ? getSmtpSecurityHint(config) : null,
+      "Use 587/2587/25 com STARTTLS (TLS direta desmarcada) ou 465/2465 com TLS direta marcada."
+    ]
+      .filter(Boolean)
+      .join(" ");
   }
 
   return message || "Falha ao enviar e-mail SMTP de teste";

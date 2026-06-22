@@ -169,6 +169,7 @@ Este arquivo controla o avanco dos modulos do ecossistema.
 - [x] Evento `gateway.smtp.test_email_sent` para FP Robots
 - [x] Evento `gateway.smtp.test_email_failed` para falha de envio SMTP
 - [x] Tratamento de erro TLS/SMTP para evitar queda do processo da API em provedor mal configurado
+- [x] Mensagem operacional para erro SMTP `wrong version number`, orientando porta/TLS correta
 - [ ] Estabilizacao operacional SMTP em provedor/rede sem timeout
 - [x] Tabela `gateway.payment_requests`
 - [x] Contrato interno V0 para solicitar pagamento
