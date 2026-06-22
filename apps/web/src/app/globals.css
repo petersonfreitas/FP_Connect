@@ -653,6 +653,39 @@ button.primary-action {
   font-weight: 800;
 }
 
+.filter-bar {
+  align-items: end;
+  border-bottom: 1px solid var(--line);
+  display: grid;
+  gap: 12px;
+  grid-template-columns: minmax(220px, 1fr) minmax(160px, 0.5fr) minmax(160px, 0.5fr) auto;
+  margin-bottom: 8px;
+  padding-bottom: 18px;
+}
+
+.filter-bar label {
+  color: var(--muted);
+  display: grid;
+  font-size: 13px;
+  font-weight: 800;
+  gap: 8px;
+}
+
+.filter-bar input,
+.filter-bar select {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  color: var(--foreground);
+  font: inherit;
+  padding: 10px 12px;
+  width: 100%;
+}
+
+.filter-actions {
+  display: flex;
+  gap: 8px;
+}
+
 .data-table {
   display: grid;
 }
@@ -1525,6 +1558,7 @@ button:disabled {
   .audit-row,
   .bulk-action-bar,
   .contracted-module-row,
+  .filter-bar,
   .form-grid,
   .module-catalog-row,
   .modules-row,

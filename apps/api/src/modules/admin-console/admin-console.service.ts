@@ -66,6 +66,12 @@ type PaginationOptions = {
   pageSize?: string;
 };
 
+type CurrentUserCompanyListOptions = PaginationOptions & {
+  module?: string;
+  q?: string;
+  status?: string;
+};
+
 type UserListScope = "all" | "company" | "platform";
 
 type UserListOptions = PaginationOptions & {
@@ -226,6 +232,7 @@ const auditLogSelect =
 const basicPlanApplicationSelect = "basic_plan_id,application_id";
 const defaultPage = 1;
 const defaultPageSize = 20;
+const emptyUuid = "00000000-0000-0000-0000-000000000000";
 const maxPageSize = 100;
 const supportAssignmentRoles = new Set<UserGlobalRole>(["super_admin", "fp_admin", "support"]);
 
@@ -269,7 +276,7 @@ export class AdminConsoleService {
 
   async listCurrentUserCompanies(
     context: InternalApiContext = emptyInternalApiContext,
-    options: PaginationOptions = {}
+    options: CurrentUserCompanyListOptions = {}
   ): Promise<PaginatedContract<AdminCurrentUserCompanyAccessContract>> {
     if (!context.actorUserId) {
       throw new UnauthorizedException("Authenticated actor is required");
@@ -280,13 +287,44 @@ export class AdminConsoleService {
 
     const pagination = normalizePagination(options);
     const { from, to } = getPaginationRange(pagination);
-    const { count, data, error } = await this.supabase.core
+    const status = normalizeCompanyStatusFilter(options.status);
+    const search = normalizeSearchTerm(options.q);
+    const moduleKey = normalizeModuleKeyFilter(options.module);
+    let query = this.supabase.core
       .from("company_memberships")
       .select("id,company_id,user_id,status,is_primary_contact", { count: "exact" })
       .eq("user_id", actorUserId)
       .is("deleted_at", null)
-      .order("created_at", { ascending: false })
-      .range(from, to);
+      .order("created_at", { ascending: false });
+
+    if (status) {
+      const companyIds = await this.listCompanyIdsByStatus(status);
+      query =
+        companyIds.length > 0
+          ? query.in("company_id", companyIds)
+          : query.eq("company_id", emptyUuid);
+    }
+
+    if (search) {
+      const companyIds = await this.listCompanyIdsBySearch(search);
+      query =
+        companyIds.length > 0
+          ? query.in("company_id", companyIds)
+          : query.eq("company_id", emptyUuid);
+    }
+
+    if (moduleKey) {
+      const companyIds = await this.listCompanyIdsByUserAccessibleApplication(
+        actorUserId,
+        moduleKey
+      );
+      query =
+        companyIds.length > 0
+          ? query.in("company_id", companyIds)
+          : query.eq("company_id", emptyUuid);
+    }
+
+    const { count, data, error } = await query.range(from, to);
 
     if (error) {
       throwSupabaseError(error);
@@ -1833,6 +1871,74 @@ export class AdminConsoleService {
     );
   }
 
+  private async listCompanyIdsByStatus(
+    status: AdminCompanyContract["status"]
+  ): Promise<string[]> {
+    const { data, error } = await this.supabase.core
+      .from("companies")
+      .select("id")
+      .eq("status", status)
+      .is("deleted_at", null);
+
+    if (error) {
+      throwSupabaseError(error);
+    }
+
+    return ((data ?? []) as Array<{ id: string }>).map((row) => row.id);
+  }
+
+  private async listCompanyIdsBySearch(search: string): Promise<string[]> {
+    const query = escapePostgrestOrValue(search);
+    const { data, error } = await this.supabase.core
+      .from("companies")
+      .select("id")
+      .is("deleted_at", null)
+      .or(`legal_name.ilike.%${query}%,trade_name.ilike.%${query}%,document.ilike.%${query}%`);
+
+    if (error) {
+      throwSupabaseError(error);
+    }
+
+    return ((data ?? []) as Array<{ id: string }>).map((row) => row.id);
+  }
+
+  private async listCompanyIdsByUserAccessibleApplication(
+    userId: string,
+    applicationKey: string
+  ): Promise<string[]> {
+    const { data: application, error: applicationError } = await this.supabase.core
+      .from("applications")
+      .select("id")
+      .eq("key", applicationKey)
+      .is("deleted_at", null)
+      .maybeSingle();
+
+    if (applicationError) {
+      throwSupabaseError(applicationError);
+    }
+
+    if (!application) {
+      return [];
+    }
+
+    const applicationId = (application as { id: string }).id;
+    const [grantRows, companyApplicationRows] = await Promise.all([
+      this.listUserApplicationRoleRowsByUserIdAndApplication(userId, applicationId),
+      this.listCompanyApplicationRowsByApplicationId(applicationId)
+    ]);
+    const contractedCompanyIds = new Set(
+      companyApplicationRows
+        .filter((row) => isGrantableCompanyApplicationStatus(row.status))
+        .map((row) => row.company_id)
+    );
+
+    return unique(
+      grantRows
+        .map((row) => row.company_id)
+        .filter((companyId) => contractedCompanyIds.has(companyId))
+    );
+  }
+
   private async buildCompanyAccessForMemberships(
     userId: string,
     memberships: CompanyUserRow[]
@@ -2216,6 +2322,25 @@ export class AdminConsoleService {
     return (data ?? []) as UserApplicationRoleRow[];
   }
 
+  private async listUserApplicationRoleRowsByUserIdAndApplication(
+    userId: string,
+    applicationId: string
+  ): Promise<UserApplicationRoleRow[]> {
+    const { data, error } = await this.supabase.core
+      .from("user_application_roles")
+      .select(userApplicationRoleSelect)
+      .eq("user_id", userId)
+      .eq("application_id", applicationId)
+      .is("deleted_at", null)
+      .order("created_at", { ascending: false });
+
+    if (error) {
+      throwSupabaseError(error);
+    }
+
+    return (data ?? []) as UserApplicationRoleRow[];
+  }
+
   private async listCompanyApplicationRowsByCompanyIds(
     companyIds: string[]
   ): Promise<CompanyApplicationRow[]> {
@@ -2227,6 +2352,22 @@ export class AdminConsoleService {
       .from("company_applications")
       .select(companyApplicationSelect)
       .in("company_id", companyIds)
+      .is("deleted_at", null);
+
+    if (error) {
+      throwSupabaseError(error);
+    }
+
+    return (data ?? []) as CompanyApplicationRow[];
+  }
+
+  private async listCompanyApplicationRowsByApplicationId(
+    applicationId: string
+  ): Promise<CompanyApplicationRow[]> {
+    const { data, error } = await this.supabase.core
+      .from("company_applications")
+      .select(companyApplicationSelect)
+      .eq("application_id", applicationId)
       .is("deleted_at", null);
 
     if (error) {
@@ -2362,6 +2503,45 @@ function normalizeUserListScope(value: string | undefined): UserListScope {
   }
 
   return "all";
+}
+
+function normalizeCompanyStatusFilter(
+  value: string | undefined
+): AdminCompanyContract["status"] | null {
+  if (
+    value === "active" ||
+    value === "cancelled" ||
+    value === "implementation" ||
+    value === "suspended"
+  ) {
+    return value;
+  }
+
+  return null;
+}
+
+function normalizeModuleKeyFilter(value: string | undefined): string | null {
+  const normalized = value?.trim().toLowerCase() ?? "";
+
+  if (!/^[a-z0-9_-]{2,40}$/.test(normalized)) {
+    return null;
+  }
+
+  return normalized;
+}
+
+function normalizeSearchTerm(value: string | undefined): string | null {
+  const normalized = value?.replace(/\s+/g, " ").trim() ?? "";
+
+  if (normalized.length < 2) {
+    return null;
+  }
+
+  return normalized.slice(0, 80);
+}
+
+function escapePostgrestOrValue(value: string): string {
+  return value.replace(/[,%]/g, " ").replace(/\s+/g, " ").trim();
 }
 
 function getPaginationRange(pagination: Required<PaginationOptions>): { from: number; to: number } {

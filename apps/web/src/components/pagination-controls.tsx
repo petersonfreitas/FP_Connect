@@ -4,6 +4,7 @@ type PaginationControlsProps = {
   basePath: string;
   page: number;
   pageSize: number;
+  searchParams?: Record<string, string | undefined>;
   total: number;
   totalPages: number;
 };
@@ -12,6 +13,7 @@ export function PaginationControls({
   basePath,
   page,
   pageSize,
+  searchParams,
   total,
   totalPages
 }: PaginationControlsProps) {
@@ -31,7 +33,10 @@ export function PaginationControls({
       </span>
       <div>
         {page > 1 ? (
-          <Link className="secondary-action compact-action" href={getPageHref(basePath, previousPage)}>
+          <Link
+            className="secondary-action compact-action"
+            href={getPageHref(basePath, previousPage, searchParams)}
+          >
             Anterior
           </Link>
         ) : (
@@ -41,7 +46,10 @@ export function PaginationControls({
           Pagina {page} de {totalPages}
         </strong>
         {page < totalPages ? (
-          <Link className="secondary-action compact-action" href={getPageHref(basePath, nextPage)}>
+          <Link
+            className="secondary-action compact-action"
+            href={getPageHref(basePath, nextPage, searchParams)}
+          >
             Proxima
           </Link>
         ) : (
@@ -52,6 +60,20 @@ export function PaginationControls({
   );
 }
 
-function getPageHref(basePath: string, page: number): string {
-  return `${basePath}?page=${page}`;
+function getPageHref(
+  basePath: string,
+  page: number,
+  searchParams: Record<string, string | undefined> = {}
+): string {
+  const params = new URLSearchParams();
+
+  for (const [key, value] of Object.entries(searchParams)) {
+    if (value) {
+      params.set(key, value);
+    }
+  }
+
+  params.set("page", String(page));
+
+  return `${basePath}?${params.toString()}`;
 }

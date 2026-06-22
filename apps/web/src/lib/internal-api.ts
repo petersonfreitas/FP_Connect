@@ -87,9 +87,12 @@ export async function getCurrentAdminAccess(): Promise<
 }
 
 type PaginationParams = {
+  module?: string;
   page?: number;
   pageSize?: number;
+  q?: string;
   scope?: "all" | "company" | "platform";
+  status?: string;
 };
 
 export async function listAdminCompanies(
@@ -675,8 +678,12 @@ function getInternalApiBaseUrl(): string {
   return baseUrl.endsWith("/api") ? baseUrl : `${baseUrl}/api`;
 }
 
-function formatPaginationSearch({ page, pageSize, scope }: PaginationParams): string {
+function formatPaginationSearch({ module, page, pageSize, q, scope, status }: PaginationParams): string {
   const params = new URLSearchParams();
+
+  if (module) {
+    params.set("module", module);
+  }
 
   if (page) {
     params.set("page", String(page));
@@ -688,6 +695,14 @@ function formatPaginationSearch({ page, pageSize, scope }: PaginationParams): st
 
   if (scope && scope !== "all") {
     params.set("scope", scope);
+  }
+
+  if (q) {
+    params.set("q", q);
+  }
+
+  if (status) {
+    params.set("status", status);
   }
 
   const search = params.toString();

@@ -41,11 +41,17 @@ export class AdminConsoleController {
   listCurrentUserCompanies(
     @Query("page") page: string | undefined,
     @Query("pageSize") pageSize: string | undefined,
+    @Query("q") q: string | undefined,
+    @Query("status") status: string | undefined,
+    @Query("module") module: string | undefined,
     @Headers() headers: Record<string, string | string[] | undefined>
   ) {
     return this.adminConsole.listCurrentUserCompanies(readInternalApiContext(headers), {
+      module,
       page,
-      pageSize
+      pageSize,
+      q,
+      status
     });
   }
 
