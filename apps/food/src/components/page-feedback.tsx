@@ -1,4 +1,10 @@
-export function Notice({ message, tone }: { message: string; tone: "danger" | "success" }) {
+export function Notice({
+  message,
+  tone
+}: {
+  message: string;
+  tone: "danger" | "success" | "warning";
+}) {
   return (
     <div className={`notice ${tone}`} role="status">
       {message}

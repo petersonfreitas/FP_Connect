@@ -1,6 +1,10 @@
 import { Body, Controller, Get, Param, Post, UseGuards } from "@nestjs/common";
 import { InternalApiGuard } from "../../auth/internal-api.guard";
-import type { CreateFoodOrderInput, CreatePublicFoodCheckoutInput } from "./food.contracts";
+import type {
+  CreateFoodOrderInput,
+  CreatePublicFoodCheckoutInput,
+  RetryPublicFoodPaymentInput
+} from "./food.contracts";
 import { FoodService } from "./food.service";
 
 @Controller("food/public")
@@ -40,5 +44,14 @@ export class FoodPublicController {
     @Param("publicSlug") publicSlug: string
   ) {
     return this.foodService.createPublicCheckout(publicSlug, input);
+  }
+
+  @Post("stores/:publicSlug/orders/:orderNumber/checkout")
+  retryPublicOrderPayment(
+    @Body() input: RetryPublicFoodPaymentInput,
+    @Param("orderNumber") orderNumber: string,
+    @Param("publicSlug") publicSlug: string
+  ) {
+    return this.foodService.retryPublicOrderPayment(publicSlug, orderNumber, input);
   }
 }

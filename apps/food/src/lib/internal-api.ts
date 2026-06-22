@@ -16,6 +16,7 @@ import type {
   FoodStoreContract,
   ModuleAccessContract,
   PaginatedContract,
+  RetryPublicFoodPaymentInput,
   UpdateFoodOrderPaymentInput,
   UpdateFoodOrderStatusInput,
   UpsertFoodCategoryInput,
@@ -293,6 +294,22 @@ export async function createPublicFoodCheckout(
 ): Promise<InternalApiResult<CreatePublicFoodCheckoutContract>> {
   return fetchPublicInternal<CreatePublicFoodCheckoutContract>(
     `food/public/stores/${encodeURIComponent(publicSlug)}/checkout`,
+    {
+      body: JSON.stringify(input),
+      method: "POST"
+    }
+  );
+}
+
+export async function retryPublicFoodPayment(
+  publicSlug: string,
+  orderNumber: string,
+  input: RetryPublicFoodPaymentInput
+): Promise<InternalApiResult<CreatePublicFoodCheckoutContract>> {
+  return fetchPublicInternal<CreatePublicFoodCheckoutContract>(
+    `food/public/stores/${encodeURIComponent(publicSlug)}/orders/${encodeURIComponent(
+      orderNumber
+    )}/checkout`,
     {
       body: JSON.stringify(input),
       method: "POST"

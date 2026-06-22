@@ -2,7 +2,8 @@ import Link from "next/link";
 import type { FoodPaymentStatus } from "@fp/types";
 import { Notice } from "@/components/page-feedback";
 import { PublicCustomerMenu } from "@/components/public-customer-menu";
-import { getPublicFoodOrder } from "@/lib/internal-api";
+import { PublicOrderPaymentRetry } from "@/components/public-order-payment-retry";
+import { getPublicFoodCheckout, getPublicFoodOrder } from "@/lib/internal-api";
 
 type PublicOrderPageProps = {
   params: Promise<{
@@ -11,6 +12,8 @@ type PublicOrderPageProps = {
   }>;
   searchParams?: Promise<{
     created?: string;
+    payment?: "failed" | "paid" | "pending";
+    retry?: string;
   }>;
 };
 
@@ -46,7 +49,10 @@ export default async function PublicOrderPage({
   searchParams
 }: PublicOrderPageProps) {
   const [{ orderNumber, slug }, query] = await Promise.all([params, searchParams]);
-  const orderResult = await getPublicFoodOrder(slug, orderNumber);
+  const [orderResult, checkoutResult] = await Promise.all([
+    getPublicFoodOrder(slug, orderNumber),
+    getPublicFoodCheckout(slug)
+  ]);
 
   if (orderResult.error || !orderResult.data) {
     return (
@@ -77,6 +83,21 @@ export default async function PublicOrderPage({
 
       {query?.created ? (
         <Notice tone="success" message={`Pedido ${order.orderNumber} enviado para a loja.`} />
+      ) : null}
+      {query?.retry && query.payment === "paid" ? (
+        <Notice tone="success" message="Pagamento aprovado na nova tentativa." />
+      ) : null}
+      {query?.payment === "failed" ? (
+        <Notice
+          tone="danger"
+          message="Pagamento recusado. Voce pode tentar novamente com outro cartao."
+        />
+      ) : null}
+      {query?.payment === "pending" ? (
+        <Notice
+          tone="warning"
+          message="Pagamento pendente. Aguarde a confirmacao ou tente novamente com outro cartao."
+        />
       ) : null}
 
       <section className="public-hero">
@@ -138,6 +159,12 @@ export default async function PublicOrderPage({
           ))}
         </div>
       </section>
+
+      <PublicOrderPaymentRetry
+        checkout={checkoutResult.data}
+        order={order}
+        slug={slug}
+      />
     </main>
   );
 }

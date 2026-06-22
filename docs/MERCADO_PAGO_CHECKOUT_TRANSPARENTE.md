@@ -22,6 +22,7 @@ Referencia operacional para a evolucao do FP Gateway com Mercado Pago Orders API
 - Para cartao, o frontend deve usar Card Payment Brick preferencialmente; Core Methods fica como alternativa quando for preciso controlar mais a UX.
 - A solicitacao interna deve trafegar apenas dados normalizados: valor, comprador, origem, `paymentMethodType`, `paymentMethodId`, `installments` e `cardToken`.
 - Webhooks/notificacoes devem atualizar `gateway.payment_requests` e publicar eventos `gateway.payment.*`.
+- Retentativas de pagamento em pedido existente nao devem duplicar `food.orders`; cada nova tentativa cria uma nova `gateway.payment_requests` com a mesma origem do pedido.
 
 ## Evolucao sugerida
 
@@ -31,3 +32,7 @@ Referencia operacional para a evolucao do FP Gateway com Mercado Pago Orders API
 4. Processar order no backend e retornar status normalizado para o Food. Concluido como V0 para status inicial `paid`, `pending` ou `failed`.
 5. Implementar webhook publico no Gateway para conciliacao assincrona.
 6. Atualizar pedido Food conforme eventos normalizados do Gateway.
+
+## Validacoes
+
+- 2026-06-22: smoke test online do checkout publico com cartao de credito validado no sandbox Mercado Pago usando os cenarios APRO, OTHE e CONT.

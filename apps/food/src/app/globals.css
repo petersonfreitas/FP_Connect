@@ -333,6 +333,11 @@ textarea {
   color: var(--success);
 }
 
+.notice.warning {
+  background: #fff7e6;
+  color: #9a5b00;
+}
+
 .company-switcher {
   display: flex;
   flex-wrap: wrap;

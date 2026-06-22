@@ -189,6 +189,10 @@ export type CreatePublicFoodCheckoutContract = {
   paymentUrl: string | null;
 };
 
+export type RetryPublicFoodPaymentInput = {
+  payment?: CreatePublicFoodCheckoutInput["payment"];
+};
+
 export type UpdateFoodOrderStatusInput = {
   status: FoodOrderStatus;
 };

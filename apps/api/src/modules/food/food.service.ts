@@ -4,6 +4,7 @@ import {
   Injectable,
   NotFoundException
 } from "@nestjs/common";
+import { randomUUID } from "node:crypto";
 import { GatewayService } from "../gateway/gateway.service";
 import { RobotsService } from "../robots/robots.service";
 import { SupabaseService } from "../../supabase/supabase.service";
@@ -28,6 +29,7 @@ import type {
   FoodStoreContract,
   FoodStoreStatus,
   PaginatedContract,
+  RetryPublicFoodPaymentInput,
   UpdateFoodOrderPaymentInput,
   UpdateFoodOrderStatusInput,
   UpsertFoodCategoryInput,
@@ -629,34 +631,76 @@ export class FoodService {
     };
   }
 
+  async retryPublicOrderPayment(
+    publicSlug: string,
+    orderNumber: string,
+    input: RetryPublicFoodPaymentInput
+  ): Promise<CreatePublicFoodCheckoutContract> {
+    const store = await this.getStoreByPublicSlug(publicSlug);
+    await this.ensurePublicStoreReadable(store);
+    const order = await this.getPublicOrderFromStore(store, orderNumber);
+    const payment = normalizePublicCheckoutPayment(input.payment);
+
+    if (order.paymentStatus === "paid") {
+      throw new BadRequestException("Pedido ja esta pago");
+    }
+
+    if (order.status === "cancelled") {
+      throw new BadRequestException("Pedido cancelado nao aceita novo pagamento");
+    }
+
+    if (!payment) {
+      throw new BadRequestException("Dados de pagamento sao obrigatorios");
+    }
+
+    const paymentRequest = await this.gateway.createPaymentRequest(store.company_id, null, {
+      amountCents: order.totalCents,
+      cardToken: payment.cardToken,
+      customerEmail: payment.customerEmail,
+      customerName: order.customerName,
+      customerPhone: order.customerPhone,
+      description: `Retentativa ${order.orderNumber} - ${store.display_name}`,
+      idempotencyKey: `food-public-checkout-retry:${order.id}:${randomUUID()}`,
+      installments: payment.installments,
+      paymentMethodId: payment.paymentMethodId,
+      paymentMethodType: payment.paymentMethodType,
+      providerKey: "mercado_pago",
+      sourceApplicationKey: "food",
+      sourceReferenceId: order.id,
+      sourceReferenceType: "food_order"
+    });
+
+    if (paymentRequest.status === "paid") {
+      const paidOrder = await this.markOrderPaymentFromGateway(
+        store.company_id,
+        order.id,
+        "card",
+        "Pagamento aprovado pelo FP Gateway/Mercado Pago em retentativa."
+      );
+
+      return {
+        order: paidOrder,
+        paymentRequestId: paymentRequest.id,
+        paymentStatus: "paid",
+        paymentUrl: paymentRequest.paymentUrl
+      };
+    }
+
+    return {
+      order,
+      paymentRequestId: paymentRequest.id,
+      paymentStatus: paymentRequest.status === "failed" ? "failed" : "pending",
+      paymentUrl: paymentRequest.paymentUrl
+    };
+  }
+
   async getPublicOrder(
     publicSlug: string,
     orderNumber: string
   ): Promise<FoodOrderContract> {
     const store = await this.getStoreByPublicSlug(publicSlug);
     await this.ensurePublicStoreReadable(store);
-
-    const normalizedOrderNumber = normalizeRequiredText(orderNumber, "orderNumber", 40);
-    const { data, error } = await this.supabase.food
-      .from("orders")
-      .select(orderSelect)
-      .eq("company_id", store.company_id)
-      .eq("store_id", store.id)
-      .eq("order_number", normalizedOrderNumber)
-      .is("deleted_at", null)
-      .maybeSingle();
-
-    if (error) {
-      throwSupabaseError(error);
-    }
-
-    if (!data) {
-      throw new NotFoundException("Pedido publico Food nao encontrado");
-    }
-
-    const orderRow = data as unknown as FoodOrderRow;
-    const items = await this.listOrderItemsByOrderIds(store.company_id, [orderRow.id]);
-    return mapOrder(orderRow, items.get(orderRow.id) ?? []);
+    return this.getPublicOrderFromStore(store, orderNumber);
   }
 
   private async buildMenu(store: FoodStoreRow | FoodStoreContract): Promise<FoodMenuContract> {
@@ -1061,6 +1105,33 @@ export class FoodService {
     if (moduleError || hasModule !== true) {
       throw new ForbiddenException("Empresa nao possui FP Food liberado");
     }
+  }
+
+  private async getPublicOrderFromStore(
+    store: FoodStoreRow,
+    orderNumber: string
+  ): Promise<FoodOrderContract> {
+    const normalizedOrderNumber = normalizeRequiredText(orderNumber, "orderNumber", 40);
+    const { data, error } = await this.supabase.food
+      .from("orders")
+      .select(orderSelect)
+      .eq("company_id", store.company_id)
+      .eq("store_id", store.id)
+      .eq("order_number", normalizedOrderNumber)
+      .is("deleted_at", null)
+      .maybeSingle();
+
+    if (error) {
+      throwSupabaseError(error);
+    }
+
+    if (!data) {
+      throw new NotFoundException("Pedido publico Food nao encontrado");
+    }
+
+    const orderRow = data as unknown as FoodOrderRow;
+    const items = await this.listOrderItemsByOrderIds(store.company_id, [orderRow.id]);
+    return mapOrder(orderRow, items.get(orderRow.id) ?? []);
   }
 
   private async listAllCategories(companyId: string): Promise<FoodCategoryContract[]> {
