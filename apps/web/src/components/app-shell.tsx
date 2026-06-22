@@ -14,41 +14,97 @@ type AppShellProps = {
   children: ReactNode;
 };
 
+type NavGroupMeta = {
+  description: string;
+  icon: string;
+};
+
 const fallbackNavigation: AdminNavigationContract = {
   primary: [{ href: "/", label: "Portal" }],
   groups: []
 };
 
+const navGroupMeta: Record<string, NavGroupMeta> = {
+  Auditoria: {
+    description: "Logs, rastros e operacao",
+    icon: "AU"
+  },
+  Cadastro: {
+    description: "Base administrativa",
+    icon: "CD"
+  },
+  "Minhas empresas": {
+    description: "Carteira e suporte",
+    icon: "ME"
+  },
+  Movimentacao: {
+    description: "Contratos e operacao",
+    icon: "MV"
+  },
+  Sistemas: {
+    description: "Modulos operacionais",
+    icon: "SI"
+  }
+};
+
 export async function AppShell({ access, accessError, activePath = "/", children }: AppShellProps) {
   const user = await requireCurrentUser();
   const accessResult = access === undefined ? await getCurrentAdminAccess() : null;
-  const navigation = access?.navigation ?? accessResult?.data?.navigation ?? fallbackNavigation;
+  const resolvedAccess = access ?? accessResult?.data ?? null;
+  const navigation = resolvedAccess?.navigation ?? fallbackNavigation;
   const navigationError = accessError ?? accessResult?.error ?? null;
   const isFallbackNavigation = navigation === fallbackNavigation;
+  const accountLabel = resolvedAccess?.user.fullName ?? user.email ?? "Usuario autenticado";
+  const accountDetail = resolvedAccess
+    ? formatGlobalRole(resolvedAccess.user.globalRole, resolvedAccess.isSuperAdmin)
+    : "FP Connect Foundation";
 
   return (
     <main className="app-shell">
       <aside className="sidebar" aria-label="Navegacao principal">
         <div className="sidebar-brand">
           <Image src="/brand/logo-b.png" alt="FP WebTech" width={270} height={95} priority />
+          <span>Console</span>
         </div>
         <nav className="nav-list">
-          {navigation.primary.map((item) => (
-            <Link
-              className={isActiveNavigationItem(activePath, item.href) ? "nav-item active" : "nav-item"}
-              href={item.href}
-              key={item.href}
-            >
-              {item.label}
-            </Link>
-          ))}
+          <div className="nav-primary">
+            {navigation.primary.map((item) => (
+              <Link
+                aria-current={isActiveNavigationItem(activePath, item.href) ? "page" : undefined}
+                className={
+                  isActiveNavigationItem(activePath, item.href) ? "nav-item active" : "nav-item"
+                }
+                href={item.href}
+                key={item.href}
+              >
+                <span className="nav-item-icon" aria-hidden="true">
+                  {getNavigationItemIcon(item.href, item.label)}
+                </span>
+                <span>{item.label}</span>
+              </Link>
+            ))}
+          </div>
 
           {navigation.groups.map((group) => (
-            <details className="nav-group" key={group.label} open>
-              <summary>{group.label}</summary>
+            <details
+              className={isActiveNavigationGroup(activePath, group) ? "nav-group active" : "nav-group"}
+              key={group.label}
+              open={shouldOpenNavigationGroup(activePath, group)}
+            >
+              <summary>
+                <span className="nav-group-icon" aria-hidden="true">
+                  {getNavigationGroupMeta(group.label).icon}
+                </span>
+                <span className="nav-group-copy">
+                  <strong>{group.label}</strong>
+                  <small>{getNavigationGroupMeta(group.label).description}</small>
+                </span>
+                <span className="nav-group-count">{group.items.length}</span>
+              </summary>
               <div className="nav-group-items">
                 {group.items.map((item) => (
                   <Link
+                    aria-current={isActiveNavigationItem(activePath, item.href) ? "page" : undefined}
                     className={
                       isActiveNavigationItem(activePath, item.href) ? "nav-item active" : "nav-item"
                     }
@@ -75,8 +131,8 @@ export async function AppShell({ access, accessError, activePath = "/", children
         <div className="workspace-account" aria-label="Usuario logado">
           <Image src="/brand/icon.png" alt="" width={36} height={36} />
           <div className="workspace-user">
-            <span>{user.email ?? "Usuario autenticado"}</span>
-            <small>FP Connect Foundation</small>
+            <span>{accountLabel}</span>
+            <small>{accountDetail}</small>
           </div>
           <form action={signOutAction}>
             <PendingSubmitButton className="logout-button" pendingLabel="Saindo...">
@@ -90,6 +146,73 @@ export async function AppShell({ access, accessError, activePath = "/", children
   );
 }
 
+function getNavigationGroupMeta(label: string): NavGroupMeta {
+  return (
+    navGroupMeta[label] ?? {
+      description: "Area do Console",
+      icon: label.slice(0, 2).toUpperCase()
+    }
+  );
+}
+
+function getNavigationItemIcon(href: string, label: string): string {
+  if (href === "/") {
+    return "IN";
+  }
+
+  if (href.startsWith("/robots")) {
+    return "RB";
+  }
+
+  if (href.startsWith("/gateway")) {
+    return "GW";
+  }
+
+  return label.slice(0, 2).toUpperCase();
+}
+
+function shouldOpenNavigationGroup(
+  activePath: string,
+  group: AdminNavigationContract["groups"][number]
+): boolean {
+  return (
+    isActiveNavigationGroup(activePath, group) ||
+    ["Cadastro", "Minhas empresas", "Movimentacao", "Sistemas"].includes(group.label)
+  );
+}
+
+function isActiveNavigationGroup(
+  activePath: string,
+  group: AdminNavigationContract["groups"][number]
+): boolean {
+  return group.items.some((item) => isActiveNavigationItem(activePath, item.href));
+}
+
 function isActiveNavigationItem(activePath: string, href: string): boolean {
-  return activePath === href || activePath === href.split("?")[0];
+  const cleanHref = href.split("?")[0];
+
+  if (cleanHref === "/") {
+    return activePath === "/";
+  }
+
+  return activePath === cleanHref || activePath.startsWith(`${cleanHref}/`);
+}
+
+function formatGlobalRole(
+  role: AdminCurrentUserAccessContract["user"]["globalRole"],
+  isSuperAdmin: boolean
+): string {
+  if (isSuperAdmin || role === "super_admin") {
+    return "Superadmin";
+  }
+
+  if (role === "fp_admin") {
+    return "Admin do Console";
+  }
+
+  if (role === "support") {
+    return "Suporte";
+  }
+
+  return "Usuario da empresa";
 }

@@ -95,6 +95,9 @@ Este arquivo registra decisoes arquiteturais e operacionais para evitar retrabal
 | DEC-087 | Ao criar uma order Mercado Pago, o FP Gateway deve normalizar o status retornado imediatamente; se a order ja nascer paga no sandbox, grava `paid` e emite `gateway.payment.requested` seguido de `gateway.payment.paid`. | Aprovada |
 | DEC-088 | Cartoes de credito/debito Mercado Pago no FP Gateway devem usar Checkout Transparente via Orders API com token gerado por MercadoPago.js/Card Payment Brick; o FP Console e a API nao devem coletar nem armazenar numero, validade ou CVV do cartao. | Aprovada |
 | DEC-089 | O cadastro/entrada de dados de cartao do comprador deve acontecer no checkout do produto consumidor, inicialmente FP Food, usando Card Payment Brick como caminho preferencial; FP Gateway recebe apenas token e metadados para criar a order e normalizar status. | Aprovada |
+| DEC-090 | SMTP por socket permanece como capacidade V0/laboratorio do FP Gateway; para producao, o caminho preferencial de e-mail transacional sera provedor por API HTTPS no Gateway, reduzindo dependencia de portas SMTP bloqueadas ou instaveis em PaaS/serverless. | Aprovada |
+| DEC-091 | A evolucao imediata passa a tratar Food, Gateway, Robots e Console com mentalidade de entrega para producao: melhorar UX, regras, validacoes, observabilidade e processos reais antes de iniciar FP Tracking como modulo operacional completo. | Aprovada |
+| DEC-092 | FP Tracking entra somente depois que os fluxos base de pedido, pagamento, eventos, permissoes e operacao estiverem suficientemente estabilizados; ate la, a entrega simples do Food segue como fallback operacional do MVP. | Aprovada |
 
 ---
 

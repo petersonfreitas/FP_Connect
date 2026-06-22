@@ -20,13 +20,13 @@ Este arquivo controla o avanco dos modulos do ecossistema.
 |---|---:|---:|---|---|
 | FP Connect Admin Console | Alta | 2 | Base funcional estabilizada | Empresas, usuarios, papel de plataforma, permissoes, modulos contratados, suporte por carteira, catalogo, auditoria, guards, bloqueios, paginacao inicial e inativacao operacional ja possuem API e telas principais. |
 | FP Robots | Alta | 2 | Base funcional em evolucao | Schema `robots`, catalogo de eventos, event log, regras simples `evento -> acao`, execucoes, falha simulada, reprocessamento basico, API interna e tela inicial no Console criados. |
-| FP Food | Alta | 2 | Base funcional em evolucao | Frontend separado `apps/food`, dashboard operacional V0, menu lateral por Cadastro/Movimentacao, configuracao da loja, categorias/produtos paginados, cardapio derivado, pedido interno V0, vitrine publica V0 por slug, acompanhamento publico de pedido, checkout publico com cartao Mercado Pago via Gateway V0, painel de pedidos com filtro/status, detalhe de pedido com historico simples, pagamento manual V0, Cozinha V0, Entrega simples V0 e eventos `food.*` iniciais criados. |
-| FP Tracking | Alta | 0 | Proximo ciclo de integracao | Endpoint interno `/api/tracking/access` ja valida empresa, modulo contratado e permissao; deve nascer como frontend separado e assumir entrega/rastreio real do Food. |
+| FP Food | Alta | 2 | Base funcional em evolucao produtiva | Frontend separado `apps/food`, dashboard operacional V0, menu lateral por Cadastro/Movimentacao, configuracao da loja, categorias/produtos paginados, cardapio derivado, pedido interno V0, vitrine publica V0 por slug, acompanhamento publico de pedido, checkout publico com cartao Mercado Pago via Gateway V0, painel de pedidos com filtro/status, detalhe de pedido com historico simples, pagamento manual V0, Cozinha V0, Entrega simples V0 e eventos `food.*` iniciais criados. Proximas melhorias devem priorizar experiencia, validacoes e processos reais. |
+| FP Tracking | Alta | 0 | Preparado para ciclo futuro | Endpoint interno `/api/tracking/access` ja valida empresa, modulo contratado e permissao; deve nascer como frontend separado e assumir entrega/rastreio real do Food depois da estabilizacao produtiva de Food, Gateway, Robots e Console. |
 | FP Billing | Futura | 0 | Fundacao de acesso preparada | Endpoint interno `/api/billing/access` ja valida empresa, modulo contratado e permissao; entrara apos base operacional. |
 | FP Tickets | Futura | 0 | Fundacao de acesso preparada | Endpoint interno `/api/tickets/access` ja valida empresa, modulo contratado e permissao; entrara apos base operacional. |
 | FP Sales | Futura | 0 | Fundacao de acesso preparada | Endpoint interno `/api/sales/access` ja valida empresa, modulo contratado e permissao; entrara apos base operacional. |
 | FP Marketing | Futura | 0 | Fundacao de acesso preparada | Endpoint interno `/api/marketing/access` ja valida empresa, modulo contratado e permissao; entrara apos base operacional. |
-| FP Gateway | Alta | 2 | Base funcional inicial | Shell V0 em `/gateway`, schema `gateway`, catalogo de provedores, configuracao SMTP por empresa, teste/envio SMTP com timeout controlado, OAuth Mercado Pago por empresa iniciado, sandbox manual Mercado Pago, contrato interno V0 de solicitacao de pagamento, PIX e cartao tokenizado via Orders API, e eventos `gateway.*` para Robots. |
+| FP Gateway | Alta | 2 | Base funcional em evolucao produtiva | Shell V0 em `/gateway`, schema `gateway`, catalogo de provedores, configuracao SMTP por empresa, teste/envio SMTP com timeout controlado, OAuth Mercado Pago por empresa iniciado, sandbox manual Mercado Pago, contrato interno V0 de solicitacao de pagamento, PIX e cartao tokenizado via Orders API, webhook Mercado Pago V0 e eventos `gateway.*` para Robots. SMTP por socket fica como laboratorio; e-mail transacional de producao deve priorizar API HTTPS de provedor dedicado. |
 | FP Fiscal | Alta/Media | 0 | Backlog criado | Modulo fiscal proprio, com foco inicial na evolucao fiscal do FP Food. |
 | FP Sign | Media | 0 | Backlog criado | Aceite simples, contratos, propostas e arquivamento documental; sem assinatura digital avancada no MVP. |
 | FP BI | Media/Baixa | 0 | Backlog criado | Indicadores e dashboards; evoluir apos maturidade dos modulos transacionais. |
@@ -171,6 +171,7 @@ Este arquivo controla o avanco dos modulos do ecossistema.
 - [x] Tratamento de erro TLS/SMTP para evitar queda do processo da API em provedor mal configurado
 - [x] Mensagem operacional para erro SMTP `wrong version number`, orientando porta/TLS correta
 - [ ] Estabilizacao operacional SMTP em provedor/rede sem timeout
+- [ ] Provedor de e-mail transacional por API HTTPS para fase de producao
 - [x] Tabela `gateway.payment_requests`
 - [x] Contrato interno V0 para solicitar pagamento
 - [x] Tela V0 para registrar/listar solicitacoes de pagamento
@@ -216,15 +217,15 @@ Este arquivo controla o avanco dos modulos do ecossistema.
 
 ## Proximo marco recomendado
 
-Iniciar o ciclo de integracao Gateway + Tracking, usando o FP Food como primeiro consumidor real:
+Estabilizar os fluxos ja implementados com mentalidade de producao, usando o FP Food como primeiro consumidor real do ecossistema:
 
-1. implementar webhook publico do Gateway para conciliacao assincrona;
-2. definir o contrato minimo Gateway -> Food para retorno de status normalizado;
-3. definir o contrato minimo Food -> Tracking para criar entrega a partir de pedido pronto;
-4. definir o contrato minimo Tracking -> Food para retorno de status/link de rastreio;
-5. manter FP Robots como trilha de eventos e automacoes dos fluxos integrados;
-6. modelar configuracoes avancadas do Food somente quando o contrato real exigir;
-7. preservar pagamento manual e entrega simples do Food como fallback operacional do MVP.
+1. validar webhook Mercado Pago online em fluxo real de pedido;
+2. melhorar UX, menus, mensagens de erro, estados de carregamento e validacoes do Food e Gateway;
+3. revisar regras e processos reais de pedido, pagamento, cozinha e entrega simples;
+4. manter FP Robots como trilha de eventos e automacoes dos fluxos integrados;
+5. modelar configuracoes avancadas do Food somente quando o contrato real exigir;
+6. preservar pagamento manual, entrega simples e SMTP por socket como fallback/laboratorio do MVP;
+7. iniciar FP Tracking completo somente depois que Food, Gateway, Robots e Console estiverem maduros para operacao.
 
 ---
 

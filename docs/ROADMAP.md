@@ -19,7 +19,8 @@ O crescimento deve ser incremental:
 1. consolidar a fundacao;
 2. liberar o menor fluxo util por modulo;
 3. validar com dados reais;
-4. evoluir automacoes, integracoes e analises somente quando o fluxo base estiver estavel.
+4. evoluir UX, processos, automacoes, integracoes e analises com criterio de producao;
+5. iniciar novos modulos operacionais completos somente quando o fluxo base estiver estavel.
 
 ## Estado atual
 
@@ -96,6 +97,14 @@ O FP Gateway foi iniciado como shell no FP Console:
 - evento `gateway.mercado_pago.oauth_connected`;
 - `gateway` exposto no `supabase/config.toml`.
 
+Diretriz de evolucao atual:
+
+- tratar as proximas melhorias de Console, Food, Gateway e Robots como preparacao de entrega para producao;
+- ajustar frontends, regras, validacoes, fluxos operacionais e experiencia real de uso conforme os smoke tests online avancarem;
+- manter SMTP por socket como capacidade V0/laboratorio, sem bloquear o MVP em timeout ou restricao de porta;
+- quando entrar em producao, priorizar e-mail transacional no FP Gateway por API HTTPS de provedor dedicado;
+- manter FP Tracking documentado e preparado, mas iniciar seu desenvolvimento completo somente depois que pedidos, pagamentos, eventos e operacao base estiverem maduros.
+
 ## Sequencia recomendada
 
 ### Bloco 1 - Fechamento do Admin Console
@@ -164,12 +173,12 @@ Proximo escopo:
 
 - preparacao dos contratos de integracao com Gateway e Tracking;
 - validacao da vitrine publica com pedido real;
-- integracao inicial com Tracking;
 - validacao do checkout publico com cartao Mercado Pago sandbox;
 - integracao inicial com Gateway real/teste para mensagens;
 - melhoria de UX operacional conforme gargalos dos fluxos integrados;
 - auditoria minima;
 - eventos publicados para FP Robots quando fizer sentido.
+- preparacao documental e tecnica para Tracking, sem iniciar o modulo completo antes da estabilizacao operacional.
 
 Criterio de saida:
 
@@ -178,6 +187,11 @@ Criterio de saida:
 ### Bloco 4 - FP Tracking MVP
 
 Objetivo: complementar o Food com acompanhamento logistico.
+
+Status:
+
+- reservado para depois da estabilizacao dos fluxos de producao em Food, Gateway, Robots e Console;
+- a Entrega simples V0 do Food continua como fallback operacional ate o Tracking nascer.
 
 Escopo inicial:
 
@@ -206,6 +220,7 @@ Escopo inicial:
 - recebimento e normalizacao de webhook: implementado como V0, pendente de smoke test online;
 - logs tecnicos mascarados;
 - eventos `gateway.*` para FP Robots.
+- provedor de e-mail transacional por API HTTPS em fase de producao, substituindo SMTP por socket como caminho preferencial.
 
 Criterio de saida:
 

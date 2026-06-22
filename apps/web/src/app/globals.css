@@ -47,15 +47,17 @@ a {
   display: flex;
   flex-direction: column;
   min-height: 100vh;
-  padding: 28px 20px;
+  padding: 24px 18px;
 }
 
 .sidebar-brand {
-  align-items: center;
+  align-items: flex-start;
   border-bottom: 1px solid rgb(255 255 255 / 14%);
-  display: flex;
-  height: 84px;
+  display: grid;
+  gap: 10px;
   margin-bottom: 24px;
+  min-height: 94px;
+  padding-bottom: 20px;
 }
 
 .sidebar-brand img {
@@ -63,25 +65,45 @@ a {
   width: 190px;
 }
 
+.sidebar-brand span {
+  background: rgb(255 255 255 / 10%);
+  border: 1px solid rgb(255 255 255 / 14%);
+  border-radius: 999px;
+  color: rgb(255 255 255 / 76%);
+  font-size: 11px;
+  font-weight: 900;
+  letter-spacing: 0.12em;
+  padding: 6px 10px;
+  text-transform: uppercase;
+  width: fit-content;
+}
+
 .nav-list {
   display: grid;
-  gap: 8px;
+  gap: 10px;
+}
+
+.nav-primary {
+  display: grid;
+  gap: 6px;
+  margin-bottom: 4px;
 }
 
 .nav-group {
+  border: 1px solid transparent;
+  border-radius: 8px;
   display: grid;
-  gap: 8px;
+  gap: 6px;
 }
 
 .nav-group summary {
-  color: rgb(255 255 255 / 62%);
+  align-items: center;
   cursor: pointer;
-  font-size: 12px;
-  font-weight: 800;
-  letter-spacing: 0.08em;
+  display: grid;
+  gap: 10px;
+  grid-template-columns: 32px minmax(0, 1fr) auto 16px;
   list-style: none;
-  padding: 12px 14px 6px;
-  text-transform: uppercase;
+  padding: 10px;
 }
 
 .nav-group summary::-webkit-details-marker {
@@ -89,30 +111,115 @@ a {
 }
 
 .nav-group summary::after {
+  color: rgb(255 255 255 / 46%);
   content: "+";
-  float: right;
+  font-size: 18px;
+  font-weight: 700;
+  grid-column: 4;
+  grid-row: 1;
+  line-height: 1;
 }
 
 .nav-group[open] summary::after {
   content: "-";
 }
 
+.nav-group.active,
+.nav-group:hover {
+  background: rgb(255 255 255 / 5%);
+  border-color: rgb(255 255 255 / 10%);
+}
+
+.nav-group-icon,
+.nav-item-icon {
+  align-items: center;
+  background: rgb(255 255 255 / 8%);
+  border: 1px solid rgb(255 255 255 / 12%);
+  border-radius: 8px;
+  color: rgb(255 255 255 / 76%);
+  display: inline-flex;
+  font-size: 11px;
+  font-weight: 900;
+  height: 32px;
+  justify-content: center;
+  letter-spacing: 0.04em;
+  width: 32px;
+}
+
+.nav-group-copy {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.nav-group-copy strong {
+  color: rgb(255 255 255 / 88%);
+  font-size: 13px;
+  font-weight: 900;
+}
+
+.nav-group-copy small {
+  color: rgb(255 255 255 / 52%);
+  font-size: 11px;
+  line-height: 1.25;
+}
+
+.nav-group-count {
+  align-items: center;
+  background: rgb(255 255 255 / 10%);
+  border-radius: 999px;
+  color: rgb(255 255 255 / 68%);
+  display: inline-flex;
+  font-size: 11px;
+  font-weight: 900;
+  height: 22px;
+  justify-content: center;
+  min-width: 22px;
+  padding: 0 6px;
+}
+
 .nav-group-items {
   display: grid;
   gap: 6px;
+  padding: 0 8px 8px 50px;
 }
 
 .nav-item {
+  align-items: center;
   border-radius: 8px;
   color: rgb(255 255 255 / 78%);
+  display: grid;
+  gap: 10px;
+  grid-template-columns: 32px minmax(0, 1fr);
   font-weight: 600;
-  padding: 12px 14px;
+  line-height: 1.25;
+  padding: 10px;
 }
 
 .nav-item.active,
 .nav-item:hover {
-  background: rgb(255 255 255 / 10%);
+  background: rgb(255 255 255 / 12%);
   color: #ffffff;
+}
+
+.nav-item.active {
+  box-shadow: inset 3px 0 0 #ffffff;
+}
+
+.nav-item.active .nav-item-icon,
+.nav-item:hover .nav-item-icon {
+  background: #ffffff;
+  border-color: #ffffff;
+  color: var(--sidebar);
+}
+
+.nav-group-items .nav-item {
+  grid-template-columns: minmax(0, 1fr);
+  padding: 10px 12px;
+}
+
+.nav-group-items .nav-item.active {
+  box-shadow: inset 3px 0 0 #ffffff;
 }
 
 .nav-status {
@@ -137,6 +244,7 @@ a {
   background: var(--panel);
   border: 1px solid var(--line);
   border-radius: 8px;
+  box-shadow: 0 8px 20px rgb(23 32 39 / 6%);
   color: var(--muted);
   display: flex;
   font-size: 13px;
@@ -144,7 +252,10 @@ a {
   margin: 0 0 20px auto;
   max-width: 1180px;
   padding: 8px;
+  position: sticky;
+  top: 16px;
   width: fit-content;
+  z-index: 5;
 }
 
 .workspace-account img {
