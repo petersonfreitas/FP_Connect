@@ -2832,7 +2832,7 @@ function buildCurrentUserNavigation(
 
   if (companyItems.length > 0) {
     groups.push({
-      label: "Minhas empresas",
+      label: "Carteira",
       items: companyItems
     });
   }

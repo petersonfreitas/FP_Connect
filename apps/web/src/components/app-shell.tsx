@@ -33,6 +33,10 @@ const navGroupMeta: Record<string, NavGroupMeta> = {
     description: "Base administrativa",
     icon: "CD"
   },
+  Carteira: {
+    description: "Empresas e suporte",
+    icon: "CE"
+  },
   "Minhas empresas": {
     description: "Carteira e suporte",
     icon: "ME"
@@ -51,9 +55,9 @@ export async function AppShell({ access, accessError, activePath = "/", children
   const user = await requireCurrentUser();
   const accessResult = access === undefined ? await getCurrentAdminAccess() : null;
   const resolvedAccess = access ?? accessResult?.data ?? null;
-  const navigation = resolvedAccess?.navigation ?? fallbackNavigation;
+  const navigation = normalizeNavigation(resolvedAccess?.navigation ?? fallbackNavigation);
   const navigationError = accessError ?? accessResult?.error ?? null;
-  const isFallbackNavigation = navigation === fallbackNavigation;
+  const isFallbackNavigation = !resolvedAccess?.navigation;
   const accountLabel = resolvedAccess?.user.fullName ?? user.email ?? "Usuario autenticado";
   const accountDetail = resolvedAccess
     ? formatGlobalRole(resolvedAccess.user.globalRole, resolvedAccess.isSuperAdmin)
@@ -177,7 +181,7 @@ function shouldOpenNavigationGroup(
 ): boolean {
   return (
     isActiveNavigationGroup(activePath, group) ||
-    ["Cadastro", "Minhas empresas", "Movimentacao", "Sistemas"].includes(group.label)
+    ["Cadastro", "Carteira", "Minhas empresas", "Movimentacao", "Sistemas"].includes(group.label)
   );
 }
 
@@ -215,4 +219,20 @@ function formatGlobalRole(
   }
 
   return "Usuario da empresa";
+}
+
+function normalizeNavigation(navigation: AdminNavigationContract): AdminNavigationContract {
+  return {
+    primary: navigation.primary,
+    groups: navigation.groups.map((group) => {
+      if (group.label !== "Minhas empresas" && group.label !== "Carteira") {
+        return group;
+      }
+
+      return {
+        label: "Carteira",
+        items: [{ href: "/carteira/empresas", label: "Carteira de empresas" }]
+      };
+    })
+  };
 }
