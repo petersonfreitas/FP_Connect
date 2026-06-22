@@ -1,6 +1,10 @@
 import Image from "next/image";
 import Link from "next/link";
-import type { AdminApplicationContract, AdminCurrentUserAccessContract } from "@fp/types";
+import type {
+  AdminApplicationContract,
+  AdminCurrentUserAccessContract,
+  AdminCurrentUserModuleAccessContract
+} from "@fp/types";
 import { AppShell } from "@/components/app-shell";
 import { getAdminConsoleOverview, getCurrentAdminAccess } from "@/lib/internal-api";
 
@@ -157,6 +161,7 @@ export default async function Home() {
 function ContextualPortal({ access }: { access: AdminCurrentUserAccessContract }) {
   const companies = access.companies;
   const modules = companies.flatMap((company) => company.modules);
+  const moduleCards = buildPortalModuleCards(modules);
 
   return (
     <AppShell access={access} activePath="/">
@@ -180,7 +185,7 @@ function ContextualPortal({ access }: { access: AdminCurrentUserAccessContract }
         <div className="foundation-panel" aria-label="Resumo de acesso">
           <span>Resumo do acesso</span>
           <div className="foundation-item">{companies.length} empresa(s) vinculada(s)</div>
-          <div className="foundation-item">{modules.length} modulo(s) liberado(s)</div>
+          <div className="foundation-item">{moduleCards.length} sistema(s) liberado(s)</div>
           <div className="foundation-item">
             {access.isPlatformUser ? "Usuario interno da plataforma" : "Usuario de empresa"}
           </div>
@@ -193,8 +198,8 @@ function ContextualPortal({ access }: { access: AdminCurrentUserAccessContract }
           <strong>{companies.length}</strong>
         </div>
         <div className="summary-item">
-          <span>Modulos</span>
-          <strong>{modules.length}</strong>
+          <span>Sistemas</span>
+          <strong>{moduleCards.length}</strong>
         </div>
         <div className="summary-item">
           <span>Perfil</span>
@@ -204,42 +209,62 @@ function ContextualPortal({ access }: { access: AdminCurrentUserAccessContract }
 
       <section className="section-heading">
         <div>
-          <div className="eyebrow">Meus acessos</div>
-          <h2>Empresas e sistemas liberados</h2>
+          <div className="eyebrow">Meus sistemas</div>
+          <h2>Hubs operacionais liberados</h2>
         </div>
-        <span className="muted">Contrato calculado pelo backend</span>
+        <span className="muted">Empresas continuam na Carteira</span>
       </section>
 
       {companies.length > 0 ? (
-        <section className="module-grid" aria-label="Empresas vinculadas">
-          {companies.map((companyAccess) => (
-            <article className="module-card" key={companyAccess.membershipId}>
-              <div className="module-card-top">
-                <span>{getMembershipLabel(companyAccess.membershipStatus)}</span>
-                <small>{companyAccess.modules.length} modulo(s)</small>
-              </div>
-              <h3>{companyAccess.company.tradeName ?? companyAccess.company.legalName}</h3>
-              <p>{formatCompanyDocument(companyAccess.company.document)}</p>
-              <div className="tag-list">
-                {companyAccess.adminPermissions.includes("admin.companies.read") ? (
-                  <Link className="tag" href={`/cadastro/empresas/${companyAccess.company.id}`}>
-                    Abrir empresa
+        <section className="module-grid" aria-label="Sistemas liberados">
+          <article className="module-card">
+            <div className="module-card-top">
+              <span>Carteira</span>
+              <small>{companies.length} empresa(s)</small>
+            </div>
+            <h3>Carteira de empresas</h3>
+            <p>Consulte empresas vinculadas, status, modulos liberados e acessos administrativos.</p>
+            <div className="tag-list">
+              <Link className="tag" href="/carteira/empresas">
+                Abrir carteira
+              </Link>
+            </div>
+          </article>
+
+          {moduleCards.length > 0 ? (
+            moduleCards.map((module) => (
+              <article className="module-card" key={module.applicationId}>
+                <div className="module-card-top">
+                  <span>{applicationToneByKey[module.applicationKey] ?? "Sistema"}</span>
+                  <small>{module.companyCount} empresa(s)</small>
+                </div>
+                <h3>{module.applicationName}</h3>
+                <p>{formatModuleCompanies(module.companyNames)}</p>
+                <div className="tag-list">
+                  <Link className="tag" href={module.href}>
+                    Abrir hub
                   </Link>
-                ) : null}
-                {companyAccess.modules.map((module) =>
-                  module.entryPath ? (
-                    <Link className="tag" href={getModuleHref(module)} key={module.applicationId}>
-                      {module.applicationName}
-                    </Link>
-                  ) : (
-                    <span className="tag muted-tag" key={module.applicationId}>
-                      {module.applicationName}
+                  {module.companyNames.slice(0, 2).map((companyName) => (
+                    <span className="tag muted-tag" key={`${module.applicationId}:${companyName}`}>
+                      {companyName}
                     </span>
-                  )
-                )}
+                  ))}
+                  {module.companyNames.length > 2 ? (
+                    <span className="tag muted-tag">+{module.companyNames.length - 2}</span>
+                  ) : null}
+                </div>
+              </article>
+            ))
+          ) : (
+            <article className="module-card">
+              <div className="module-card-top">
+                <span>Carteira</span>
+                <small>Sem sistema operacional</small>
               </div>
+              <h3>Nenhum modulo liberado</h3>
+              <p>Seu usuario possui empresa vinculada, mas ainda nao ha modulo operacional ativo.</p>
             </article>
-          ))}
+          )}
         </section>
       ) : (
         <section className="content-panel">
@@ -253,19 +278,62 @@ function ContextualPortal({ access }: { access: AdminCurrentUserAccessContract }
   );
 }
 
-function getModuleHref(module: {
+type PortalModuleCard = {
+  applicationId: string;
   applicationKey: string;
-  companyId: string;
-  entryPath: string | null;
-}): string {
+  applicationName: string;
+  companyCount: number;
+  companyNames: string[];
+  href: string;
+};
+
+function buildPortalModuleCards(
+  modules: AdminCurrentUserModuleAccessContract[]
+): PortalModuleCard[] {
+  const modulesByApplication = new Map<string, PortalModuleCard>();
+
+  for (const module of modules) {
+    const current = modulesByApplication.get(module.applicationId);
+
+    if (current) {
+      current.companyCount += 1;
+      current.companyNames.push(module.companyName);
+      continue;
+    }
+
+    modulesByApplication.set(module.applicationId, {
+      applicationId: module.applicationId,
+      applicationKey: module.applicationKey,
+      applicationName: module.applicationName,
+      companyCount: 1,
+      companyNames: [module.companyName],
+      href: getModuleHref(module)
+    });
+  }
+
+  return Array.from(modulesByApplication.values()).sort((first, second) =>
+    first.applicationName.localeCompare(second.applicationName, "pt-BR")
+  );
+}
+
+function getModuleHref(module: AdminCurrentUserModuleAccessContract): string {
   if (module.applicationKey === "food") {
     return `/sistemas/food?companyId=${module.companyId}`;
   }
 
   const path = module.entryPath ?? "/";
+
+  if (path === "/" || modulesShouldOpenWithoutCompany(module.applicationKey)) {
+    return path;
+  }
+
   return path.includes("?")
     ? `${path}&companyId=${module.companyId}`
     : `${path}?companyId=${module.companyId}`;
+}
+
+function modulesShouldOpenWithoutCompany(applicationKey: string): boolean {
+  return applicationKey === "gateway" || applicationKey === "robots";
 }
 
 function getRoleLabel(role: AdminCurrentUserAccessContract["user"]["globalRole"]): string {
@@ -284,18 +352,14 @@ function getRoleLabel(role: AdminCurrentUserAccessContract["user"]["globalRole"]
   return "Usuario de empresa";
 }
 
-function getMembershipLabel(status: string): string {
-  if (status === "active") {
-    return "Vinculo ativo";
+function formatModuleCompanies(companyNames: string[]): string {
+  if (companyNames.length === 0) {
+    return "Nenhuma empresa vinculada a este sistema.";
   }
 
-  if (status === "invited") {
-    return "Convite pendente";
+  if (companyNames.length === 1) {
+    return `Disponivel para ${companyNames[0]}.`;
   }
 
-  return "Vinculo inativo";
-}
-
-function formatCompanyDocument(document: string | null): string {
-  return document ? `Documento ${document}` : "Documento nao informado";
+  return `Disponivel para ${companyNames.length} empresas da sua carteira.`;
 }
