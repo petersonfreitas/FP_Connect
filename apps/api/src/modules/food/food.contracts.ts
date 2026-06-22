@@ -92,6 +92,14 @@ export type FoodMenuContract = {
   uncategorizedProducts: FoodProductContract[];
 };
 
+export type FoodPublicCheckoutContract = {
+  mercadoPago: {
+    enabled: boolean;
+    mode: "manual_sandbox" | "oauth" | null;
+    publicKey: string | null;
+  };
+};
+
 export type FoodOrderItemContract = {
   id: string;
   companyId: string;
@@ -162,6 +170,23 @@ export type CreateFoodOrderInput = {
   customerPhone?: string | null;
   customerNote?: string | null;
   items: CreateFoodOrderItemInput[];
+};
+
+export type CreatePublicFoodCheckoutInput = CreateFoodOrderInput & {
+  payment?: {
+    cardToken?: string | null;
+    customerEmail?: string | null;
+    installments?: number | null;
+    paymentMethodId?: string | null;
+    paymentMethodType?: "credit_card" | "debit_card" | "pix" | null;
+  } | null;
+};
+
+export type CreatePublicFoodCheckoutContract = {
+  order: FoodOrderContract;
+  paymentRequestId: string | null;
+  paymentStatus: "failed" | "paid" | "pending";
+  paymentUrl: string | null;
 };
 
 export type UpdateFoodOrderStatusInput = {

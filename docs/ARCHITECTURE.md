@@ -181,6 +181,7 @@ FP Gateway:
 - modulo iniciado como shell no Console para credenciais, OAuth e provedores externos;
 - deve encapsular WhatsApp, Instagram, Facebook, Ads, Mercado Pago, PagSeguro e canais equivalentes;
 - deve ser a fronteira entre o ecossistema e APIs externas.
+- integracoes Mercado Pago devem seguir a referencia em `docs/MERCADO_PAGO_CHECKOUT_TRANSPARENTE.md`.
 
 Regra:
 

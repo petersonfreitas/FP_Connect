@@ -8,6 +8,7 @@ import { GatewayService } from "./gateway.service";
 @Module({
   imports: [RobotsModule],
   controllers: [GatewayController],
-  providers: [GatewayService, InternalApiGuard, ModuleAccessGuard]
+  providers: [GatewayService, InternalApiGuard, ModuleAccessGuard],
+  exports: [GatewayService]
 })
 export class GatewayModule {}

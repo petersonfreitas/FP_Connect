@@ -4,9 +4,12 @@ import {
   Injectable,
   NotFoundException
 } from "@nestjs/common";
+import { GatewayService } from "../gateway/gateway.service";
 import { RobotsService } from "../robots/robots.service";
 import { SupabaseService } from "../../supabase/supabase.service";
 import type {
+  CreatePublicFoodCheckoutContract,
+  CreatePublicFoodCheckoutInput,
   CreateFoodOrderInput,
   FoodCategoryContract,
   FoodCategoryStatus,
@@ -21,6 +24,7 @@ import type {
   FoodPaymentStatus,
   FoodProductContract,
   FoodProductStatus,
+  FoodPublicCheckoutContract,
   FoodStoreContract,
   FoodStoreStatus,
   PaginatedContract,
@@ -120,6 +124,24 @@ type FoodDashboardOrderRow = {
   payment_status: FoodPaymentStatus;
   total_cents: number;
   created_at: string;
+};
+
+type MercadoPagoCompanyConfigRow = {
+  public_config: {
+    mode?: "manual_sandbox" | "oauth";
+  } | null;
+  secret_config: {
+    publicKey?: string | null;
+  } | null;
+  status: "active" | "configured" | "error" | "inactive" | "not_configured";
+};
+
+type PublicCheckoutPaymentInput = {
+  cardToken: string;
+  customerEmail: string;
+  installments: number;
+  paymentMethodId: string;
+  paymentMethodType: "credit_card" | "debit_card";
 };
 
 type PaginationOptions = {
@@ -249,6 +271,7 @@ const validPaymentStatuses = new Set<FoodPaymentStatus>([
 @Injectable()
 export class FoodService {
   constructor(
+    private readonly gateway: GatewayService,
     private readonly supabase: SupabaseService,
     private readonly robots: RobotsService
   ) {}
@@ -527,6 +550,12 @@ export class FoodService {
     return this.buildMenu(store);
   }
 
+  async getPublicCheckout(publicSlug: string): Promise<FoodPublicCheckoutContract> {
+    const store = await this.getStoreByPublicSlug(publicSlug);
+    await this.ensurePublicStoreAvailable(store);
+    return this.getPublicCheckoutForCompany(store.company_id);
+  }
+
   async createPublicOrder(
     publicSlug: string,
     input: CreateFoodOrderInput
@@ -537,6 +566,67 @@ export class FoodService {
     return this.createOrder(store.company_id, null, input, {
       eventSource: "public-store-v0"
     });
+  }
+
+  async createPublicCheckout(
+    publicSlug: string,
+    input: CreatePublicFoodCheckoutInput
+  ): Promise<CreatePublicFoodCheckoutContract> {
+    const store = await this.getStoreByPublicSlug(publicSlug);
+    await this.ensurePublicStoreAvailable(store);
+    const payment = normalizePublicCheckoutPayment(input.payment);
+    const order = await this.createOrder(store.company_id, null, input, {
+      eventSource: "public-store-v0"
+    });
+
+    if (!payment) {
+      return {
+        order,
+        paymentRequestId: null,
+        paymentStatus: "pending",
+        paymentUrl: null
+      };
+    }
+
+    const paymentRequest = await this.gateway.createPaymentRequest(store.company_id, null, {
+      amountCents: order.totalCents,
+      cardToken: payment.cardToken,
+      customerEmail: payment.customerEmail,
+      customerName: order.customerName,
+      customerPhone: order.customerPhone,
+      description: `Pedido ${order.orderNumber} - ${store.display_name}`,
+      idempotencyKey: `food-public-checkout:${order.id}:${payment.paymentMethodType}`,
+      installments: payment.installments,
+      paymentMethodId: payment.paymentMethodId,
+      paymentMethodType: payment.paymentMethodType,
+      providerKey: "mercado_pago",
+      sourceApplicationKey: "food",
+      sourceReferenceId: order.id,
+      sourceReferenceType: "food_order"
+    });
+
+    if (paymentRequest.status === "paid") {
+      const paidOrder = await this.markOrderPaymentFromGateway(
+        store.company_id,
+        order.id,
+        "card",
+        "Pagamento aprovado pelo FP Gateway/Mercado Pago."
+      );
+
+      return {
+        order: paidOrder,
+        paymentRequestId: paymentRequest.id,
+        paymentStatus: "paid",
+        paymentUrl: paymentRequest.paymentUrl
+      };
+    }
+
+    return {
+      order,
+      paymentRequestId: paymentRequest.id,
+      paymentStatus: paymentRequest.status === "failed" ? "failed" : "pending",
+      paymentUrl: paymentRequest.paymentUrl
+    };
   }
 
   async getPublicOrder(
@@ -795,6 +885,104 @@ export class FoodService {
     if (current.payment_status !== "paid" && order.paymentStatus === "paid") {
       await this.emitPaymentMarkedAsPaid(companyId, actorUserId, order);
     }
+
+    return order;
+  }
+
+  private async getPublicCheckoutForCompany(
+    companyId: string
+  ): Promise<FoodPublicCheckoutContract> {
+    const disabled: FoodPublicCheckoutContract = {
+      mercadoPago: {
+        enabled: false,
+        mode: null,
+        publicKey: null
+      }
+    };
+    const { data: provider, error: providerError } = await this.supabase.gateway
+      .from("provider_catalog")
+      .select("id")
+      .eq("key", "mercado_pago")
+      .is("deleted_at", null)
+      .maybeSingle();
+
+    if (providerError) {
+      throwSupabaseError(providerError);
+    }
+
+    if (!provider) {
+      return disabled;
+    }
+
+    const { data: config, error: configError } = await this.supabase.gateway
+      .from("company_provider_configs")
+      .select("status,public_config,secret_config")
+      .eq("company_id", companyId)
+      .eq("provider_id", (provider as { id: string }).id)
+      .is("deleted_at", null)
+      .maybeSingle();
+
+    if (configError) {
+      throwSupabaseError(configError);
+    }
+
+    if (!config) {
+      return disabled;
+    }
+
+    const mercadoPagoConfig = config as unknown as MercadoPagoCompanyConfigRow;
+    const publicKey = mercadoPagoConfig.secret_config?.publicKey?.trim() ?? null;
+    const mode = mercadoPagoConfig.public_config?.mode ?? null;
+    const enabled =
+      Boolean(publicKey) &&
+      (mercadoPagoConfig.status === "active" || mercadoPagoConfig.status === "configured");
+
+    return {
+      mercadoPago: {
+        enabled,
+        mode,
+        publicKey: enabled ? publicKey : null
+      }
+    };
+  }
+
+  private async markOrderPaymentFromGateway(
+    companyId: string,
+    orderId: string,
+    paymentMethod: FoodPaymentMethod,
+    paymentNote: string
+  ): Promise<FoodOrderContract> {
+    const current = await this.getOrderRow(companyId, orderId);
+
+    if (current.payment_status === "paid") {
+      const items = await this.listOrderItemsByOrderIds(companyId, [current.id]);
+      return mapOrder(current, items.get(current.id) ?? []);
+    }
+
+    const { data, error } = await this.supabase.food
+      .from("orders")
+      .update({
+        paid_at: new Date().toISOString(),
+        paid_by: null,
+        payment_method: paymentMethod,
+        payment_note: paymentNote,
+        payment_status: "paid",
+        updated_by: null
+      })
+      .eq("id", orderId)
+      .eq("company_id", companyId)
+      .is("deleted_at", null)
+      .select(orderSelect)
+      .single();
+
+    if (error) {
+      throwSupabaseError(error);
+    }
+
+    const orderRow = data as unknown as FoodOrderRow;
+    const items = await this.listOrderItemsByOrderIds(companyId, [orderRow.id]);
+    const order = mapOrder(orderRow, items.get(orderRow.id) ?? []);
+    await this.emitPaymentMarkedAsPaid(companyId, null, order);
 
     return order;
   }
@@ -1235,7 +1423,7 @@ export class FoodService {
 
   private async emitPaymentMarkedAsPaid(
     companyId: string,
-    actorUserId: string,
+    actorUserId: string | null,
     order: FoodOrderContract
   ): Promise<void> {
     await this.robots.createEvent(companyId, actorUserId, {
@@ -1301,6 +1489,55 @@ function normalizeRequiredText(value: unknown, field: string, maxLength: number)
   }
 
   return normalized;
+}
+
+function normalizePublicCheckoutPayment(
+  value: CreatePublicFoodCheckoutInput["payment"]
+): PublicCheckoutPaymentInput | null {
+  if (!value) {
+    return null;
+  }
+
+  const cardToken = normalizeRequiredText(value.cardToken, "payment.cardToken", 300);
+  const customerEmail = normalizeEmail(value.customerEmail, "payment.customerEmail");
+  const installments = normalizeInstallments(value.installments);
+  const paymentMethodId = normalizeRequiredText(
+    value.paymentMethodId,
+    "payment.paymentMethodId",
+    80
+  );
+
+  if (value.paymentMethodType !== "credit_card" && value.paymentMethodType !== "debit_card") {
+    throw new BadRequestException("payment.paymentMethodType deve ser credit_card ou debit_card");
+  }
+
+  return {
+    cardToken,
+    customerEmail,
+    installments,
+    paymentMethodId,
+    paymentMethodType: value.paymentMethodType
+  };
+}
+
+function normalizeEmail(value: unknown, field: string): string {
+  const normalized = normalizeRequiredText(value, field, 180).toLowerCase();
+
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalized)) {
+    throw new BadRequestException(`${field} invalido`);
+  }
+
+  return normalized;
+}
+
+function normalizeInstallments(value: unknown): number {
+  const numberValue = typeof value === "string" || typeof value === "number" ? Number(value) : NaN;
+
+  if (!Number.isInteger(numberValue) || numberValue < 1 || numberValue > 24) {
+    throw new BadRequestException("payment.installments deve estar entre 1 e 24");
+  }
+
+  return numberValue;
 }
 
 function normalizeOptionalText(

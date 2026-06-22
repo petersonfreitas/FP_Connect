@@ -2,12 +2,15 @@ import "server-only";
 
 import type {
   AdminCurrentUserAccessContract,
+  CreatePublicFoodCheckoutContract,
+  CreatePublicFoodCheckoutInput,
   CreateFoodOrderInput,
   FoodCategoryContract,
   FoodDashboardContract,
   FoodMenuContract,
   FoodOrderContract,
   FoodOrderDetailContract,
+  FoodPublicCheckoutContract,
   FoodOrderStatus,
   FoodProductContract,
   FoodStoreContract,
@@ -225,6 +228,14 @@ export async function getPublicFoodMenu(
   );
 }
 
+export async function getPublicFoodCheckout(
+  publicSlug: string
+): Promise<InternalApiResult<FoodPublicCheckoutContract>> {
+  return fetchPublicInternal<FoodPublicCheckoutContract>(
+    `food/public/stores/${encodeURIComponent(publicSlug)}/checkout`
+  );
+}
+
 export async function listFoodOrders(
   companyId: string,
   pagination: PaginationParams = {}
@@ -269,6 +280,19 @@ export async function createPublicFoodOrder(
 ): Promise<InternalApiResult<FoodOrderContract>> {
   return fetchPublicInternal<FoodOrderContract>(
     `food/public/stores/${encodeURIComponent(publicSlug)}/orders`,
+    {
+      body: JSON.stringify(input),
+      method: "POST"
+    }
+  );
+}
+
+export async function createPublicFoodCheckout(
+  publicSlug: string,
+  input: CreatePublicFoodCheckoutInput
+): Promise<InternalApiResult<CreatePublicFoodCheckoutContract>> {
+  return fetchPublicInternal<CreatePublicFoodCheckoutContract>(
+    `food/public/stores/${encodeURIComponent(publicSlug)}/checkout`,
     {
       body: JSON.stringify(input),
       method: "POST"

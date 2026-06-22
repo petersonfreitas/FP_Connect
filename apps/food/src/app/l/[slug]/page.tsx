@@ -4,7 +4,7 @@ import {
 } from "@/app/actions";
 import { PublicStorefront } from "@/components/public-storefront";
 import { Notice } from "@/components/page-feedback";
-import { getPublicFoodMenu } from "@/lib/internal-api";
+import { getPublicFoodCheckout, getPublicFoodMenu } from "@/lib/internal-api";
 
 type PublicStorePageProps = {
   params: Promise<{
@@ -22,7 +22,10 @@ export default async function PublicStorePage({
   searchParams
 }: PublicStorePageProps) {
   const [{ slug }, query] = await Promise.all([params, searchParams]);
-  const menuResult = await getPublicFoodMenu(slug);
+  const [menuResult, checkoutResult] = await Promise.all([
+    getPublicFoodMenu(slug),
+    getPublicFoodCheckout(slug)
+  ]);
 
   if (menuResult.error || !menuResult.data) {
     return (
@@ -42,6 +45,7 @@ export default async function PublicStorePage({
     <>
       {query?.error ? <Notice tone="danger" message={query.error} /> : null}
       <PublicStorefront
+        checkout={checkoutResult.data}
         createOrderAction={createPublicFoodOrderAction}
         menu={menuResult.data}
         trackOrderAction={trackPublicFoodOrderAction}

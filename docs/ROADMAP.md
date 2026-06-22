@@ -67,7 +67,8 @@ O FP Food foi iniciado como frontend separado:
 - acompanhamento publico V0 em `/l/[slug]/pedido/[orderNumber]`;
 - painel interno de pedidos com filtro por status, acoes rapidas e polling leve de 30 segundos;
 - detalhe interno de pedido com itens, dados do cliente e historico simples de status;
-- pagamento manual V0 no pedido, sem Gateway;
+- pagamento manual V0 no pedido como fallback operacional;
+- checkout publico com cartao Mercado Pago via FP Gateway V0;
 - Cozinha V0 com fila de pedidos aceitos/em preparo e acoes rapidas;
 - Entrega simples V0 com fila de pedidos prontos/em rota e status `out_for_delivery`/`delivered`;
 - realtime de pedidos, cozinha e acompanhamento publico fica para fase posterior; refresh manual, `router.refresh()` e polling leve sao provisoriamente aceitaveis no MVP;
@@ -162,7 +163,8 @@ Proximo escopo:
 - preparacao dos contratos de integracao com Gateway e Tracking;
 - validacao da vitrine publica com pedido real;
 - integracao inicial com Tracking;
-- integracao inicial com Gateway real/teste para pagamentos e mensagens;
+- validacao do checkout publico com cartao Mercado Pago sandbox;
+- integracao inicial com Gateway real/teste para mensagens;
 - melhoria de UX operacional conforme gargalos dos fluxos integrados;
 - auditoria minima;
 - eventos publicados para FP Robots quando fizer sentido.

@@ -254,7 +254,7 @@ export class GatewayService {
 
   async createPaymentRequest(
     companyId: string,
-    actorUserId: string,
+    actorUserId: string | null,
     input: CreateGatewayPaymentRequestInput
   ): Promise<GatewayPaymentRequestContract> {
     const normalized = normalizePaymentRequestInput(input);
@@ -939,7 +939,7 @@ export class GatewayService {
 
   private async createMercadoPagoPaymentForPaymentRequest(
     companyId: string,
-    actorUserId: string,
+    actorUserId: string | null,
     input: NormalizedPaymentRequestInput,
     paymentRequest: GatewayPaymentRequestContract,
     provider: GatewayProviderContract,
@@ -1041,7 +1041,7 @@ export class GatewayService {
 
   private async markPaymentRequestAsFailed(
     companyId: string,
-    actorUserId: string,
+    actorUserId: string | null,
     paymentRequest: GatewayPaymentRequestContract,
     provider: GatewayProviderContract,
     failure: {
@@ -1088,7 +1088,7 @@ export class GatewayService {
 
   private async safeCreateGatewayEvent(
     companyId: string,
-    actorUserId: string,
+    actorUserId: string | null,
     input: {
       eventCode: string;
       payload: Record<string, unknown>;

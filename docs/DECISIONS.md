@@ -94,6 +94,7 @@ Este arquivo registra decisoes arquiteturais e operacionais para evitar retrabal
 | DEC-086 | No sandbox manual Mercado Pago, o FP Gateway deve validar e-mail de pagador com dominio `@testuser.com` antes da chamada externa, evitando falha `invalid_email_for_sandbox`. | Aprovada |
 | DEC-087 | Ao criar uma order Mercado Pago, o FP Gateway deve normalizar o status retornado imediatamente; se a order ja nascer paga no sandbox, grava `paid` e emite `gateway.payment.requested` seguido de `gateway.payment.paid`. | Aprovada |
 | DEC-088 | Cartoes de credito/debito Mercado Pago no FP Gateway devem usar Checkout Transparente via Orders API com token gerado por MercadoPago.js/Card Payment Brick; o FP Console e a API nao devem coletar nem armazenar numero, validade ou CVV do cartao. | Aprovada |
+| DEC-089 | O cadastro/entrada de dados de cartao do comprador deve acontecer no checkout do produto consumidor, inicialmente FP Food, usando Card Payment Brick como caminho preferencial; FP Gateway recebe apenas token e metadados para criar a order e normalizar status. | Aprovada |
 
 ---
 

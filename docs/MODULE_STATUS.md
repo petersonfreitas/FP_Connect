@@ -20,7 +20,7 @@ Este arquivo controla o avanco dos modulos do ecossistema.
 |---|---:|---:|---|---|
 | FP Connect Admin Console | Alta | 2 | Base funcional estabilizada | Empresas, usuarios, papel de plataforma, permissoes, modulos contratados, suporte por carteira, catalogo, auditoria, guards, bloqueios, paginacao inicial e inativacao operacional ja possuem API e telas principais. |
 | FP Robots | Alta | 2 | Base funcional em evolucao | Schema `robots`, catalogo de eventos, event log, regras simples `evento -> acao`, execucoes, falha simulada, reprocessamento basico, API interna e tela inicial no Console criados. |
-| FP Food | Alta | 2 | Base funcional em evolucao | Frontend separado `apps/food`, dashboard operacional V0, menu lateral por Cadastro/Movimentacao, configuracao da loja, categorias/produtos paginados, cardapio derivado, pedido interno V0, vitrine publica V0 por slug, acompanhamento publico de pedido, painel de pedidos com filtro/status, detalhe de pedido com historico simples, pagamento manual V0, Cozinha V0, Entrega simples V0 e eventos `food.*` iniciais criados. |
+| FP Food | Alta | 2 | Base funcional em evolucao | Frontend separado `apps/food`, dashboard operacional V0, menu lateral por Cadastro/Movimentacao, configuracao da loja, categorias/produtos paginados, cardapio derivado, pedido interno V0, vitrine publica V0 por slug, acompanhamento publico de pedido, checkout publico com cartao Mercado Pago via Gateway V0, painel de pedidos com filtro/status, detalhe de pedido com historico simples, pagamento manual V0, Cozinha V0, Entrega simples V0 e eventos `food.*` iniciais criados. |
 | FP Tracking | Alta | 0 | Proximo ciclo de integracao | Endpoint interno `/api/tracking/access` ja valida empresa, modulo contratado e permissao; deve nascer como frontend separado e assumir entrega/rastreio real do Food. |
 | FP Billing | Futura | 0 | Fundacao de acesso preparada | Endpoint interno `/api/billing/access` ja valida empresa, modulo contratado e permissao; entrara apos base operacional. |
 | FP Tickets | Futura | 0 | Fundacao de acesso preparada | Endpoint interno `/api/tickets/access` ja valida empresa, modulo contratado e permissao; entrara apos base operacional. |
@@ -140,6 +140,8 @@ Este arquivo controla o avanco dos modulos do ecossistema.
 - [x] Entrega simples V0 com pedidos prontos e em rota
 - [x] Status simples do pedido
 - [x] Pagamento manual V0
+- [x] Checkout publico com cartao Mercado Pago via FP Gateway V0
+- [ ] Smoke test publico com cartao Mercado Pago sandbox
 - [ ] Realtime futuro para pedidos, cozinha e acompanhamento publico
 - [x] Eventos de pedido para Robots
 - [ ] Integracao com Tracking
@@ -180,9 +182,9 @@ Este arquivo controla o avanco dos modulos do ecossistema.
 - [x] Consulta manual de status Mercado Pago Orders na tela de Pagamentos V0
 - [x] Status inicial da order Mercado Pago normalizado na criacao, com `gateway.payment.paid` imediato quando sandbox nascer pago
 - [x] Contrato V0 preparado para cartao de credito/debito Mercado Pago com token gerado por MercadoPago.js/Card Payment Brick
+- [x] Integracao Food -> Gateway para solicitar pagamento com cartao a partir do pedido publico
 - [ ] Smoke test com cartao Mercado Pago sandbox
-- [ ] Smoke test com PIX Mercado Pago sandbox
-- [ ] Integracao Food -> Gateway para solicitar pagamento a partir do pedido
+- [x] Smoke test com PIX Mercado Pago sandbox
 - [ ] Webhook externo normalizado
 - [ ] Envio transacional SMTP solicitado pelo FP Robots
 
@@ -210,8 +212,8 @@ Este arquivo controla o avanco dos modulos do ecossistema.
 
 Iniciar o ciclo de integracao Gateway + Tracking, usando o FP Food como primeiro consumidor real:
 
-1. integrar o pedido do FP Food ao contrato V0 `gateway.payment_requests`;
-2. configurar Mercado Pago real/teste sobre o contrato ja criado;
+1. validar checkout publico com cartao Mercado Pago sandbox no FP Food;
+2. implementar webhook publico do Gateway para conciliacao assincrona;
 3. definir o contrato minimo Gateway -> Food para retorno de status normalizado;
 4. definir o contrato minimo Food -> Tracking para criar entrega a partir de pedido pronto;
 5. definir o contrato minimo Tracking -> Food para retorno de status/link de rastreio;
