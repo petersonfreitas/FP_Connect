@@ -1,12 +1,16 @@
 import Link from "next/link";
 import type {
   AdminCurrentUserAccessContract,
+  RobotsActionType,
   RobotsEventCatalogContract,
   RobotsEventContract,
+  RobotsEventStatus,
   RobotsExecutionContract,
+  RobotsExecutionStatus,
   RobotsRuleContract
 } from "@fp/types";
 import { AppShell } from "@/components/app-shell";
+import { PaginationControls } from "@/components/pagination-controls";
 import { PendingSubmitButton } from "@/components/pending-submit-button";
 import {
   ContextSummary,
@@ -25,12 +29,19 @@ import {
 import { reprocessRobotsExecutionAction } from "./actions";
 
 export const dynamic = "force-dynamic";
+const pageSize = 20;
 
 type RobotsPageProps = {
   searchParams?: Promise<{
+    actionType?: string;
     companyId?: string;
+    dateFrom?: string;
+    dateTo?: string;
     error?: string;
+    page?: string;
     reprocessed?: string;
+    source?: string;
+    status?: string;
     tab?: string;
   }>;
 };
@@ -88,12 +99,47 @@ const catalogStatusLabels = {
   inactive: "Inativo"
 };
 
+const eventStatusOptions: Array<{ label: string; value: RobotsEventStatus }> = [
+  { label: "Recebido", value: "received" },
+  { label: "Falhou", value: "failed" },
+  { label: "Duplicado ignorado", value: "ignored_duplicate" }
+];
+
+const executionStatusOptions: Array<{ label: string; value: RobotsExecutionStatus }> = [
+  { label: "Pendente", value: "pending" },
+  { label: "Executando", value: "running" },
+  { label: "Concluida", value: "succeeded" },
+  { label: "Falhou", value: "failed" },
+  { label: "Cancelada", value: "cancelled" }
+];
+
+const actionTypeOptions: Array<{ label: string; value: RobotsActionType }> = [
+  { label: "E-mail", value: "email" },
+  { label: "Gateway externo", value: "gateway_external_action" },
+  { label: "API interna", value: "internal_api" },
+  { label: "Log interno", value: "internal_log" },
+  { label: "Webhook", value: "webhook" }
+];
+
 export default async function RobotsPage({ searchParams }: RobotsPageProps) {
   const query = searchParams ? await searchParams : {};
   const accessResult = await getCurrentAdminAccess();
   const access = accessResult.data;
   const selectedCompanyId = resolveSelectedCompanyId(query.companyId, access);
   const selectedTab = resolveRobotsTab(query.tab);
+  const page = normalizePage(query.page);
+  const eventFilters = {
+    dateFrom: selectedTab === "events" ? normalizeFilterValue(query.dateFrom) : undefined,
+    dateTo: selectedTab === "events" ? normalizeFilterValue(query.dateTo) : undefined,
+    source: selectedTab === "events" ? normalizeFilterValue(query.source) : undefined,
+    status: selectedTab === "events" ? normalizeFilterValue(query.status) : undefined
+  };
+  const executionFilters = {
+    actionType: selectedTab === "executions" ? normalizeFilterValue(query.actionType) : undefined,
+    dateFrom: selectedTab === "executions" ? normalizeFilterValue(query.dateFrom) : undefined,
+    dateTo: selectedTab === "executions" ? normalizeFilterValue(query.dateTo) : undefined,
+    status: selectedTab === "executions" ? normalizeFilterValue(query.status) : undefined
+  };
 
   if (!access || !selectedCompanyId) {
     return (
@@ -148,14 +194,34 @@ export default async function RobotsPage({ searchParams }: RobotsPageProps) {
 
   const [catalogResult, eventsResult, rulesResult, executionsResult] = await Promise.all([
     listRobotsEventCatalog(selectedCompanyId),
-    listRobotsEvents(selectedCompanyId),
+    listRobotsEvents(selectedCompanyId, {
+      ...eventFilters,
+      page: selectedTab === "events" ? page : 1,
+      pageSize
+    }),
     listRobotsRules(selectedCompanyId),
-    listRobotsExecutions(selectedCompanyId)
+    listRobotsExecutions(selectedCompanyId, {
+      ...executionFilters,
+      page: selectedTab === "executions" ? page : 1,
+      pageSize
+    })
   ]);
   const catalog = catalogResult.data ?? [];
-  const events = eventsResult.data ?? [];
+  const eventsPagination = eventsResult.data;
+  const events = eventsPagination?.items ?? [];
   const rules = rulesResult.data ?? [];
-  const executions = executionsResult.data ?? [];
+  const executionsPagination = executionsResult.data;
+  const executions = executionsPagination?.items ?? [];
+  const sourceOptions = getSourceOptions(catalog);
+  const hasEventFilters = Boolean(
+    eventFilters.dateFrom || eventFilters.dateTo || eventFilters.source || eventFilters.status
+  );
+  const hasExecutionFilters = Boolean(
+    executionFilters.actionType ||
+      executionFilters.dateFrom ||
+      executionFilters.dateTo ||
+      executionFilters.status
+  );
   const selectedCompany = access.companies.find(
     (companyAccess) => companyAccess.company.id === selectedCompanyId
   );
@@ -224,7 +290,9 @@ export default async function RobotsPage({ searchParams }: RobotsPageProps) {
       {selectedTab === "overview" ? (
         <RobotsOverview
           catalog={catalog}
+          eventTotal={eventsPagination?.total ?? events.length}
           events={events}
+          executionTotal={executionsPagination?.total ?? executions.length}
           executions={executions}
           rules={rules}
         />
@@ -237,17 +305,43 @@ export default async function RobotsPage({ searchParams }: RobotsPageProps) {
               <h1>Eventos recebidos</h1>
               <p>Fatos aceitos pelo catalogo do Robots, sempre com empresa e origem identificadas.</p>
             </div>
-            <span>{events.length} registro(s)</span>
+            <span>{eventsPagination?.total ?? 0} registro(s)</span>
           </div>
+
+          <RobotsEventFilters
+            companyId={selectedCompanyId}
+            filters={eventFilters}
+            hasFilters={hasEventFilters}
+            sourceOptions={sourceOptions}
+          />
 
           {events.length > 0 ? (
             <RobotsEventsTable events={events} selectedCompanyId={selectedCompanyId} />
           ) : (
             <div className="empty-state">
-              Nenhum evento recebido ainda. O endpoint interno ja esta preparado para Food, Tracking
-              e Gateway publicarem eventos padronizados.
+              {hasEventFilters
+                ? "Nenhum evento encontrado para os filtros informados."
+                : "Nenhum evento recebido ainda. O endpoint interno ja esta preparado para Food, Tracking e Gateway publicarem eventos padronizados."}
             </div>
           )}
+
+          {eventsPagination ? (
+            <PaginationControls
+              basePath="/robots"
+              page={eventsPagination.page}
+              pageSize={eventsPagination.pageSize}
+              searchParams={{
+                companyId: selectedCompanyId,
+                dateFrom: eventFilters.dateFrom,
+                dateTo: eventFilters.dateTo,
+                source: eventFilters.source,
+                status: eventFilters.status,
+                tab: "events"
+              }}
+              total={eventsPagination.total}
+              totalPages={eventsPagination.totalPages}
+            />
+          ) : null}
         </section>
       ) : null}
 
@@ -258,17 +352,42 @@ export default async function RobotsPage({ searchParams }: RobotsPageProps) {
               <h1>Execucoes</h1>
               <p>Acoes criadas a partir das regras ativas do Robots.</p>
             </div>
-            <span>{executions.length} registro(s)</span>
+            <span>{executionsPagination?.total ?? 0} registro(s)</span>
           </div>
+
+          <RobotsExecutionFilters
+            companyId={selectedCompanyId}
+            filters={executionFilters}
+            hasFilters={hasExecutionFilters}
+          />
 
           {executions.length > 0 ? (
             <RobotsExecutionsTable executions={executions} selectedCompanyId={selectedCompanyId} />
           ) : (
             <div className="empty-state">
-              Nenhuma execucao registrada ainda. As execucoes aparecerao quando eventos reais
-              encontrarem regras ativas para esta empresa.
+              {hasExecutionFilters
+                ? "Nenhuma execucao encontrada para os filtros informados."
+                : "Nenhuma execucao registrada ainda. As execucoes aparecerao quando eventos reais encontrarem regras ativas para esta empresa."}
             </div>
           )}
+
+          {executionsPagination ? (
+            <PaginationControls
+              basePath="/robots"
+              page={executionsPagination.page}
+              pageSize={executionsPagination.pageSize}
+              searchParams={{
+                actionType: executionFilters.actionType,
+                companyId: selectedCompanyId,
+                dateFrom: executionFilters.dateFrom,
+                dateTo: executionFilters.dateTo,
+                status: executionFilters.status,
+                tab: "executions"
+              }}
+              total={executionsPagination.total}
+              totalPages={executionsPagination.totalPages}
+            />
+          ) : null}
         </section>
       ) : null}
 
@@ -348,12 +467,16 @@ function RobotsSubnav({
 
 function RobotsOverview({
   catalog,
+  eventTotal,
   events,
+  executionTotal,
   executions,
   rules
 }: {
   catalog: RobotsEventCatalogContract[];
+  eventTotal: number;
   events: RobotsEventContract[];
+  executionTotal: number;
   executions: RobotsExecutionContract[];
   rules: RobotsRuleContract[];
 }) {
@@ -369,8 +492,8 @@ function RobotsOverview({
       <section className="summary-strip" aria-label="Resumo operacional do FP Robots">
         <div className="summary-item">
           <span>Eventos recebidos</span>
-          <strong>{events.length}</strong>
-          <small>Ultimos registros da empresa selecionada.</small>
+          <strong>{eventTotal}</strong>
+          <small>Total encontrado para a empresa selecionada.</small>
         </div>
         <div className="summary-item">
           <span>Falhas em eventos</span>
@@ -411,13 +534,139 @@ function RobotsOverview({
         <article className="module-card">
           <div className="module-card-top">
             <span>Operacao</span>
-            <small>{executions.length} execucao(oes)</small>
+            <small>{executionTotal} execucao(oes)</small>
           </div>
           <h3>Reprocessamento</h3>
           <p>Falhas operacionais permanecem auditaveis e podem ser reprocessadas quando permitido.</p>
         </article>
       </section>
     </>
+  );
+}
+
+function RobotsEventFilters({
+  companyId,
+  filters,
+  hasFilters,
+  sourceOptions
+}: {
+  companyId: string;
+  filters: {
+    dateFrom?: string;
+    dateTo?: string;
+    source?: string;
+    status?: string;
+  };
+  hasFilters: boolean;
+  sourceOptions: string[];
+}) {
+  return (
+    <form action="/robots" className="filter-bar">
+      <input name="companyId" type="hidden" value={companyId} />
+      <input name="tab" type="hidden" value="events" />
+      <label>
+        Status
+        <select defaultValue={filters.status ?? ""} name="status">
+          <option value="">Todos</option>
+          {eventStatusOptions.map((status) => (
+            <option key={status.value} value={status.value}>
+              {status.label}
+            </option>
+          ))}
+        </select>
+      </label>
+      <label>
+        Origem
+        <select defaultValue={filters.source ?? ""} name="source">
+          <option value="">Todas</option>
+          {sourceOptions.map((source) => (
+            <option key={source} value={source}>
+              {source}
+            </option>
+          ))}
+        </select>
+      </label>
+      <label>
+        De
+        <input defaultValue={filters.dateFrom ?? ""} name="dateFrom" type="date" />
+      </label>
+      <label>
+        Ate
+        <input defaultValue={filters.dateTo ?? ""} name="dateTo" type="date" />
+      </label>
+      <div className="filter-actions">
+        <button className="primary-action" type="submit">
+          Filtrar
+        </button>
+        {hasFilters ? (
+          <Link className="secondary-action" href={buildRobotsTabHref(companyId, "events")}>
+            Limpar
+          </Link>
+        ) : null}
+      </div>
+    </form>
+  );
+}
+
+function RobotsExecutionFilters({
+  companyId,
+  filters,
+  hasFilters
+}: {
+  companyId: string;
+  filters: {
+    actionType?: string;
+    dateFrom?: string;
+    dateTo?: string;
+    status?: string;
+  };
+  hasFilters: boolean;
+}) {
+  return (
+    <form action="/robots" className="filter-bar">
+      <input name="companyId" type="hidden" value={companyId} />
+      <input name="tab" type="hidden" value="executions" />
+      <label>
+        Status
+        <select defaultValue={filters.status ?? ""} name="status">
+          <option value="">Todos</option>
+          {executionStatusOptions.map((status) => (
+            <option key={status.value} value={status.value}>
+              {status.label}
+            </option>
+          ))}
+        </select>
+      </label>
+      <label>
+        Acao
+        <select defaultValue={filters.actionType ?? ""} name="actionType">
+          <option value="">Todas</option>
+          {actionTypeOptions.map((actionType) => (
+            <option key={actionType.value} value={actionType.value}>
+              {actionType.label}
+            </option>
+          ))}
+        </select>
+      </label>
+      <label>
+        De
+        <input defaultValue={filters.dateFrom ?? ""} name="dateFrom" type="date" />
+      </label>
+      <label>
+        Ate
+        <input defaultValue={filters.dateTo ?? ""} name="dateTo" type="date" />
+      </label>
+      <div className="filter-actions">
+        <button className="primary-action" type="submit">
+          Filtrar
+        </button>
+        {hasFilters ? (
+          <Link className="secondary-action" href={buildRobotsTabHref(companyId, "executions")}>
+            Limpar
+          </Link>
+        ) : null}
+      </div>
+    </form>
   );
 }
 
@@ -583,6 +832,29 @@ function resolveRobotsTab(value: string | undefined): RobotsTab {
   const tab = robotsTabs.find((item) => item.key === value);
 
   return tab?.key ?? "overview";
+}
+
+function normalizePage(value: string | undefined): number {
+  const page = Number(value);
+  return Number.isInteger(page) && page > 0 ? page : 1;
+}
+
+function normalizeFilterValue(value: string | undefined): string | undefined {
+  const normalized = value?.trim();
+  return normalized || undefined;
+}
+
+function getSourceOptions(catalog: RobotsEventCatalogContract[]): string[] {
+  return Array.from(new Set(catalog.map((event) => event.sourceApplicationKey))).sort();
+}
+
+function buildRobotsTabHref(companyId: string, tab: RobotsTab): string {
+  const params = new URLSearchParams({
+    companyId,
+    tab
+  });
+
+  return `/robots?${params.toString()}`;
 }
 
 function formatDate(value: string): string {

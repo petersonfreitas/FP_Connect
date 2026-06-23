@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Headers, Param, Post, UseGuards } from "@nestjs/common";
+import { Body, Controller, Get, Headers, Param, Post, Query, UseGuards } from "@nestjs/common";
 import { InternalApiGuard } from "../../auth/internal-api.guard";
 import { ModuleAccessGuard } from "../../auth/module-access.guard";
 import { ModuleAccessPolicy } from "../../auth/module-access-policy.decorator";
@@ -40,8 +40,23 @@ export class RobotsController {
     companyHeader: "x-fp-company-id",
     permissionKey: "robots.events.read"
   })
-  listEvents(@Headers("x-fp-company-id") companyId: string) {
-    return this.robots.listEvents(companyId);
+  listEvents(
+    @Headers("x-fp-company-id") companyId: string,
+    @Query("page") page: string | undefined,
+    @Query("pageSize") pageSize: string | undefined,
+    @Query("status") status: string | undefined,
+    @Query("source") source: string | undefined,
+    @Query("dateFrom") dateFrom: string | undefined,
+    @Query("dateTo") dateTo: string | undefined
+  ) {
+    return this.robots.listEvents(companyId, {
+      dateFrom,
+      dateTo,
+      page,
+      pageSize,
+      source,
+      status
+    });
   }
 
   @Get("rules")
@@ -60,8 +75,23 @@ export class RobotsController {
     companyHeader: "x-fp-company-id",
     permissionKey: "robots.events.read"
   })
-  listExecutions(@Headers("x-fp-company-id") companyId: string) {
-    return this.robots.listExecutions(companyId);
+  listExecutions(
+    @Headers("x-fp-company-id") companyId: string,
+    @Query("page") page: string | undefined,
+    @Query("pageSize") pageSize: string | undefined,
+    @Query("status") status: string | undefined,
+    @Query("actionType") actionType: string | undefined,
+    @Query("dateFrom") dateFrom: string | undefined,
+    @Query("dateTo") dateTo: string | undefined
+  ) {
+    return this.robots.listExecutions(companyId, {
+      actionType,
+      dateFrom,
+      dateTo,
+      page,
+      pageSize,
+      status
+    });
   }
 
   @Get("events/:id")

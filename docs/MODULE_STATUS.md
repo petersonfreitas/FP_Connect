@@ -108,6 +108,7 @@ Este arquivo controla o avanco dos modulos do ecossistema.
 - [x] Execucoes geradas por regras ativas
 - [x] Painel operacional inicial com visao geral, eventos, execucoes, regras e catalogo
 - [x] Remocao dos atalhos de teste do Console
+- [x] Filtros e paginacao em eventos e execucoes
 - [x] Reprocessamento basico
 - [x] Integracao inicial com Food
 - [ ] Integracao inicial com Tracking

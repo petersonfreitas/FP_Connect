@@ -85,11 +85,15 @@ export async function getCurrentAdminAccess(): Promise<
 }
 
 type PaginationParams = {
+  actionType?: string;
+  dateFrom?: string;
+  dateTo?: string;
   module?: string;
   page?: number;
   pageSize?: number;
   q?: string;
   scope?: "all" | "company" | "platform";
+  source?: string;
   status?: string;
 };
 
@@ -380,29 +384,37 @@ export async function listRobotsEventCatalog(
 }
 
 export async function listRobotsEvents(
-  companyId: string
-): Promise<InternalApiResult<RobotsEventContract[]>> {
-  return fetchInternal<RobotsEventContract[]>("robots/events", {
-    headers: {
-      "X-FP-Company-Id": companyId
+  companyId: string,
+  pagination: PaginationParams = {}
+): Promise<InternalApiResult<PaginatedContract<RobotsEventContract>>> {
+  return fetchInternal<PaginatedContract<RobotsEventContract>>(
+    `robots/events${formatPaginationSearch(pagination)}`,
+    {
+      headers: {
+        "X-FP-Company-Id": companyId
+      }
     }
-  });
+  );
+}
+
+export async function listRobotsExecutions(
+  companyId: string,
+  pagination: PaginationParams = {}
+): Promise<InternalApiResult<PaginatedContract<RobotsExecutionContract>>> {
+  return fetchInternal<PaginatedContract<RobotsExecutionContract>>(
+    `robots/executions${formatPaginationSearch(pagination)}`,
+    {
+      headers: {
+        "X-FP-Company-Id": companyId
+      }
+    }
+  );
 }
 
 export async function listRobotsRules(
   companyId: string
 ): Promise<InternalApiResult<RobotsRuleContract[]>> {
   return fetchInternal<RobotsRuleContract[]>("robots/rules", {
-    headers: {
-      "X-FP-Company-Id": companyId
-    }
-  });
-}
-
-export async function listRobotsExecutions(
-  companyId: string
-): Promise<InternalApiResult<RobotsExecutionContract[]>> {
-  return fetchInternal<RobotsExecutionContract[]>("robots/executions", {
     headers: {
       "X-FP-Company-Id": companyId
     }
@@ -654,8 +666,31 @@ function getInternalApiBaseUrl(): string {
   return baseUrl.endsWith("/api") ? baseUrl : `${baseUrl}/api`;
 }
 
-function formatPaginationSearch({ module, page, pageSize, q, scope, status }: PaginationParams): string {
+function formatPaginationSearch({
+  actionType,
+  dateFrom,
+  dateTo,
+  module,
+  page,
+  pageSize,
+  q,
+  scope,
+  source,
+  status
+}: PaginationParams): string {
   const params = new URLSearchParams();
+
+  if (actionType) {
+    params.set("actionType", actionType);
+  }
+
+  if (dateFrom) {
+    params.set("dateFrom", dateFrom);
+  }
+
+  if (dateTo) {
+    params.set("dateTo", dateTo);
+  }
 
   if (module) {
     params.set("module", module);
@@ -675,6 +710,10 @@ function formatPaginationSearch({ module, page, pageSize, q, scope, status }: Pa
 
   if (q) {
     params.set("q", q);
+  }
+
+  if (source) {
+    params.set("source", source);
   }
 
   if (status) {

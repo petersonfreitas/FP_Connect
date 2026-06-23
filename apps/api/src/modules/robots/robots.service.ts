@@ -3,6 +3,7 @@ import { SupabaseService } from "../../supabase/supabase.service";
 import type {
   CreateRobotsEventContract,
   CreateRobotsEventInput,
+  PaginatedContract,
   ReprocessRobotsExecutionContract,
   RobotsActionStatus,
   RobotsActionType,
@@ -16,6 +17,24 @@ import type {
   RobotsRuleContract,
   RobotsRuleStatus
 } from "./robots.contracts";
+
+type RobotsEventListOptions = {
+  dateFrom?: string;
+  dateTo?: string;
+  page?: string;
+  pageSize?: string;
+  source?: string;
+  status?: string;
+};
+
+type RobotsExecutionListOptions = {
+  actionType?: string;
+  dateFrom?: string;
+  dateTo?: string;
+  page?: string;
+  pageSize?: string;
+  status?: string;
+};
 
 type RobotCatalogRow = {
   code: string;
@@ -86,6 +105,24 @@ type RobotExecutionRow = {
 const maxEventCodeLength = 160;
 const maxSourceKeyLength = 80;
 const maxIdempotencyLength = 160;
+const defaultPage = 1;
+const defaultPageSize = 20;
+const maxPageSize = 100;
+const eventStatuses: RobotsEventStatus[] = ["failed", "ignored_duplicate", "received"];
+const executionStatuses: RobotsExecutionStatus[] = [
+  "cancelled",
+  "failed",
+  "pending",
+  "running",
+  "succeeded"
+];
+const actionTypes: RobotsActionType[] = [
+  "email",
+  "gateway_external_action",
+  "internal_api",
+  "internal_log",
+  "webhook"
+];
 const sensitiveKeys = new Set([
   "access_token",
   "authorization",
@@ -118,20 +155,50 @@ export class RobotsService {
     return ((data ?? []) as RobotCatalogRow[]).map(mapCatalog);
   }
 
-  async listEvents(companyId: string): Promise<RobotsEventContract[]> {
-    const { data, error } = await this.supabase.robots
+  async listEvents(
+    companyId: string,
+    options: RobotsEventListOptions = {}
+  ): Promise<PaginatedContract<RobotsEventContract>> {
+    const pagination = normalizePagination(options);
+    const range = getPaginationRange(pagination);
+    const status = normalizeEventStatus(options.status);
+    const source = normalizeSourceFilter(options.source);
+    const dateFrom = normalizeDateFilter(options.dateFrom, "start");
+    const dateTo = normalizeDateFilter(options.dateTo, "end");
+    let query = this.supabase.robots
       .from("events")
-      .select(eventSelect)
+      .select(eventSelect, { count: "exact" })
       .eq("company_id", companyId)
       .is("deleted_at", null)
-      .order("created_at", { ascending: false })
-      .limit(50);
+      .order("created_at", { ascending: false });
+
+    if (status) {
+      query = query.eq("status", status);
+    }
+
+    if (source) {
+      query = query.eq("source_application_key", source);
+    }
+
+    if (dateFrom) {
+      query = query.gte("created_at", dateFrom);
+    }
+
+    if (dateTo) {
+      query = query.lte("created_at", dateTo);
+    }
+
+    const { data, error, count } = await query.range(range.from, range.to);
 
     if (error) {
       throwSupabaseError(error);
     }
 
-    return ((data ?? []) as unknown as RobotEventRow[]).map(mapEvent);
+    return toPaginated(
+      ((data ?? []) as unknown as RobotEventRow[]).map(mapEvent),
+      pagination,
+      count ?? 0
+    );
   }
 
   async getEvent(companyId: string, eventId: string): Promise<RobotsEventContract> {
@@ -174,20 +241,50 @@ export class RobotsService {
     return rules.map((rule) => mapRule(rule, actionsByRuleId.get(rule.id) ?? []));
   }
 
-  async listExecutions(companyId: string): Promise<RobotsExecutionContract[]> {
-    const { data, error } = await this.supabase.robots
+  async listExecutions(
+    companyId: string,
+    options: RobotsExecutionListOptions = {}
+  ): Promise<PaginatedContract<RobotsExecutionContract>> {
+    const pagination = normalizePagination(options);
+    const range = getPaginationRange(pagination);
+    const status = normalizeExecutionStatus(options.status);
+    const actionType = normalizeActionType(options.actionType);
+    const dateFrom = normalizeDateFilter(options.dateFrom, "start");
+    const dateTo = normalizeDateFilter(options.dateTo, "end");
+    let query = this.supabase.robots
       .from("event_executions")
-      .select(executionSelect)
+      .select(executionSelect, { count: "exact" })
       .eq("company_id", companyId)
       .is("deleted_at", null)
-      .order("created_at", { ascending: false })
-      .limit(50);
+      .order("created_at", { ascending: false });
+
+    if (status) {
+      query = query.eq("status", status);
+    }
+
+    if (actionType) {
+      query = query.eq("action_type", actionType);
+    }
+
+    if (dateFrom) {
+      query = query.gte("created_at", dateFrom);
+    }
+
+    if (dateTo) {
+      query = query.lte("created_at", dateTo);
+    }
+
+    const { data, error, count } = await query.range(range.from, range.to);
 
     if (error) {
       throwSupabaseError(error);
     }
 
-    return ((data ?? []) as unknown as RobotExecutionRow[]).map(mapExecution);
+    return toPaginated(
+      ((data ?? []) as unknown as RobotExecutionRow[]).map(mapExecution),
+      pagination,
+      count ?? 0
+    );
   }
 
   async createEvent(
@@ -700,6 +797,99 @@ function mapExecution(row: RobotExecutionRow): RobotsExecutionContract {
     ruleId: row.rule_id,
     status: row.status,
     updatedAt: row.updated_at
+  };
+}
+
+function normalizePagination(
+  options: RobotsEventListOptions | RobotsExecutionListOptions
+): { page: number; pageSize: number } {
+  const page = normalizePositiveInteger(options.page, defaultPage);
+  const pageSize = normalizePositiveInteger(options.pageSize, defaultPageSize);
+
+  return {
+    page,
+    pageSize: Math.min(pageSize, maxPageSize)
+  };
+}
+
+function normalizePositiveInteger(value: string | undefined, fallback: number): number {
+  const parsed = Number(value);
+
+  if (!Number.isInteger(parsed) || parsed < 1) {
+    return fallback;
+  }
+
+  return parsed;
+}
+
+function normalizeEventStatus(value: string | undefined): RobotsEventStatus | null {
+  return eventStatuses.includes(value as RobotsEventStatus) ? (value as RobotsEventStatus) : null;
+}
+
+function normalizeExecutionStatus(value: string | undefined): RobotsExecutionStatus | null {
+  return executionStatuses.includes(value as RobotsExecutionStatus)
+    ? (value as RobotsExecutionStatus)
+    : null;
+}
+
+function normalizeActionType(value: string | undefined): RobotsActionType | null {
+  return actionTypes.includes(value as RobotsActionType) ? (value as RobotsActionType) : null;
+}
+
+function normalizeSourceFilter(value: string | undefined): string | null {
+  const normalized = value?.trim().toLowerCase() ?? "";
+
+  if (!/^[a-z0-9_-]{2,40}$/.test(normalized)) {
+    return null;
+  }
+
+  return normalized;
+}
+
+function normalizeDateFilter(value: string | undefined, boundary: "end" | "start"): string | null {
+  const normalized = value?.trim();
+
+  if (!normalized) {
+    return null;
+  }
+
+  const date =
+    /^\d{4}-\d{2}-\d{2}$/.test(normalized) && boundary === "start"
+      ? new Date(`${normalized}T00:00:00.000Z`)
+      : /^\d{4}-\d{2}-\d{2}$/.test(normalized)
+        ? new Date(`${normalized}T23:59:59.999Z`)
+        : new Date(normalized);
+
+  if (Number.isNaN(date.getTime())) {
+    throw new BadRequestException("Filtro de data invalido");
+  }
+
+  return date.toISOString();
+}
+
+function getPaginationRange(pagination: { page: number; pageSize: number }): {
+  from: number;
+  to: number;
+} {
+  const from = (pagination.page - 1) * pagination.pageSize;
+
+  return {
+    from,
+    to: from + pagination.pageSize - 1
+  };
+}
+
+function toPaginated<T>(
+  items: T[],
+  pagination: { page: number; pageSize: number },
+  total: number
+): PaginatedContract<T> {
+  return {
+    items,
+    page: pagination.page,
+    pageSize: pagination.pageSize,
+    total,
+    totalPages: Math.max(1, Math.ceil(total / pagination.pageSize))
   };
 }
 

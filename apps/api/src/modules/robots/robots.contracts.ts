@@ -10,6 +10,14 @@ export type RobotsActionType =
   | "internal_log"
   | "webhook";
 
+export type PaginatedContract<T> = {
+  items: T[];
+  page: number;
+  pageSize: number;
+  total: number;
+  totalPages: number;
+};
+
 export type RobotsEventCatalogContract = {
   id: string;
   code: string;
