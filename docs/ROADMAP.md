@@ -65,6 +65,7 @@ O FP Food foi iniciado como frontend separado:
 - cardapio derivado para previa interna;
 - pedido interno V0;
 - vitrine publica V0 por slug em `/l/[slug]`;
+- vitrine publica organizada em blocos de loja, acompanhamento, cardapio e checkout;
 - link publico exposto no cadastro da loja para validacao da experiencia do cliente;
 - acompanhamento publico V0 em `/l/[slug]/pedido/[orderNumber]`;
 - painel interno de pedidos com filtro por status, acoes rapidas e polling leve de 30 segundos;

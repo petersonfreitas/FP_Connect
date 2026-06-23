@@ -1178,12 +1178,76 @@ textarea {
   margin: 0;
 }
 
+.public-hero-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 20px;
+}
+
+.public-hero-actions a {
+  background: rgb(255 255 255 / 12%);
+  border: 1px solid rgb(255 255 255 / 24%);
+  border-radius: 999px;
+  color: #ffffff;
+  font-weight: 900;
+  padding: 10px 14px;
+}
+
 .public-store-status {
   background: rgb(255 255 255 / 12%);
   border: 1px solid rgb(255 255 255 / 22%);
-  border-radius: 999px;
+  border-radius: 8px;
+  display: grid;
+  gap: 4px;
+  min-width: 170px;
+  padding: 14px;
+}
+
+.public-store-status span {
   font-weight: 900;
-  padding: 10px 14px;
+}
+
+.public-store-status small {
+  color: rgb(255 255 255 / 72%);
+  font-weight: 800;
+}
+
+.public-store-overview {
+  display: grid;
+  gap: 14px;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.public-info-card {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+  padding: 16px;
+}
+
+.public-info-card span,
+.public-section-heading span,
+.public-cart-heading span {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 900;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.public-info-card strong {
+  color: var(--accent-strong);
+  overflow-wrap: anywhere;
+}
+
+.public-info-card p {
+  color: var(--muted);
+  line-height: 1.5;
+  margin: 0;
 }
 
 .public-order-lookup {
@@ -1236,6 +1300,28 @@ textarea {
   border: 1px solid var(--line);
   border-radius: 8px;
   padding: 24px;
+}
+
+.public-section-heading {
+  align-items: end;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  display: flex;
+  gap: 16px;
+  justify-content: space-between;
+  padding: 22px 24px;
+}
+
+.public-section-heading h2 {
+  letter-spacing: 0;
+  margin: 6px 0;
+}
+
+.public-section-heading p {
+  color: var(--muted);
+  line-height: 1.5;
+  margin: 0;
 }
 
 .public-category h2,
@@ -1326,6 +1412,15 @@ textarea {
   padding: 22px;
   position: sticky;
   top: 24px;
+}
+
+.public-cart-heading {
+  align-items: start;
+  border-bottom: 1px solid var(--line);
+  display: flex;
+  gap: 14px;
+  justify-content: space-between;
+  padding-bottom: 16px;
 }
 
 .public-cart-row {
@@ -1545,6 +1640,8 @@ textarea {
   .order-item-row,
   .order-status-form,
   .public-hero,
+  .public-section-heading,
+  .public-cart-heading,
   .public-product-footer,
   .public-cart-row,
   .public-cart-total {
@@ -1578,6 +1675,7 @@ textarea {
 
   .public-order-layout,
   .public-product-grid,
+  .public-store-overview,
   .kitchen-board,
   .public-order-lookup,
   .public-order-lookup form,

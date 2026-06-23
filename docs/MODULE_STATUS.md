@@ -20,7 +20,7 @@ Este arquivo controla o avanco dos modulos do ecossistema.
 |---|---:|---:|---|---|
 | FP Connect Admin Console | Alta | 2 | Base funcional estabilizada | Empresas, usuarios, papel de plataforma, permissoes, modulos contratados, suporte por carteira, catalogo, auditoria, guards, bloqueios, paginacao inicial e inativacao operacional ja possuem API e telas principais. |
 | FP Robots | Alta | 2 | Base funcional em evolucao | Schema `robots`, catalogo de eventos, event log, regras simples `evento -> acao`, execucoes, reprocessamento basico, API interna e painel operacional inicial no Console criados. |
-| FP Food | Alta | 2 | Base funcional em evolucao produtiva | Frontend separado `apps/food`, dashboard operacional V0 com acesso rapido da loja, menu lateral reorganizado no padrao do Console por Gestao da loja/Cadastro/Movimentacao, configuracao da loja com link publico, categorias/produtos paginados, cardapio derivado, pedido interno V0, vitrine publica V0 por slug, acompanhamento publico de pedido, checkout publico com cartao Mercado Pago via Gateway V0, painel de pedidos com filtro/status, detalhe de pedido com historico simples, pagamento manual V0, Cozinha V0, Entrega simples V0 e eventos `food.*` iniciais criados. Proximas melhorias devem priorizar experiencia, validacoes e processos reais. |
+| FP Food | Alta | 2 | Base funcional em evolucao produtiva | Frontend separado `apps/food`, dashboard operacional V0 com acesso rapido da loja, menu lateral reorganizado no padrao do Console por Gestao da loja/Cadastro/Movimentacao, configuracao da loja com link publico, categorias/produtos paginados, cardapio derivado, pedido interno V0, vitrine publica V0 por slug com blocos de loja, acompanhamento, cardapio e checkout, acompanhamento publico de pedido, checkout publico com cartao Mercado Pago via Gateway V0, painel de pedidos com filtro/status, detalhe de pedido com historico simples, pagamento manual V0, Cozinha V0, Entrega simples V0 e eventos `food.*` iniciais criados. Proximas melhorias devem priorizar experiencia, validacoes e processos reais. |
 | FP Tracking | Alta | 0 | Preparado para ciclo futuro | Endpoint interno `/api/tracking/access` ja valida empresa, modulo contratado e permissao; deve nascer como frontend separado e assumir entrega/rastreio real do Food depois da estabilizacao produtiva de Food, Gateway, Robots e Console. |
 | FP Billing | Futura | 0 | Fundacao de acesso preparada | Endpoint interno `/api/billing/access` ja valida empresa, modulo contratado e permissao; entrara apos base operacional. |
 | FP Tickets | Futura | 0 | Fundacao de acesso preparada | Endpoint interno `/api/tickets/access` ja valida empresa, modulo contratado e permissao; entrara apos base operacional. |
@@ -132,6 +132,7 @@ Este arquivo controla o avanco dos modulos do ecossistema.
 - [x] Cardapio operacional derivado
 - [x] Evento `food.menu.updated` para Robots
 - [x] Vitrine publica V0 por slug
+- [x] Vitrine publica organizada por loja, acompanhamento, cardapio e checkout
 - [x] Acompanhamento publico V0 por numero do pedido
 - [x] Criacao de pedido interno V0
 - [x] Painel interno de pedidos

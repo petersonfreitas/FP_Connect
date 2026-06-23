@@ -79,6 +79,10 @@ export function PublicStorefront({
   const [mercadoPagoReady, setMercadoPagoReady] = useState(false);
   const [payingWithCard, setPayingWithCard] = useState(false);
   const selectedItems = products.filter((product) => (quantities[product.id] ?? 0) > 0);
+  const selectedItemsCount = selectedItems.reduce(
+    (sum, product) => sum + (quantities[product.id] ?? 0),
+    0
+  );
   const totalCents = selectedItems.reduce(
     (sum, product) => sum + product.priceCents * (quantities[product.id] ?? 0),
     0
@@ -224,8 +228,37 @@ export function PublicStorefront({
               ? `Preparo medio: ${menu.store.preparationTimeMinutes} min.`
               : "Cardapio aberto para pedidos."}
           </p>
+          <div className="public-hero-actions">
+            <a href="#cardapio">Ver cardapio</a>
+            <a href="#meus-pedidos">Meus pedidos</a>
+          </div>
         </div>
-        <div className="public-store-status">Loja aberta</div>
+        <div className="public-store-status">
+          <span>Loja aberta</span>
+          <small>{selectedItemsCount > 0 ? `${selectedItemsCount} item(ns) no pedido` : "Pedido online"}</small>
+        </div>
+      </section>
+
+      <section className="public-store-overview" aria-label="Informacoes da loja">
+        <article className="public-info-card">
+          <span>Preparo</span>
+          <strong>
+            {menu.store.preparationTimeMinutes
+              ? `${menu.store.preparationTimeMinutes} min`
+              : "Sob consulta"}
+          </strong>
+          <p>Tempo medio informado pela loja.</p>
+        </article>
+        <article className="public-info-card">
+          <span>Atendimento</span>
+          <strong>{menu.store.contactPhone ?? "Online"}</strong>
+          <p>Canal para duvidas sobre pedido e entrega.</p>
+        </article>
+        <article className="public-info-card">
+          <span>Pagamento</span>
+          <strong>{publicKey ? "Online e loja" : "Na loja"}</strong>
+          <p>{publicKey ? "Cartao Mercado Pago ou fluxo combinado." : "Combine com a loja."}</p>
+        </article>
       </section>
 
       <section className="public-order-lookup" id="meus-pedidos">
@@ -251,7 +284,16 @@ export function PublicStorefront({
       <form action={createOrderAction} className="public-order-layout" ref={orderFormRef}>
         <input name="publicSlug" type="hidden" value={menu.store.publicSlug} />
 
-        <section className="public-menu">
+        <section className="public-menu" id="cardapio">
+          <div className="public-section-heading">
+            <div>
+              <div className="eyebrow">Cardapio</div>
+              <h2>Escolha os itens do pedido</h2>
+              <p>Use os controles de quantidade e finalize no carrinho ao lado.</p>
+            </div>
+            <span>{products.length} produto(s)</span>
+          </div>
+
           {menu.categories.map((category) => (
             <div className="public-category" key={category.id}>
               <div>
@@ -294,9 +336,13 @@ export function PublicStorefront({
         </section>
 
         <aside className="public-cart">
-          <div>
-            <h2>Seu pedido</h2>
-            <p>Confira os itens e informe seus dados para enviar para a loja.</p>
+          <div className="public-cart-heading">
+            <div>
+              <div className="eyebrow">Checkout</div>
+              <h2>Seu pedido</h2>
+              <p>Confira os itens e informe seus dados para enviar para a loja.</p>
+            </div>
+            <span>{selectedItemsCount} item(ns)</span>
           </div>
 
           {products.map((product) => (
