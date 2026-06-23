@@ -58,12 +58,14 @@ O FP Food foi iniciado como frontend separado:
 - login compartilhado com Supabase Auth e cookies HttpOnly do ecossistema;
 - uso da API interna central `apps/api`;
 - dashboard operacional V0 em `/`;
+- acesso rapido no dashboard para configuracao da loja, cardapio e vitrine publica;
 - menu lateral por Cadastro e Movimentacao;
 - schema `food` com configuracao inicial de loja;
 - categorias e produtos operacionais com listas paginadas;
 - cardapio derivado para previa interna;
 - pedido interno V0;
 - vitrine publica V0 por slug em `/l/[slug]`;
+- link publico exposto no cadastro da loja para validacao da experiencia do cliente;
 - acompanhamento publico V0 em `/l/[slug]/pedido/[orderNumber]`;
 - painel interno de pedidos com filtro por status, acoes rapidas e polling leve de 30 segundos;
 - detalhe interno de pedido com itens, dados do cliente e historico simples de status;

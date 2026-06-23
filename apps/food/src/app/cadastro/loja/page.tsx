@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { CompanySwitcher } from "@/components/company-switcher";
 import { StoreForm } from "@/components/food-forms";
 import { FoodShell } from "@/components/food-shell";
@@ -61,8 +62,37 @@ export default async function StorePage({ searchParams }: StorePageProps) {
               <h1>{displayCompanyName(selectedCompany)}</h1>
               <p>Configuracao operacional da loja Food vinculada a empresa.</p>
             </div>
-            <span>{storeResult.data ? "Configurada" : "Primeira configuracao"}</span>
+            <div className="panel-heading-actions">
+              <span>{storeResult.data ? "Configurada" : "Primeira configuracao"}</span>
+              {storeResult.data ? (
+                <div className="store-link-actions">
+                  <a
+                    className="primary-action compact-action"
+                    href={`/l/${encodeURIComponent(storeResult.data.publicSlug)}`}
+                    rel="noreferrer"
+                    target="_blank"
+                  >
+                    Abrir vitrine
+                  </a>
+                  <Link
+                    className="secondary-action compact-action"
+                    href={`/movimentacao/cardapio?companyId=${selectedCompany.company.id}`}
+                  >
+                    Abrir cardapio
+                  </Link>
+                </div>
+              ) : null}
+            </div>
           </div>
+          {storeResult.data ? (
+            <div className="store-public-link">
+              <span>Link publico</span>
+              <strong>/l/{storeResult.data.publicSlug}</strong>
+              <small>
+                Compartilhe este caminho com clientes ou use para validar a experiencia publica.
+              </small>
+            </div>
+          ) : null}
           <StoreForm company={selectedCompany} store={storeResult.data} />
         </section>
       )}

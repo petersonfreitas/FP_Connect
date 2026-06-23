@@ -5,7 +5,7 @@ import { formatMoney } from "@/components/food-forms";
 import { FoodShell } from "@/components/food-shell";
 import { EmptyFoodAccess, Notice } from "@/components/page-feedback";
 import { getFoodPageContext } from "@/lib/food-context";
-import { getFoodAccess, getFoodDashboard } from "@/lib/internal-api";
+import { getFoodAccess, getFoodDashboard, getFoodStore } from "@/lib/internal-api";
 
 type DashboardPageProps = {
   searchParams?: Promise<{
@@ -42,7 +42,12 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
     selectedCompany && !foodAccessResult.error
       ? await getFoodDashboard(selectedCompany.company.id)
       : { data: null, error: null };
+  const storeResult =
+    selectedCompany && !foodAccessResult.error
+      ? await getFoodStore(selectedCompany.company.id)
+      : { data: null, error: null };
   const dashboard = dashboardResult.data;
+  const store = storeResult.data;
   const companyId = selectedCompany?.company.id;
 
   return (
@@ -57,6 +62,11 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
       {context.accessError ? <Notice tone="danger" message={context.accessError} /> : null}
       {foodAccessResult.error ? <Notice tone="danger" message={foodAccessResult.error} /> : null}
       {dashboardResult.error ? <Notice tone="danger" message={dashboardResult.error} /> : null}
+      {storeResult.error &&
+      !storeResult.error.includes("404") &&
+      !storeResult.error.includes("ainda nao configurada") ? (
+        <Notice tone="danger" message={storeResult.error} />
+      ) : null}
 
       <CompanySwitcher
         basePath="/"
@@ -77,6 +87,8 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
         </section>
       ) : (
         <>
+          <StoreAccessPanel companyId={companyId} store={store} />
+
           <section className="content-panel">
             <div className="panel-heading">
               <div>
@@ -186,6 +198,75 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
   );
 }
 
+function StoreAccessPanel({
+  companyId,
+  store
+}: {
+  companyId: string | undefined;
+  store:
+    | {
+        displayName: string;
+        publicSlug: string;
+        status: string;
+      }
+    | null
+    | undefined;
+}) {
+  const storeConfigHref = `/cadastro/loja${companyId ? `?companyId=${companyId}` : ""}`;
+  const menuConfigHref = `/movimentacao/cardapio${companyId ? `?companyId=${companyId}` : ""}`;
+  const publicStoreHref = store ? `/l/${encodeURIComponent(store.publicSlug)}` : null;
+
+  return (
+    <section className="content-panel quick-access-panel">
+      <div className="panel-heading">
+        <div>
+          <h1>Area da loja</h1>
+          <p>Atalhos para operar, configurar e validar a visao publica do cliente.</p>
+        </div>
+        <span>{store ? getStoreStatusLabel(store.status) : "Loja pendente"}</span>
+      </div>
+
+      <div className="quick-access-grid">
+        <article className="quick-access-card">
+          <span>Configuracao</span>
+          <strong>{store?.displayName ?? "Configurar loja"}</strong>
+          <p>Nome publico, slug, telefone, tempo medio e status da loja.</p>
+          <Link className="secondary-action compact-action" href={storeConfigHref}>
+            Abrir cadastro
+          </Link>
+        </article>
+        <article className="quick-access-card">
+          <span>Cardapio</span>
+          <strong>Produtos publicados</strong>
+          <p>Organize categorias e confira os itens que aparecem na vitrine publica.</p>
+          <Link className="secondary-action compact-action" href={menuConfigHref}>
+            Abrir cardapio
+          </Link>
+        </article>
+        <article className="quick-access-card">
+          <span>Link publico</span>
+          <strong>{store ? `/l/${store.publicSlug}` : "Configure o slug"}</strong>
+          <p>Visao do cliente para realizar pedidos e acompanhar compras anteriores.</p>
+          {publicStoreHref ? (
+            <a
+              className="primary-action compact-action"
+              href={publicStoreHref}
+              rel="noreferrer"
+              target="_blank"
+            >
+              Abrir vitrine
+            </a>
+          ) : (
+            <Link className="primary-action compact-action" href={storeConfigHref}>
+              Configurar link
+            </Link>
+          )}
+        </article>
+      </div>
+    </section>
+  );
+}
+
 function DashboardMetric({
   description,
   label,
@@ -202,6 +283,17 @@ function DashboardMetric({
       <small>{description}</small>
     </div>
   );
+}
+
+function getStoreStatusLabel(status: string): string {
+  const labels: Record<string, string> = {
+    closed: "Fechada",
+    implementation: "Implementacao",
+    open: "Aberta",
+    suspended: "Suspensa"
+  };
+
+  return labels[status] ?? status;
 }
 
 function DashboardList({ items }: { items: Array<{ label: string; value: number }> }) {
