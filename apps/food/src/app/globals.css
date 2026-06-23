@@ -672,21 +672,47 @@ textarea {
   gap: 18px;
 }
 
-.hours-group {
+.hours-card {
+  background: #ffffff;
   border: 1px solid var(--line);
   border-radius: 8px;
   display: grid;
-  gap: 14px;
-  padding: 16px;
+  gap: 18px;
+  padding: 18px;
 }
 
-.hours-group h2 {
+.hours-card-heading {
+  align-items: start;
+  display: flex;
+  gap: 16px;
+  justify-content: space-between;
+}
+
+.hours-card-heading > strong {
+  background: var(--accent-soft);
+  border-radius: 999px;
   color: var(--accent-strong);
-  font-size: 18px;
-  margin: 0 0 4px;
+  font-size: 12px;
+  padding: 7px 10px;
+  white-space: nowrap;
 }
 
-.hours-group p {
+.hours-card-heading span {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 900;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.hours-card h2 {
+  color: var(--accent-strong);
+  font-size: 20px;
+  letter-spacing: 0;
+  margin: 4px 0;
+}
+
+.hours-card p {
   color: var(--muted);
   line-height: 1.5;
   margin: 0;
@@ -699,18 +725,39 @@ textarea {
   border-radius: 8px;
   display: grid;
   gap: 12px;
-  grid-template-columns: minmax(160px, 1fr) repeat(2, minmax(120px, 180px));
+  grid-template-columns: minmax(180px, 1fr) minmax(130px, 0.7fr) repeat(2, minmax(120px, 170px));
   padding: 12px;
 }
 
 .hours-toggle {
-  align-items: center;
+  align-items: start;
   display: flex;
   flex-direction: row;
+  line-height: 1.2;
 }
 
 .hours-toggle input {
+  margin-top: 2px;
   width: auto;
+}
+
+.hours-toggle span {
+  display: grid;
+  gap: 4px;
+}
+
+.hours-toggle small {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.subtle-toggle {
+  color: var(--muted);
+}
+
+.hours-placeholder {
+  display: block;
 }
 
 label {
@@ -1661,6 +1708,7 @@ textarea {
   .workspace-account,
   .panel-heading,
   .panel-heading-actions,
+  .hours-card-heading,
   .pagination-bar,
   .form-footer {
     align-items: stretch;

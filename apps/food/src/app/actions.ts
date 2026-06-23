@@ -141,8 +141,13 @@ export async function saveFoodStoreHoursAction(formData: FormData): Promise<void
     const kind = normalizeStoreHourKind(kindValue);
     const parsedWeekday = optionalInteger(weekdayValue);
     const isActive = formData.get(`isActive:${normalizedKey}`) === "on";
-    const opensAt = String(formData.get(`opensAt:${normalizedKey}`) ?? "");
-    const closesAt = String(formData.get(`closesAt:${normalizedKey}`) ?? "");
+    const isAllDay = formData.get(`isAllDay:${normalizedKey}`) === "on";
+    const opensAt = isAllDay
+      ? "00:00"
+      : String(formData.get(`opensAt:${normalizedKey}`) ?? "");
+    const closesAt = isAllDay
+      ? "23:59"
+      : String(formData.get(`closesAt:${normalizedKey}`) ?? "");
 
     if (
       parsedWeekday === null ||

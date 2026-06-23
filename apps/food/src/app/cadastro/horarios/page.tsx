@@ -66,7 +66,7 @@ export default async function StoreHoursPage({ searchParams }: StoreHoursPagePro
           <div className="panel-heading">
             <div>
               <h1>{displayCompanyName(selectedCompany)}</h1>
-              <p>Defina janelas de pedidos e deixe a base de entregas pronta para o proximo bloco.</p>
+              <p>Separe o funcionamento da loja da janela de entrega para controlar a vitrine publica com mais clareza.</p>
             </div>
             <span>{storeResult.data?.status === "open" ? "Loja aberta" : "Loja nao aberta"}</span>
           </div>

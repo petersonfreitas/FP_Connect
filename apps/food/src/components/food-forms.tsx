@@ -45,25 +45,30 @@ const weekdayOptions = [
 ] as const;
 
 const hourKindOptions: Array<{
+  allDayLabel?: string;
   defaultClosesAt: string;
   defaultOpensAt: string;
   description: string;
   kind: FoodStoreHourKind;
   label: string;
+  summary: string;
 }> = [
   {
+    allDayLabel: "Aberto 24h",
     defaultClosesAt: "23:00",
     defaultOpensAt: "18:00",
-    description: "Controla quando a vitrine aceita novos pedidos.",
+    description: "Define quando a loja aceita pedidos pela vitrine publica.",
     kind: "ordering",
-    label: "Pedidos"
+    label: "Funcionamento da loja",
+    summary: "Pedidos online"
   },
   {
     defaultClosesAt: "23:00",
     defaultOpensAt: "18:00",
-    description: "Base para a proxima etapa de entrega e retirada.",
+    description: "Define quando a operacao de entrega fica disponivel.",
     kind: "delivery",
-    label: "Entregas"
+    label: "Entrega",
+    summary: "Janela de entrega"
   }
 ];
 
@@ -159,10 +164,14 @@ export function StoreHoursForm({
 
       <div className="hours-layout">
         {hourKindOptions.map((group) => (
-          <section className="hours-group" key={group.kind}>
-            <div>
-              <h2>{group.label}</h2>
-              <p>{group.description}</p>
+          <section className="hours-card" key={group.kind}>
+            <div className="hours-card-heading">
+              <div>
+                <span>{group.summary}</span>
+                <h2>{group.label}</h2>
+                <p>{group.description}</p>
+              </div>
+              {group.allDayLabel ? <strong>{group.allDayLabel}</strong> : null}
             </div>
 
             <div className="hours-list">
@@ -171,6 +180,7 @@ export function StoreHoursForm({
                 const current = hours.find(
                   (hour) => hour.kind === group.kind && hour.weekday === weekday && hour.isActive
                 );
+                const isAllDay = current?.opensAt === "00:00" && current?.closesAt === "23:59";
 
                 return (
                   <div className="hours-row" key={key}>
@@ -181,8 +191,26 @@ export function StoreHoursForm({
                         name={`isActive:${key}`}
                         type="checkbox"
                       />
-                      <span>{label}</span>
+                      <span>
+                        {label}
+                        <small>{current ? `${current.opensAt} ate ${current.closesAt}` : "Inativo"}</small>
+                      </span>
                     </label>
+                    {group.allDayLabel ? (
+                      <label className="hours-toggle subtle-toggle">
+                        <input
+                          defaultChecked={isAllDay}
+                          name={`isAllDay:${key}`}
+                          type="checkbox"
+                        />
+                        <span>
+                          {group.allDayLabel}
+                          <small>Ignora abre/fecha</small>
+                        </span>
+                      </label>
+                    ) : (
+                      <span className="hours-placeholder" aria-hidden="true" />
+                    )}
                     <label>
                       Abre
                       <input
@@ -208,7 +236,7 @@ export function StoreHoursForm({
       </div>
 
       <div className="form-footer">
-        <span>Sem horarios ativos, a loja segue aberta para pedidos enquanto o status estiver Aberta.</span>
+        <span>Sem dias ativos em funcionamento, a loja segue aceitando pedidos enquanto o status estiver Aberta.</span>
         <PendingSubmitButton pendingLabel="Salvando...">Salvar horarios</PendingSubmitButton>
       </div>
     </form>
