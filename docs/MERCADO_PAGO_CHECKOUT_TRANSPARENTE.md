@@ -35,7 +35,7 @@ Referencia operacional para a evolucao do FP Gateway com Mercado Pago Orders API
 
 ## Evolucao sugerida
 
-1. Manter Pagamentos V0 no FP Console para testes tecnicos de Pix e token de cartao.
+1. Manter a area Pagamentos no FP Gateway para testes tecnicos de Pix e token de cartao.
 2. Criar checkout real no FP Food usando MercadoPago.js/Card Payment Brick. Concluido como V0 publico em `/l/[slug]`.
 3. Enviar ao FP Gateway somente o token retornado pelo Mercado Pago e os metadados de pagamento. Concluido como V0 via rota server-side do `apps/food`.
 4. Processar order no backend e retornar status normalizado para o Food. Concluido como V0 para status inicial `paid`, `pending` ou `failed`.

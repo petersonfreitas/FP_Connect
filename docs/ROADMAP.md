@@ -1,10 +1,10 @@
 # ROADMAP.md - Sequencia do ecossistema FP WebTech
 
-Este arquivo define a ordem de evolucao do produto. Ele nao deve repetir status detalhado, decisoes ou regras de acesso.
+Este arquivo define a direcao de evolucao do produto. Ele deve permanecer curto e nao repetir status detalhado, decisoes ou backlogs.
 
 Fontes complementares:
 
-- `docs/MODULE_STATUS.md`: status atual por modulo.
+- `docs/MODULE_STATUS.md`: status atual, nivel e checklists por modulo.
 - `docs/ACCESS_MODEL.md`: papeis, vinculos e permissoes.
 - `docs/ARCHITECTURE.md`: arquitetura tecnica.
 - `docs/DECISIONS.md`: decisoes aprovadas.
@@ -20,181 +20,82 @@ O crescimento deve ser incremental:
 2. liberar o menor fluxo util por modulo;
 3. validar com dados reais;
 4. evoluir UX, processos, automacoes, integracoes e analises com criterio de producao;
-5. iniciar novos modulos operacionais completos somente quando o fluxo base estiver estavel.
+5. iniciar novos modulos completos somente quando o fluxo base estiver estavel.
 
-## Estado atual
+## Estado Atual
 
-O Admin Console esta no fim da fase de fundacao:
+O detalhe operacional vive em `docs/MODULE_STATUS.md`.
 
-- autenticacao server-side com Supabase Auth;
-- acesso separado entre usuarios do Console e usuarios de empresas;
-- menus permissionados;
-- CRUD de usuarios internos do Console;
-- usuarios de empresa administrados no contexto da empresa;
-- suporte administrativo vinculado por empresa;
-- superadmin vinculado automaticamente como suporte ao criar empresa;
-- rotas redirecionadas antigas removidas;
-- rate limit, metricas basicas e bloqueio de duplo submit implementados.
+Resumo executivo:
 
-Pendencia operacional principal:
+- Admin Console: base funcional estabilizada, ainda com smoke test manual amplo pendente.
+- FP Robots: base funcional de eventos, regras simples, execucoes e reprocessamento basico.
+- FP Food: primeiro produto operacional em evolucao produtiva, com loja, cardapio, pedidos, cozinha, entrega simples, vitrine publica e checkout Mercado Pago via Gateway.
+- FP Gateway: base funcional em evolucao produtiva, com provedores, Mercado Pago, pagamentos, webhook V0, SMTP laboratorio/fallback e direcao de e-mail por API HTTPS.
+- FP Tracking: preparado para ciclo futuro, mas ainda nao iniciado como modulo operacional.
 
-- smoke test manual com Supabase ativo para confirmar fluxos de acesso, empresa, usuarios, vinculos, modulos contratados e menus.
+## Diretriz Atual
 
-O FP Robots ja possui a primeira base funcional:
+- Tratar Console, Food, Gateway e Robots como preparacao de entrega para producao.
+- Usar o FP Food como primeiro consumidor real do ecossistema.
+- Evoluir Gateway conforme contratos reais de pagamento, mensagens e provedores surgirem.
+- Manter Robots como trilha de eventos e automacoes, sem armazenar credenciais de provedores externos.
+- Preservar pagamento manual, entrega simples e SMTP por socket como fallback/laboratorio do MVP.
+- Iniciar FP Tracking completo somente depois que pedidos, pagamentos, eventos, permissoes e operacao base estiverem maduros.
 
-- schema `robots`;
-- catalogo inicial de eventos;
-- event log por empresa;
-- regras simples `evento -> acao`;
-- execucoes por regra ativa;
-- reprocessamento basico de execucoes falhadas;
-- API interna para registrar/listar/detalhar eventos;
-- painel `/robots` com contexto empresarial, visao geral e abas operacionais;
-- detalhe de evento com payload mascarado.
+## Sequencia Recomendada
 
-O FP Food foi iniciado como frontend separado:
+### Bloco 1 - Console, Food, Gateway e Robots em modo producao
 
-- app `apps/food`;
-- login compartilhado com Supabase Auth e cookies HttpOnly do ecossistema;
-- uso da API interna central `apps/api`;
-- dashboard operacional V0 em `/`;
-- acesso rapido no dashboard para configuracao da loja, cardapio e vitrine publica;
-- menu lateral reorganizado no padrao visual do Console por Gestao da loja, Cadastro e Movimentacao;
-- schema `food` com configuracao inicial de loja;
-- categorias e produtos operacionais com listas paginadas;
-- cardapio derivado para previa interna;
-- pedido interno V0;
-- vitrine publica V0 por slug em `/l/[slug]`;
-- vitrine publica organizada em blocos de loja, acompanhamento, cardapio e checkout;
-- link publico exposto no cadastro da loja para validacao da experiencia do cliente;
-- acompanhamento publico V0 em `/l/[slug]/pedido/[orderNumber]`;
-- painel interno de pedidos com filtro por status, acoes rapidas e polling leve de 30 segundos;
-- detalhe interno de pedido com itens, dados do cliente e historico simples de status;
-- pagamento manual V0 no pedido como fallback operacional;
-- checkout publico com cartao Mercado Pago via FP Gateway V0;
-- Cozinha V0 com fila de pedidos aceitos/em preparo e acoes rapidas;
-- Entrega simples V0 com fila de pedidos prontos/em rota e status `out_for_delivery`/`delivered`;
-- realtime de pedidos, cozinha e acompanhamento publico fica para fase posterior; refresh manual, `router.refresh()` e polling leve sao provisoriamente aceitaveis no MVP;
-- eventos `food.store.configured`, `food.menu.updated`, `food.order.created` e `food.order.status_changed` publicados para o FP Robots.
+Objetivo: estabilizar a experiencia real dos fluxos ja implementados.
 
-O FP Gateway foi iniciado como shell no FP Console:
+Prioridades:
 
-- schema `gateway`;
-- catalogo, permissao e role no `core`;
-- endpoint interno `/gateway/access` com guard de modulo contratado;
-- tela `/gateway` para selecionar empresa e validar fronteiras do modulo;
-- painel organizado em subareas internas para pagamentos, Mercado Pago, e-mail, provedores e eventos;
-- catalogo inicial de provedores com SMTP, Mercado Pago, WhatsApp e Meta;
-- configuracao SMTP por empresa com segredo server-side;
-- teste basico de conexao SMTP e evento `gateway.smtp.validated` para FP Robots;
-- envio real de e-mail SMTP de teste com eventos `gateway.smtp.test_email_sent` e `gateway.smtp.test_email_failed`;
-- tela de e-mail reposicionada para API HTTPS futura, mantendo SMTP por socket como laboratorio/fallback;
-- SMTP segue com pendencia operacional de timeout em alguns provedores/rede e nao deve travar o MVP;
-- OAuth Mercado Pago por empresa, usando app OAuth, callback no web e troca de token server-side pela API;
-- modo sandbox manual Mercado Pago por empresa para validar PIX no Checkout Transparente em localhost antes de Vercel/webhook;
-- tabela `gateway.payment_requests`, endpoint interno e tela V0 para solicitacoes de pagamento;
-- criacao de PIX Mercado Pago alinhada ao Checkout Transparente via Orders API (`POST /v1/orders`);
-- contrato V0 de cartao de credito/debito Mercado Pago usando token gerado por MercadoPago.js/Card Payment Brick, sem coletar dados sensiveis de cartao no FP Console;
-- webhook Mercado Pago V0 para conciliacao assincrona de orders;
-- debito permanece pendente de smoke test por falta de cartao de teste no momento;
-- eventos `gateway.payment.requested`, `gateway.payment.requires_provider_config`, `gateway.payment.failed` e `gateway.payment.paid`;
-- evento `gateway.mercado_pago.oauth_connected`;
-- `gateway` exposto no `supabase/config.toml`.
-
-Diretriz de evolucao atual:
-
-- tratar as proximas melhorias de Console, Food, Gateway e Robots como preparacao de entrega para producao;
-- ajustar frontends, regras, validacoes, fluxos operacionais e experiencia real de uso conforme os smoke tests online avancarem;
-- manter SMTP por socket como capacidade V0/laboratorio, sem bloquear o MVP em timeout ou restricao de porta;
-- quando entrar em producao, priorizar e-mail transacional no FP Gateway por API HTTPS de provedor dedicado;
-- manter FP Tracking documentado e preparado, mas iniciar seu desenvolvimento completo somente depois que pedidos, pagamentos, eventos e operacao base estiverem maduros.
-
-## Sequencia recomendada
-
-### Bloco 1 - Fechamento do Admin Console
-
-Objetivo: encerrar a fundacao antes de abrir modulos operacionais.
-
-Itens:
-
-- executar smoke test manual do Admin Console;
-- corrigir eventuais 403/404 de fluxo real;
-- validar edicao e inativacao de vinculos empresariais;
-- validar carteira de suporte;
-- revisar logs de rate limit e metricas;
-- confirmar que menus ocultam tudo que nao pertence ao usuario.
+- validar smoke tests online dos fluxos principais;
+- melhorar UX, textos, menus, feedback de erro e estados de processamento;
+- revisar regras reais de pedido, pagamento, cozinha e entrega simples;
+- manter paginacao, filtros e bloqueio de duplo submit como padrao;
+- registrar eventos relevantes no Robots.
 
 Criterio de saida:
 
-- superadmin, fp_admin, support e company_user entram no portal correto, veem apenas o que podem usar e executam as acoes permitidas.
+- uma empresa consegue operar pedido, pagamento, cozinha, entrega simples e eventos com menus coerentes e falhas compreensiveis.
 
-### Bloco 2 - FP Robots V0
+### Bloco 2 - Gateway produtivo
 
-Objetivo: concluir a primeira camada operacional para eventos e automacoes internas.
+Objetivo: fortalecer o Gateway como camada oficial de integracoes externas.
 
-Escopo inicial:
+Prioridades:
 
-- aplicar e validar migration do event log;
-- registrar eventos internos pelos modulos consumidores;
-- validar regras simples `evento -> acao`;
-- criar execucoes por regra ativa;
-- reprocessar falha manualmente;
-- nenhuma integracao externa real no V0.
-
-Diretriz:
-
-- FP Robots orquestra eventos e execucoes.
-- FP Gateway, modulo futuro, encapsulara provedores externos como WhatsApp, Meta, pagamentos e canais equivalentes.
+- validar webhook Mercado Pago online em fluxo real de pedido;
+- amadurecer OAuth Mercado Pago por empresa;
+- manter sandbox manual somente como apoio de teste;
+- evoluir e-mail transacional por API HTTPS;
+- preparar contratos futuros para WhatsApp/Meta sem acoplar Food ou Robots aos provedores.
 
 Criterio de saida:
 
-- um modulo consegue registrar um evento interno e acompanhar seu processamento basico.
+- modulos consumidores solicitam operacoes externas sem conhecer credenciais nem detalhes de provedor.
 
-### Bloco 3 - FP Food MVP
+### Bloco 3 - Food produtivo
 
-Objetivo: primeiro produto operacional do ecossistema.
+Objetivo: amadurecer o FP Food como primeiro produto vendavel.
 
-Base criada:
+Prioridades:
 
-- frontend separado para operacao do Food;
-- dashboard operacional V0;
-- navegacao operacional por Cadastro e Movimentacao;
-- empresa com modulo Food contratado;
-- configuracao inicial da loja;
-- categorias com listagem paginada;
-- produtos com listagem paginada;
-- cardapio operacional derivado;
-- pedido interno V0;
-- vitrine publica V0 por slug;
-- acompanhamento publico V0 do pedido;
-- detalhe de pedido e historico simples de status;
-- pagamento manual V0;
-- cozinha e entrega simples V0;
-- eventos iniciais de integracao com FP Robots.
-
-Proximo escopo:
-
-- preparacao dos contratos de integracao com Gateway e Tracking;
-- validacao da vitrine publica com pedido real;
-- validacao do checkout publico com cartao Mercado Pago sandbox;
-- integracao inicial com Gateway real/teste para mensagens;
-- melhoria de UX operacional conforme gargalos dos fluxos integrados;
-- auditoria minima;
-- eventos publicados para FP Robots quando fizer sentido.
-- preparacao documental e tecnica para Tracking, sem iniciar o modulo completo antes da estabilizacao operacional.
+- refinar vitrine publica, carrinho e checkout;
+- melhorar painel interno de pedidos, cozinha e entrega;
+- revisar configuracoes da loja conforme processos reais;
+- manter integrações com Gateway e Robots limpas;
+- adiar configuracoes avancadas ate haver contrato real que justifique.
 
 Criterio de saida:
 
-- uma empresa consegue operar um pedido simples com isolamento por empresa.
+- a loja consegue receber, acompanhar e concluir pedidos com experiencia clara para operador e cliente.
 
-### Bloco 4 - FP Tracking MVP
+### Bloco 4 - Tracking MVP
 
-Objetivo: complementar o Food com acompanhamento logistico.
-
-Status:
-
-- reservado para depois da estabilizacao dos fluxos de producao em Food, Gateway, Robots e Console;
-- a Entrega simples V0 do Food continua como fallback operacional ate o Tracking nascer.
+Objetivo: complementar o Food com acompanhamento logistico real quando a base estiver madura.
 
 Escopo inicial:
 
@@ -206,30 +107,9 @@ Escopo inicial:
 
 Criterio de saida:
 
-- um pedido ou entrega possui rastreamento operacional simples.
+- um pedido ou entrega possui rastreamento operacional simples, sem substituir prematuramente a entrega simples do Food.
 
-### Bloco 5 - FP Gateway MVP
-
-Objetivo: iniciar a camada oficial de integracoes externas em ambiente real/teste.
-
-Escopo inicial:
-
-- catalogo inicial de provedores: iniciado;
-- configuracao de provedor por empresa: iniciada com SMTP;
-- contrato interno de solicitacao de pagamento: iniciado;
-- conexao OAuth com Mercado Pago: iniciada;
-- criacao real/teste de pagamento PIX Mercado Pago via Checkout Transparente: iniciada via sandbox manual;
-- integracao do Food ao contrato de pagamento;
-- recebimento e normalizacao de webhook: implementado como V0, pendente de smoke test online;
-- logs tecnicos mascarados;
-- eventos `gateway.*` para FP Robots.
-- provedor de e-mail transacional por API HTTPS em fase de producao, substituindo SMTP por socket como caminho preferencial.
-
-Criterio de saida:
-
-- Food consegue solicitar uma operacao de pagamento sem conhecer credenciais ou detalhes do provedor.
-
-### Bloco 6 - Integracao Food -> Gateway -> Tracking -> Robots
+### Bloco 5 - Cadeia integrada
 
 Objetivo: validar o ecossistema funcionando em cadeia.
 
@@ -238,29 +118,28 @@ Fluxo esperado:
 1. Food cria pedido.
 2. Gateway processa pagamento ou mensagem externa quando aplicavel.
 3. Tracking recebe ou acompanha entrega.
-4. Robots registra eventos operacionais.
-5. Console observa status, logs e permissoes.
+4. Robots registra eventos operacionais e dispara automacoes.
+5. Console observa status, logs, permissoes e suporte.
 
 Criterio de saida:
 
 - fluxo multiempresa ponta a ponta com contratos reais de integracao e sem credenciais externas dentro dos modulos consumidores.
 
-## Modulos futuros
+## Modulos Futuros
 
 Os modulos abaixo orientam arquitetura, mas nao devem virar implementacao sem autorizacao ou dependencia real:
 
-- FP Gateway: integracoes externas, credenciais, OAuth, WhatsApp, Meta, pagamentos e provedores equivalentes.
 - FP Fiscal: emissao e gestao fiscal, inicialmente conectado ao Food quando o fluxo exigir.
 - FP Router: roteirizacao e apoio logistico futuro do Tracking.
 - FP Sign: aceite de propostas e documentos simples.
 - FP BI: indicadores e dashboards apos maturidade dos modulos transacionais.
 - FP Marketing, Sales, Tickets e Billing: modulos planejados conforme backlogs.
 
-## Regras de evolucao
+## Regras De Evolucao
 
 - Backlogs definem escopo.
 - Fluxos reais definem prioridade.
-- Nao criar integracao externa antes do FP Gateway.
+- Nao criar integracao externa fora do FP Gateway.
 - Nao duplicar identidade, empresa ou permissao fora do `core`.
 - Nao transformar backlog futuro em implementacao atual sem autorizacao.
 - Cada bloco deve terminar com validacao objetiva antes do proximo.

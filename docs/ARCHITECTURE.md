@@ -42,7 +42,7 @@ supabase/
 
 Diretrizes:
 
-- `apps/web` concentra o FP Console, o painel inicial do FP Robots e o shell inicial do FP Gateway;
+- `apps/web` concentra o FP Console, o painel operacional do FP Robots e o painel inicial do FP Gateway;
 - `apps/food` concentra o frontend operacional separado do FP Food;
 - `apps/api` concentra a API Nest modular;
 - `packages/shared` guarda tipos/contratos reutilizaveis;
@@ -116,7 +116,7 @@ Regras:
 
 Aplicacoes atuais:
 
-- `apps/web`: FP Console, area administrativa do FP Robots e shell inicial do FP Gateway;
+- `apps/web`: FP Console, area administrativa do FP Robots e painel inicial do FP Gateway;
 - `apps/food`: operacao do FP Food.
 
 Os frontends compartilham Supabase Auth, cookies HttpOnly de sessao e a mesma API interna, mas podem ter deploys independentes na Vercel.
@@ -159,7 +159,7 @@ Webhooks:
 
 - entrada exige assinatura, token ou validacao equivalente;
 - saida, retries e reprocessamentos pertencem preferencialmente ao FP Robots;
-- provedores externos devem ser encapsulados pelo futuro FP Gateway.
+- provedores externos devem ser encapsulados pelo FP Gateway.
 
 ## FP Robots e FP Gateway
 
@@ -178,7 +178,7 @@ FP Food:
 
 FP Gateway:
 
-- modulo iniciado como shell no Console para credenciais, OAuth e provedores externos;
+- modulo iniciado no Console para credenciais, OAuth, pagamentos e provedores externos;
 - deve encapsular WhatsApp, Instagram, Facebook, Ads, Mercado Pago, PagSeguro e canais equivalentes;
 - deve ser a fronteira entre o ecossistema e APIs externas.
 - integracoes Mercado Pago devem seguir a referencia em `docs/MERCADO_PAGO_CHECKOUT_TRANSPARENTE.md`.

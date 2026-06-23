@@ -93,7 +93,7 @@ Este arquivo controla o avanco dos modulos do ecossistema.
 ## Checklist - FP Robots
 
 - [x] Shell visual V0
-- [x] Separacao conceitual entre orquestracao do Robots e provedores externos via futuro FP Gateway
+- [x] Separacao conceitual entre orquestracao do Robots e provedores externos via FP Gateway
 - [x] Estrutura do modulo
 - [x] Catalogo inicial de eventos
 - [x] Registro de eventos

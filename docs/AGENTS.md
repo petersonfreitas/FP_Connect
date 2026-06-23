@@ -41,13 +41,13 @@ Backlogs futuros orientam arquitetura, mas so viram implementacao com autorizaca
 
 ## Prioridade atual
 
-1. Fechar Admin Console.
-2. Criar FP Robots V0.
-3. Evoluir FP Food MVP.
-4. Evoluir FP Tracking MVP.
-5. Integrar Food -> Tracking -> Robots.
+1. Estabilizar Admin Console, FP Food, FP Gateway e FP Robots com mentalidade de producao.
+2. Evoluir FP Food como primeiro produto operacional vendavel.
+3. Fortalecer FP Gateway como camada oficial de integracoes externas.
+4. Manter FP Robots como trilha de eventos e automacoes.
+5. Iniciar FP Tracking completo somente depois que pedidos, pagamentos, eventos e operacao base estiverem maduros.
 
-FP Gateway e futuro modulo de integracoes externas. Nao criar integracao direta com provedores externos antes dele, salvo autorizacao explicita.
+FP Gateway e o modulo oficial de integracoes externas. Nao criar integracao direta com provedores externos fora dele, salvo autorizacao explicita.
 
 ## Regras obrigatorias
 
