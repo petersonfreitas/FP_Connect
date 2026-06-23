@@ -59,7 +59,7 @@ O FP Food foi iniciado como frontend separado:
 - uso da API interna central `apps/api`;
 - dashboard operacional V0 em `/`;
 - acesso rapido no dashboard para configuracao da loja, cardapio e vitrine publica;
-- menu lateral por Cadastro e Movimentacao;
+- menu lateral reorganizado no padrao visual do Console por Gestao da loja, Cadastro e Movimentacao;
 - schema `food` com configuracao inicial de loja;
 - categorias e produtos operacionais com listas paginadas;
 - cardapio derivado para previa interna;
