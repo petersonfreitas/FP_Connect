@@ -133,6 +133,7 @@ export async function saveFoodProductAction(formData: FormData): Promise<void> {
 
 export async function saveFoodStoreHoursAction(formData: FormData): Promise<void> {
   const companyId = requireCompanyId(formData);
+  const selectedTab = normalizeStoreHourTab(formData.get("tab"));
   const hours: UpsertFoodStoreHoursInput["hours"] = [];
 
   for (const key of formData.getAll("hourKey")) {
@@ -173,7 +174,9 @@ export async function saveFoodStoreHoursAction(formData: FormData): Promise<void
 
   const result = await saveFoodStoreHours(companyId, { hours });
 
-  redirectWithResult("/cadastro/horarios", companyId, result.error, "hoursSaved");
+  redirectWithResult("/cadastro/horarios", companyId, result.error, "hoursSaved", {
+    tab: selectedTab
+  });
 }
 
 export async function createInternalFoodOrderAction(formData: FormData): Promise<void> {
@@ -453,6 +456,16 @@ function normalizeStoreHourKind(value: string): FoodStoreHourKind {
   }
 
   return value as FoodStoreHourKind;
+}
+
+function normalizeStoreHourTab(value: FormDataEntryValue | null): FoodStoreHourKind {
+  const tab = String(value ?? "");
+
+  if (tab === "delivery") {
+    return "delivery";
+  }
+
+  return "ordering";
 }
 
 function optionalPaymentMethod(value: FormDataEntryValue | null): FoodPaymentMethod | null {

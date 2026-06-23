@@ -10,6 +10,7 @@ type StoreHoursPageProps = {
     companyId?: string;
     error?: string;
     hoursSaved?: string;
+    tab?: string;
   }>;
 };
 
@@ -17,6 +18,7 @@ export const dynamic = "force-dynamic";
 
 export default async function StoreHoursPage({ searchParams }: StoreHoursPageProps) {
   const params = await searchParams;
+  const selectedTab = resolveHoursTab(params?.tab);
   const context = await getFoodPageContext(params?.companyId);
   const selectedCompany = context.selectedCompany;
   const foodAccessResult = selectedCompany
@@ -75,9 +77,17 @@ export default async function StoreHoursPage({ searchParams }: StoreHoursPagePro
               A vitrine permanece disponivel para consulta. As regras abaixo controlam quando o cliente pode enviar pedidos e quando a entrega fica disponivel.
             </p>
           </section>
-          <StoreHoursForm companyId={selectedCompany.company.id} hours={hoursResult.data ?? []} />
+          <StoreHoursForm
+            companyId={selectedCompany.company.id}
+            hours={hoursResult.data ?? []}
+            selectedKind={selectedTab}
+          />
         </>
       )}
     </FoodShell>
   );
+}
+
+function resolveHoursTab(value: string | undefined) {
+  return value === "delivery" ? "delivery" : "ordering";
 }

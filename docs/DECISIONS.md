@@ -98,6 +98,7 @@ Este arquivo registra decisoes arquiteturais e operacionais para evitar retrabal
 | DEC-090 | SMTP por socket permanece como capacidade V0/laboratorio do FP Gateway; para producao, o caminho preferencial de e-mail transacional sera provedor por API HTTPS no Gateway, reduzindo dependencia de portas SMTP bloqueadas ou instaveis em PaaS/serverless. | Aprovada |
 | DEC-091 | A evolucao imediata passa a tratar Food, Gateway, Robots e Console com mentalidade de entrega para producao: melhorar UX, regras, validacoes, observabilidade e processos reais antes de iniciar FP Tracking como modulo operacional completo. | Aprovada |
 | DEC-092 | FP Tracking entra somente depois que os fluxos base de pedido, pagamento, eventos, permissoes e operacao estiverem suficientemente estabilizados; ate la, a entrega simples do Food segue como fallback operacional do MVP. | Aprovada |
+| DEC-093 | Modulos com areas internas devem usar navegacao superior em cards (`module-subnav`) como padrao visual, seguindo FP Robots/Gateway: um card por area, descricao curta e destaque no item ativo. | Aprovada |
 
 ---
 

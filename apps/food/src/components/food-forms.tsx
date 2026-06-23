@@ -1,3 +1,4 @@
+import Link from "next/link";
 import type {
   AdminCurrentUserCompanyAccessContract,
   FoodCategoryContract,
@@ -154,56 +155,41 @@ export function StoreForm({
 
 export function StoreHoursForm({
   companyId,
-  hours
+  hours,
+  selectedKind
 }: {
   companyId: string;
   hours: FoodStoreHourContract[];
+  selectedKind: FoodStoreHourKind;
 }) {
+  const selectedGroup =
+    hourKindOptions.find((group) => group.kind === selectedKind) ?? hourKindOptions[0];
+  const hiddenGroups = hourKindOptions.filter((group) => group.kind !== selectedGroup.kind);
+
   return (
     <form action={saveFoodStoreHoursAction} className="store-form">
       <input name="companyId" type="hidden" value={companyId} />
+      <input name="tab" type="hidden" value={selectedGroup.kind} />
 
-      <div className="hours-layout">
+      <nav className="module-subnav hours-subnav" aria-label="Areas de horarios do FP Food">
         {hourKindOptions.map((group) => (
-          <section className="content-panel stack-panel hours-card" key={group.kind}>
-            <div className="panel-heading">
-              <div>
-                <h2>{group.label}</h2>
-                <p>{group.description}</p>
-              </div>
-              <div className="panel-heading-actions">
-                <span>{group.summary}</span>
-                {group.allDayLabel ? <strong className="hours-card-badge">{group.allDayLabel}</strong> : null}
-              </div>
-            </div>
-
-            <div className="hours-list">
-              {weekdayOptions.map(([weekday, label]) => {
-                const key = `${group.kind}:${weekday}`;
-                const current = hours.find(
-                  (hour) => hour.kind === group.kind && hour.weekday === weekday && hour.isActive
-                );
-                const isAllDay = current?.opensAt === "00:00" && current?.closesAt === "23:59";
-
-                return (
-                  <StoreHoursRow
-                    allDayLabel={group.allDayLabel}
-                    closesAt={current?.closesAt ?? group.defaultClosesAt}
-                    defaultClosesAt={group.defaultClosesAt}
-                    defaultOpensAt={group.defaultOpensAt}
-                    isActive={Boolean(current)}
-                    isAllDay={isAllDay}
-                    key={key}
-                    label={label}
-                    nameKey={key}
-                    opensAt={current?.opensAt ?? group.defaultOpensAt}
-                  />
-                );
-              })}
-            </div>
-          </section>
+          <Link
+            aria-current={selectedGroup.kind === group.kind ? "page" : undefined}
+            href={`/cadastro/horarios?companyId=${encodeURIComponent(companyId)}&tab=${group.kind}`}
+            key={group.kind}
+            prefetch={false}
+          >
+            <strong>{group.label}</strong>
+            <span>{group.description}</span>
+          </Link>
         ))}
-      </div>
+      </nav>
+
+      {hiddenGroups.map((group) => (
+        <StoreHoursHiddenRows group={group} hours={hours} key={group.kind} />
+      ))}
+
+      <StoreHoursPanel group={selectedGroup} hours={hours} />
 
       <section className="content-panel stack-panel hours-actions-panel">
         <div className="form-footer">
@@ -213,6 +199,93 @@ export function StoreHoursForm({
       </section>
     </form>
   );
+}
+
+function StoreHoursPanel({
+  group,
+  hours
+}: {
+  group: (typeof hourKindOptions)[number];
+  hours: FoodStoreHourContract[];
+}) {
+  return (
+    <section className="content-panel stack-panel hours-card" id={group.kind}>
+      <div className="panel-heading">
+        <div>
+          <h2>{group.label}</h2>
+          <p>{group.description}</p>
+        </div>
+        <div className="panel-heading-actions">
+          <span>{group.summary}</span>
+          {group.allDayLabel ? <strong className="hours-card-badge">{group.allDayLabel}</strong> : null}
+        </div>
+      </div>
+
+      <div className="hours-list">
+        {weekdayOptions.map(([weekday, label]) => {
+          const key = `${group.kind}:${weekday}`;
+          const current = findCurrentHour(hours, group.kind, weekday);
+          const isAllDay = current?.opensAt === "00:00" && current?.closesAt === "23:59";
+
+          return (
+            <StoreHoursRow
+              allDayLabel={group.allDayLabel}
+              closesAt={current?.closesAt ?? group.defaultClosesAt}
+              defaultClosesAt={group.defaultClosesAt}
+              defaultOpensAt={group.defaultOpensAt}
+              isActive={Boolean(current)}
+              isAllDay={isAllDay}
+              key={key}
+              label={label}
+              nameKey={key}
+              opensAt={current?.opensAt ?? group.defaultOpensAt}
+            />
+          );
+        })}
+      </div>
+    </section>
+  );
+}
+
+function StoreHoursHiddenRows({
+  group,
+  hours
+}: {
+  group: (typeof hourKindOptions)[number];
+  hours: FoodStoreHourContract[];
+}) {
+  return (
+    <>
+      {weekdayOptions.map(([weekday]) => {
+        const current = findCurrentHour(hours, group.kind, weekday);
+
+        if (!current) {
+          return null;
+        }
+
+        const key = `${group.kind}:${weekday}`;
+        const isAllDay = current.opensAt === "00:00" && current.closesAt === "23:59";
+
+        return (
+          <span hidden key={key}>
+            <input name="hourKey" type="hidden" value={key} />
+            <input name={`isActive:${key}`} type="hidden" value="on" />
+            {isAllDay ? <input name={`isAllDay:${key}`} type="hidden" value="on" /> : null}
+            <input name={`opensAt:${key}`} type="hidden" value={current.opensAt} />
+            <input name={`closesAt:${key}`} type="hidden" value={current.closesAt} />
+          </span>
+        );
+      })}
+    </>
+  );
+}
+
+function findCurrentHour(
+  hours: FoodStoreHourContract[],
+  kind: FoodStoreHourKind,
+  weekday: number
+) {
+  return hours.find((hour) => hour.kind === kind && hour.weekday === weekday && hour.isActive);
 }
 
 export function CategoryForm({
