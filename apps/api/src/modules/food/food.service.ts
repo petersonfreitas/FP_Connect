@@ -27,6 +27,8 @@ import type {
   FoodProductStatus,
   FoodPublicCheckoutContract,
   FoodStoreContract,
+  FoodStoreHourContract,
+  FoodStoreHourKind,
   FoodStoreStatus,
   PaginatedContract,
   RetryPublicFoodPaymentInput,
@@ -34,6 +36,7 @@ import type {
   UpdateFoodOrderStatusInput,
   UpsertFoodCategoryInput,
   UpsertFoodProductInput,
+  UpsertFoodStoreHoursInput,
   UpsertFoodStoreInput
 } from "./food.contracts";
 
@@ -46,6 +49,19 @@ type FoodStoreRow = {
   contact_phone: string | null;
   preparation_time_minutes: number | null;
   delivery_notes: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+type FoodStoreHourRow = {
+  id: string;
+  company_id: string;
+  store_id: string;
+  kind: FoodStoreHourKind;
+  weekday: number;
+  opens_at: string;
+  closes_at: string;
+  is_active: boolean;
   created_at: string;
   updated_at: string;
 };
@@ -172,6 +188,19 @@ const storeSelect = [
   "updated_at"
 ].join(",");
 
+const storeHourSelect = [
+  "id",
+  "company_id",
+  "store_id",
+  "kind",
+  "weekday",
+  "opens_at",
+  "closes_at",
+  "is_active",
+  "created_at",
+  "updated_at"
+].join(",");
+
 const categorySelect = [
   "id",
   "company_id",
@@ -269,6 +298,8 @@ const validPaymentStatuses = new Set<FoodPaymentStatus>([
   "paid",
   "pending"
 ]);
+const validStoreHourKinds = new Set<FoodStoreHourKind>(["delivery", "ordering"]);
+const saoPauloTimeZone = "America/Sao_Paulo";
 
 @Injectable()
 export class FoodService {
@@ -340,6 +371,72 @@ export class FoodService {
     await this.emitStoreConfigured(companyId, actorUserId, store);
 
     return store;
+  }
+
+  async listStoreHours(companyId: string): Promise<FoodStoreHourContract[]> {
+    const store = await this.findStore(companyId);
+
+    if (!store) {
+      return [];
+    }
+
+    return this.listStoreHoursByStore(companyId, store.id);
+  }
+
+  async replaceStoreHours(
+    companyId: string,
+    actorUserId: string,
+    input: UpsertFoodStoreHoursInput
+  ): Promise<FoodStoreHourContract[]> {
+    const store = await this.findStore(companyId);
+
+    if (!store) {
+      throw new NotFoundException("Loja Food ainda nao configurada");
+    }
+
+    const normalized = normalizeStoreHoursInput(input);
+    const now = new Date().toISOString();
+
+    const { error: updateError } = await this.supabase.food
+      .from("store_hours")
+      .update({
+        deleted_at: now,
+        updated_by: actorUserId
+      })
+      .eq("company_id", companyId)
+      .eq("store_id", store.id)
+      .is("deleted_at", null);
+
+    if (updateError) {
+      throwSupabaseError(updateError);
+    }
+
+    if (normalized.length > 0) {
+      const { error: insertError } = await this.supabase.food
+        .from("store_hours")
+        .insert(
+          normalized.map((hour) => ({
+            closes_at: hour.closesAt,
+            company_id: companyId,
+            created_by: actorUserId,
+            is_active: hour.isActive,
+            kind: hour.kind,
+            opens_at: hour.opensAt,
+            store_id: store.id,
+            updated_by: actorUserId,
+            weekday: hour.weekday
+          }))
+        );
+
+      if (insertError) {
+        throwSupabaseError(insertError);
+      }
+    }
+
+    const hours = await this.listStoreHoursByStore(companyId, store.id);
+    await this.emitStoreHoursUpdated(companyId, actorUserId, store, hours);
+
+    return hours;
   }
 
   async listCategories(
@@ -564,6 +661,7 @@ export class FoodService {
   ): Promise<FoodOrderContract> {
     const store = await this.getStoreByPublicSlug(publicSlug);
     await this.ensurePublicStoreAvailable(store);
+    await this.ensureOrderingOpen(store);
 
     return this.createOrder(store.company_id, null, input, {
       eventSource: "public-store-v0"
@@ -576,6 +674,7 @@ export class FoodService {
   ): Promise<CreatePublicFoodCheckoutContract> {
     const store = await this.getStoreByPublicSlug(publicSlug);
     await this.ensurePublicStoreAvailable(store);
+    await this.ensureOrderingOpen(store);
     const payment = normalizePublicCheckoutPayment(input.payment);
     const order = await this.createOrder(store.company_id, null, input, {
       eventSource: "public-store-v0"
@@ -638,6 +737,7 @@ export class FoodService {
   ): Promise<CreatePublicFoodCheckoutContract> {
     const store = await this.getStoreByPublicSlug(publicSlug);
     await this.ensurePublicStoreReadable(store);
+    await this.ensureOrderingOpen(store);
     const order = await this.getPublicOrderFromStore(store, orderNumber);
     const payment = normalizePublicCheckoutPayment(input.payment);
 
@@ -705,11 +805,14 @@ export class FoodService {
 
   private async buildMenu(store: FoodStoreRow | FoodStoreContract): Promise<FoodMenuContract> {
     const companyId = "company_id" in store ? store.company_id : store.companyId;
+    const storeId = store.id;
     const mappedStore = "company_id" in store ? mapStore(store) : store;
-    const [categories, products] = await Promise.all([
+    const [categories, hours, products] = await Promise.all([
       this.listAllCategories(companyId),
+      this.listStoreHoursByStore(companyId, storeId),
       this.listAllProducts(companyId)
     ]);
+    const availability = calculateStoreAvailability(hours);
     const visibleCategories = categories.filter((category) => category.status === "active");
     const visibleProducts = products.filter((product) => product.status === "available");
     const productsByCategoryId = new Map<string, FoodProductContract[]>();
@@ -727,10 +830,12 @@ export class FoodService {
     }
 
     return {
+      availability,
       categories: visibleCategories.map((category) => ({
         ...category,
         products: productsByCategoryId.get(category.id) ?? []
       })),
+      hours,
       store: mappedStore,
       uncategorizedProducts
     };
@@ -1046,6 +1151,27 @@ export class FoodService {
     return (data as unknown as FoodStoreRow | null) ?? null;
   }
 
+  private async listStoreHoursByStore(
+    companyId: string,
+    storeId: string
+  ): Promise<FoodStoreHourContract[]> {
+    const { data, error } = await this.supabase.food
+      .from("store_hours")
+      .select(storeHourSelect)
+      .eq("company_id", companyId)
+      .eq("store_id", storeId)
+      .is("deleted_at", null)
+      .order("kind", { ascending: false })
+      .order("weekday", { ascending: true })
+      .order("opens_at", { ascending: true });
+
+    if (error) {
+      throwSupabaseError(error);
+    }
+
+    return ((data ?? []) as unknown as FoodStoreHourRow[]).map(mapStoreHour);
+  }
+
   private async getStoreByPublicSlug(publicSlug: string): Promise<FoodStoreRow> {
     const slug = normalizeSlug(publicSlug);
     const { data, error } = await this.supabase.food
@@ -1071,6 +1197,15 @@ export class FoodService {
 
     if (store.status !== "open") {
       throw new ForbiddenException("Loja Food publica nao esta aberta");
+    }
+  }
+
+  private async ensureOrderingOpen(store: FoodStoreRow): Promise<void> {
+    const hours = await this.listStoreHoursByStore(store.company_id, store.id);
+    const availability = calculateStoreAvailability(hours);
+
+    if (!availability.isOrderingOpen) {
+      throw new BadRequestException(availability.message);
     }
   }
 
@@ -1421,6 +1556,29 @@ export class FoodService {
     });
   }
 
+  private async emitStoreHoursUpdated(
+    companyId: string,
+    actorUserId: string,
+    store: FoodStoreRow,
+    hours: FoodStoreHourContract[]
+  ): Promise<void> {
+    await this.robots.createEvent(companyId, actorUserId, {
+      eventCode: "food.store.hours.updated",
+      idempotencyKey: `food-store-hours-updated:${store.id}:${Date.now()}`,
+      originMetadata: {
+        generatedBy: "fp-food",
+        source: "store-hours-v0"
+      },
+      payload: {
+        deliveryWindows: hours.filter((hour) => hour.kind === "delivery" && hour.isActive).length,
+        orderingWindows: hours.filter((hour) => hour.kind === "ordering" && hour.isActive).length,
+        storeId: store.id
+      },
+      sourceApplicationKey: "food",
+      sourceEventId: store.id
+    });
+  }
+
   private async emitMenuUpdated(
     companyId: string,
     actorUserId: string,
@@ -1530,6 +1688,61 @@ function normalizeStoreInput(input: UpsertFoodStoreInput) {
     publicSlug,
     status
   };
+}
+
+function normalizeStoreHoursInput(input: UpsertFoodStoreHoursInput) {
+  if (!input || !Array.isArray(input.hours)) {
+    throw new BadRequestException("hours deve ser uma lista");
+  }
+
+  return input.hours
+    .map((hour) => ({
+      closesAt: normalizeStoreHourTime(hour.closesAt, "closesAt"),
+      isActive: hour.isActive !== false,
+      kind: normalizeStoreHourKind(hour.kind),
+      opensAt: normalizeStoreHourTime(hour.opensAt, "opensAt"),
+      weekday: normalizeWeekday(hour.weekday)
+    }))
+    .filter((hour) => hour.isActive)
+    .map((hour) => {
+      if (hour.opensAt === hour.closesAt) {
+        throw new BadRequestException("opensAt e closesAt nao podem ser iguais");
+      }
+
+      return hour;
+    });
+}
+
+function normalizeStoreHourKind(value: unknown): FoodStoreHourKind {
+  if (typeof value !== "string" || !validStoreHourKinds.has(value as FoodStoreHourKind)) {
+    throw new BadRequestException("kind do horario Food invalido");
+  }
+
+  return value as FoodStoreHourKind;
+}
+
+function normalizeWeekday(value: unknown): number {
+  const parsed = typeof value === "string" || typeof value === "number" ? Number(value) : NaN;
+
+  if (!Number.isInteger(parsed) || parsed < 0 || parsed > 6) {
+    throw new BadRequestException("weekday deve estar entre 0 e 6");
+  }
+
+  return parsed;
+}
+
+function normalizeStoreHourTime(value: unknown, field: string): string {
+  if (typeof value !== "string" || !/^\d{2}:\d{2}$/.test(value)) {
+    throw new BadRequestException(`${field} deve estar no formato HH:mm`);
+  }
+
+  const [hour, minute] = value.split(":").map(Number);
+
+  if (hour > 23 || minute > 59) {
+    throw new BadRequestException(`${field} deve ser um horario valido`);
+  }
+
+  return `${value}:00`;
 }
 
 function normalizeCategoryInput(input: UpsertFoodCategoryInput) {
@@ -1755,6 +1968,88 @@ function getCurrentDayPeriod(): { periodEnd: Date; periodStart: Date } {
   };
 }
 
+function calculateStoreAvailability(hours: FoodStoreHourContract[]): FoodMenuContract["availability"] {
+  const checkedAt = new Date().toISOString();
+  const orderingHours = hours.filter((hour) => hour.kind === "ordering" && hour.isActive);
+  const deliveryHours = hours.filter((hour) => hour.kind === "delivery" && hour.isActive);
+  const localNow = getLocalStoreTime();
+  const isOrderingOpen =
+    orderingHours.length === 0 || isWithinAnyStoreHour(orderingHours, localNow);
+  const isDeliveryOpen =
+    deliveryHours.length === 0 || isWithinAnyStoreHour(deliveryHours, localNow);
+
+  return {
+    checkedAt,
+    isDeliveryOpen,
+    isOrderingOpen,
+    message: isOrderingOpen
+      ? "Loja aberta para pedidos."
+      : "Pedidos fora do horario de atendimento da loja."
+  };
+}
+
+function getLocalStoreTime(): { minutes: number; weekday: number } {
+  const parts = new Intl.DateTimeFormat("en-US", {
+    hour: "2-digit",
+    hourCycle: "h23",
+    minute: "2-digit",
+    timeZone: saoPauloTimeZone,
+    weekday: "short"
+  }).formatToParts(new Date());
+  const values = new Map(parts.map((part) => [part.type, part.value]));
+  const weekdayLabel = values.get("weekday") ?? "Sun";
+  const hour = Number(values.get("hour") ?? 0);
+  const minute = Number(values.get("minute") ?? 0);
+
+  return {
+    minutes: hour * 60 + minute,
+    weekday: weekdayLabelToNumber(weekdayLabel)
+  };
+}
+
+function isWithinAnyStoreHour(
+  hours: FoodStoreHourContract[],
+  localNow: { minutes: number; weekday: number }
+): boolean {
+  return hours.some((hour) => {
+    const opensAt = timeToMinutes(hour.opensAt);
+    const closesAt = timeToMinutes(hour.closesAt);
+
+    if (opensAt < closesAt) {
+      return hour.weekday === localNow.weekday
+        && localNow.minutes >= opensAt
+        && localNow.minutes < closesAt;
+    }
+
+    return (
+      (hour.weekday === localNow.weekday && localNow.minutes >= opensAt) ||
+      (nextWeekday(hour.weekday) === localNow.weekday && localNow.minutes < closesAt)
+    );
+  });
+}
+
+function timeToMinutes(value: string): number {
+  const [hour, minute] = value.slice(0, 5).split(":").map(Number);
+  return hour * 60 + minute;
+}
+
+function nextWeekday(weekday: number): number {
+  return weekday === 6 ? 0 : weekday + 1;
+}
+
+function weekdayLabelToNumber(value: string): number {
+  const normalized = value.toLowerCase();
+
+  if (normalized.startsWith("mon")) return 1;
+  if (normalized.startsWith("tue")) return 2;
+  if (normalized.startsWith("wed")) return 3;
+  if (normalized.startsWith("thu")) return 4;
+  if (normalized.startsWith("fri")) return 5;
+  if (normalized.startsWith("sat")) return 6;
+
+  return 0;
+}
+
 function createOrderStatusCount(): Record<FoodOrderStatus, number> {
   return {
     accepted: 0,
@@ -1851,6 +2146,21 @@ function mapStore(row: FoodStoreRow): FoodStoreContract {
     publicSlug: row.public_slug,
     status: row.status,
     updatedAt: row.updated_at
+  };
+}
+
+function mapStoreHour(row: FoodStoreHourRow): FoodStoreHourContract {
+  return {
+    closesAt: row.closes_at.slice(0, 5),
+    companyId: row.company_id,
+    createdAt: row.created_at,
+    id: row.id,
+    isActive: row.is_active,
+    kind: row.kind,
+    opensAt: row.opens_at.slice(0, 5),
+    storeId: row.store_id,
+    updatedAt: row.updated_at,
+    weekday: row.weekday
   };
 }
 

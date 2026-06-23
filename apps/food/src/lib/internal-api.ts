@@ -14,6 +14,7 @@ import type {
   FoodOrderStatus,
   FoodProductContract,
   FoodStoreContract,
+  FoodStoreHourContract,
   ModuleAccessContract,
   PaginatedContract,
   RetryPublicFoodPaymentInput,
@@ -21,6 +22,7 @@ import type {
   UpdateFoodOrderStatusInput,
   UpsertFoodCategoryInput,
   UpsertFoodProductInput,
+  UpsertFoodStoreHoursInput,
   UpsertFoodStoreInput
 } from "@fp/types";
 import { requireCurrentUser } from "./auth";
@@ -75,6 +77,29 @@ export async function upsertFoodStore(
   input: UpsertFoodStoreInput
 ): Promise<InternalApiResult<FoodStoreContract>> {
   return fetchInternal<FoodStoreContract>("food/store", {
+    body: JSON.stringify(input),
+    headers: {
+      "X-FP-Company-Id": companyId
+    },
+    method: "POST"
+  });
+}
+
+export async function listFoodStoreHours(
+  companyId: string
+): Promise<InternalApiResult<FoodStoreHourContract[]>> {
+  return fetchInternal<FoodStoreHourContract[]>("food/store/hours", {
+    headers: {
+      "X-FP-Company-Id": companyId
+    }
+  });
+}
+
+export async function saveFoodStoreHours(
+  companyId: string,
+  input: UpsertFoodStoreHoursInput
+): Promise<InternalApiResult<FoodStoreHourContract[]>> {
+  return fetchInternal<FoodStoreHourContract[]>("food/store/hours", {
     body: JSON.stringify(input),
     headers: {
       "X-FP-Company-Id": companyId

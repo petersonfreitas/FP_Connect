@@ -3,13 +3,16 @@ import type {
   FoodCategoryContract,
   FoodMenuContract,
   FoodProductContract,
-  FoodStoreContract
+  FoodStoreContract,
+  FoodStoreHourContract,
+  FoodStoreHourKind
 } from "@fp/types";
 import { PendingSubmitButton } from "@/components/pending-submit-button";
 import {
   saveFoodCategoryAction,
   saveFoodProductAction,
-  saveFoodStoreAction
+  saveFoodStoreAction,
+  saveFoodStoreHoursAction
 } from "@/app/actions";
 import { displayCompanyName } from "@/lib/food-context";
 
@@ -30,6 +33,39 @@ const productStatusOptions = [
   ["unavailable", "Indisponivel"],
   ["hidden", "Oculto"]
 ] as const;
+
+const weekdayOptions = [
+  [0, "Domingo"],
+  [1, "Segunda"],
+  [2, "Terca"],
+  [3, "Quarta"],
+  [4, "Quinta"],
+  [5, "Sexta"],
+  [6, "Sabado"]
+] as const;
+
+const hourKindOptions: Array<{
+  defaultClosesAt: string;
+  defaultOpensAt: string;
+  description: string;
+  kind: FoodStoreHourKind;
+  label: string;
+}> = [
+  {
+    defaultClosesAt: "23:00",
+    defaultOpensAt: "18:00",
+    description: "Controla quando a vitrine aceita novos pedidos.",
+    kind: "ordering",
+    label: "Pedidos"
+  },
+  {
+    defaultClosesAt: "23:00",
+    defaultOpensAt: "18:00",
+    description: "Base para a proxima etapa de entrega e retirada.",
+    kind: "delivery",
+    label: "Entregas"
+  }
+];
 
 export function StoreForm({
   company,
@@ -105,6 +141,75 @@ export function StoreForm({
       <div className="form-footer">
         <span>Salvar emite o evento food.store.configured para o FP Robots.</span>
         <PendingSubmitButton pendingLabel="Salvando...">Salvar loja</PendingSubmitButton>
+      </div>
+    </form>
+  );
+}
+
+export function StoreHoursForm({
+  companyId,
+  hours
+}: {
+  companyId: string;
+  hours: FoodStoreHourContract[];
+}) {
+  return (
+    <form action={saveFoodStoreHoursAction} className="store-form">
+      <input name="companyId" type="hidden" value={companyId} />
+
+      <div className="hours-layout">
+        {hourKindOptions.map((group) => (
+          <section className="hours-group" key={group.kind}>
+            <div>
+              <h2>{group.label}</h2>
+              <p>{group.description}</p>
+            </div>
+
+            <div className="hours-list">
+              {weekdayOptions.map(([weekday, label]) => {
+                const key = `${group.kind}:${weekday}`;
+                const current = hours.find(
+                  (hour) => hour.kind === group.kind && hour.weekday === weekday && hour.isActive
+                );
+
+                return (
+                  <div className="hours-row" key={key}>
+                    <input name="hourKey" type="hidden" value={key} />
+                    <label className="hours-toggle">
+                      <input
+                        defaultChecked={Boolean(current)}
+                        name={`isActive:${key}`}
+                        type="checkbox"
+                      />
+                      <span>{label}</span>
+                    </label>
+                    <label>
+                      Abre
+                      <input
+                        defaultValue={current?.opensAt ?? group.defaultOpensAt}
+                        name={`opensAt:${key}`}
+                        type="time"
+                      />
+                    </label>
+                    <label>
+                      Fecha
+                      <input
+                        defaultValue={current?.closesAt ?? group.defaultClosesAt}
+                        name={`closesAt:${key}`}
+                        type="time"
+                      />
+                    </label>
+                  </div>
+                );
+              })}
+            </div>
+          </section>
+        ))}
+      </div>
+
+      <div className="form-footer">
+        <span>Sem horarios ativos, a loja segue aberta para pedidos enquanto o status estiver Aberta.</span>
+        <PendingSubmitButton pendingLabel="Salvando...">Salvar horarios</PendingSubmitButton>
       </div>
     </form>
   );

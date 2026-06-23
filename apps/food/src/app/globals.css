@@ -666,6 +666,53 @@ textarea {
   grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
+.hours-layout,
+.hours-list {
+  display: grid;
+  gap: 18px;
+}
+
+.hours-group {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  display: grid;
+  gap: 14px;
+  padding: 16px;
+}
+
+.hours-group h2 {
+  color: var(--accent-strong);
+  font-size: 18px;
+  margin: 0 0 4px;
+}
+
+.hours-group p {
+  color: var(--muted);
+  line-height: 1.5;
+  margin: 0;
+}
+
+.hours-row {
+  align-items: end;
+  background: #f8fbfa;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  display: grid;
+  gap: 12px;
+  grid-template-columns: minmax(160px, 1fr) repeat(2, minmax(120px, 180px));
+  padding: 12px;
+}
+
+.hours-toggle {
+  align-items: center;
+  display: flex;
+  flex-direction: row;
+}
+
+.hours-toggle input {
+  width: auto;
+}
+
 label {
   color: var(--foreground);
   display: grid;
@@ -1213,10 +1260,14 @@ textarea {
   font-weight: 800;
 }
 
+.public-store-status.closed {
+  background: rgb(255 255 255 / 8%);
+}
+
 .public-store-overview {
   display: grid;
   gap: 14px;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(4, minmax(0, 1fr));
 }
 
 .public-info-card {
@@ -1618,6 +1669,10 @@ textarea {
   }
 
   .form-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .hours-row {
     grid-template-columns: 1fr;
   }
 

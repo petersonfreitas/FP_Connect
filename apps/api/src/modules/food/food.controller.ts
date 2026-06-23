@@ -21,6 +21,7 @@ import type {
   UpdateFoodOrderStatusInput,
   UpsertFoodCategoryInput,
   UpsertFoodProductInput,
+  UpsertFoodStoreHoursInput,
   UpsertFoodStoreInput
 } from "./food.contracts";
 import { FoodService } from "./food.service";
@@ -75,6 +76,30 @@ export class FoodController {
     @Headers("x-fp-actor-user-id") actorUserId: string
   ) {
     return this.foodService.upsertStore(companyId, actorUserId, input);
+  }
+
+  @Get("store/hours")
+  @ModuleAccessPolicy({
+    applicationKey: "food",
+    companyHeader: "x-fp-company-id",
+    permissionKey: "food.access"
+  })
+  listStoreHours(@Headers("x-fp-company-id") companyId: string) {
+    return this.foodService.listStoreHours(companyId);
+  }
+
+  @Post("store/hours")
+  @ModuleAccessPolicy({
+    applicationKey: "food",
+    companyHeader: "x-fp-company-id",
+    permissionKey: "food.access"
+  })
+  replaceStoreHours(
+    @Body() input: UpsertFoodStoreHoursInput,
+    @Headers("x-fp-company-id") companyId: string,
+    @Headers("x-fp-actor-user-id") actorUserId: string
+  ) {
+    return this.foodService.replaceStoreHours(companyId, actorUserId, input);
   }
 
   @Get("categories")

@@ -28,6 +28,7 @@ const navigation = {
       label: "Gestao da loja",
       items: [
         { href: "/cadastro/loja", label: "Loja" },
+        { href: "/cadastro/horarios", label: "Horarios" },
         { href: "/movimentacao/cardapio", label: "Cardapio" }
       ]
     },

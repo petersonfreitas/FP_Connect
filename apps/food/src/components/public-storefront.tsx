@@ -87,6 +87,7 @@ export function PublicStorefront({
     (sum, product) => sum + product.priceCents * (quantities[product.id] ?? 0),
     0
   );
+  const canOrderNow = menu.availability.isOrderingOpen;
   const publicKey = checkout?.mercadoPago.enabled ? checkout.mercadoPago.publicKey : null;
 
   const submitCardPayment = useCallback(
@@ -131,7 +132,7 @@ export function PublicStorefront({
   );
 
   useEffect(() => {
-    if (!publicKey || !mercadoPagoReady || selectedItems.length === 0 || totalCents <= 0) {
+    if (!canOrderNow || !publicKey || !mercadoPagoReady || selectedItems.length === 0 || totalCents <= 0) {
       return undefined;
     }
 
@@ -191,7 +192,7 @@ export function PublicStorefront({
       window.fpFoodCardPaymentBrick?.unmount();
       window.fpFoodCardPaymentBrick = undefined;
     };
-  }, [mercadoPagoReady, publicKey, selectedItems.length, submitCardPayment, totalCents]);
+  }, [canOrderNow, mercadoPagoReady, publicKey, selectedItems.length, submitCardPayment, totalCents]);
 
   function changeQuantity(productId: string, delta: number) {
     setQuantities((current) => {
@@ -233,9 +234,9 @@ export function PublicStorefront({
             <a href="#meus-pedidos">Meus pedidos</a>
           </div>
         </div>
-        <div className="public-store-status">
-          <span>Loja aberta</span>
-          <small>{selectedItemsCount > 0 ? `${selectedItemsCount} item(ns) no pedido` : "Pedido online"}</small>
+        <div className={canOrderNow ? "public-store-status" : "public-store-status closed"}>
+          <span>{canOrderNow ? "Pedidos abertos" : "Pedidos fechados"}</span>
+          <small>{selectedItemsCount > 0 ? `${selectedItemsCount} item(ns) no pedido` : menu.availability.message}</small>
         </div>
       </section>
 
@@ -251,8 +252,13 @@ export function PublicStorefront({
         </article>
         <article className="public-info-card">
           <span>Atendimento</span>
-          <strong>{menu.store.contactPhone ?? "Online"}</strong>
-          <p>Canal para duvidas sobre pedido e entrega.</p>
+          <strong>{canOrderNow ? "Aceitando pedidos" : "Fora do horario"}</strong>
+          <p>{menu.store.contactPhone ?? "Canal para duvidas sobre pedido e entrega."}</p>
+        </article>
+        <article className="public-info-card">
+          <span>Entrega</span>
+          <strong>{menu.availability.isDeliveryOpen ? "Disponivel" : "Fora do horario"}</strong>
+          <p>Horario de entrega parametrizado pela loja.</p>
         </article>
         <article className="public-info-card">
           <span>Pagamento</span>
@@ -378,6 +384,12 @@ export function PublicStorefront({
             <strong>{formatMoney(totalCents)}</strong>
           </div>
 
+          {!canOrderNow ? (
+            <p className="public-delivery-note">
+              {menu.availability.message} O cardapio segue disponivel para consulta.
+            </p>
+          ) : null}
+
           <label>
             Nome
             <input maxLength={120} name="customerName" placeholder="Seu nome" required />
@@ -398,7 +410,7 @@ export function PublicStorefront({
           ) : null}
 
           <PendingSubmitButton
-            disabled={selectedItems.length === 0}
+            disabled={selectedItems.length === 0 || !canOrderNow}
             pendingLabel="Enviando pedido..."
           >
             Enviar pedido
@@ -416,7 +428,11 @@ export function PublicStorefront({
             </p>
           </div>
 
-          {selectedItems.length === 0 ? (
+          {!canOrderNow ? (
+            <div className="empty-state public-empty-cart">
+              Pagamento online indisponivel fora do horario de pedidos.
+            </div>
+          ) : selectedItems.length === 0 ? (
             <div className="empty-state public-empty-cart">
               Adicione itens ao pedido para habilitar o pagamento com cartao.
             </div>

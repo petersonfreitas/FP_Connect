@@ -8,11 +8,13 @@ import type {
   FoodPaymentMethod,
   FoodPaymentStatus,
   FoodProductStatus,
+  FoodStoreHourKind,
   FoodStoreStatus,
   UpdateFoodOrderPaymentInput,
   UpdateFoodOrderStatusInput,
   UpsertFoodCategoryInput,
   UpsertFoodProductInput,
+  UpsertFoodStoreHoursInput,
   UpsertFoodStoreInput
 } from "@fp/types";
 import {
@@ -20,6 +22,7 @@ import {
   createFoodCategory,
   createFoodProduct,
   createPublicFoodOrder,
+  saveFoodStoreHours,
   updateFoodCategory,
   updateFoodOrderPayment,
   updateFoodOrderStatus,
@@ -54,6 +57,7 @@ const validPaymentStatuses = new Set<FoodPaymentStatus>([
   "paid",
   "pending"
 ]);
+const validStoreHourKinds = new Set<FoodStoreHourKind>(["delivery", "ordering"]);
 
 export async function saveFoodStoreAction(formData: FormData): Promise<void> {
   const companyId = String(formData.get("companyId") ?? "").trim();
@@ -125,6 +129,46 @@ export async function saveFoodProductAction(formData: FormData): Promise<void> {
     result.error,
     productId ? "productUpdated" : "productCreated"
   );
+}
+
+export async function saveFoodStoreHoursAction(formData: FormData): Promise<void> {
+  const companyId = requireCompanyId(formData);
+  const hours: UpsertFoodStoreHoursInput["hours"] = [];
+
+  for (const key of formData.getAll("hourKey")) {
+    const normalizedKey = String(key);
+    const [kindValue, weekdayValue] = normalizedKey.split(":");
+    const kind = normalizeStoreHourKind(kindValue);
+    const parsedWeekday = optionalInteger(weekdayValue);
+    const isActive = formData.get(`isActive:${normalizedKey}`) === "on";
+    const opensAt = String(formData.get(`opensAt:${normalizedKey}`) ?? "");
+    const closesAt = String(formData.get(`closesAt:${normalizedKey}`) ?? "");
+
+    if (
+      parsedWeekday === null ||
+      !Number.isInteger(parsedWeekday) ||
+      parsedWeekday < 0 ||
+      parsedWeekday > 6
+    ) {
+      redirectWithResult("/cadastro/horarios", companyId, "Dia da semana invalido.", "hoursSaved");
+    }
+
+    const weekday = parsedWeekday;
+
+    if (isActive) {
+      hours.push({
+        closesAt,
+        isActive,
+        kind,
+        opensAt,
+        weekday
+      });
+    }
+  }
+
+  const result = await saveFoodStoreHours(companyId, { hours });
+
+  redirectWithResult("/cadastro/horarios", companyId, result.error, "hoursSaved");
 }
 
 export async function createInternalFoodOrderAction(formData: FormData): Promise<void> {
@@ -396,6 +440,14 @@ function normalizePaymentStatus(value: FormDataEntryValue | null): FoodPaymentSt
   }
 
   return status as FoodPaymentStatus;
+}
+
+function normalizeStoreHourKind(value: string): FoodStoreHourKind {
+  if (!validStoreHourKinds.has(value as FoodStoreHourKind)) {
+    redirect("/cadastro/horarios?error=Tipo%20de%20horario%20invalido.");
+  }
+
+  return value as FoodStoreHourKind;
 }
 
 function optionalPaymentMethod(value: FormDataEntryValue | null): FoodPaymentMethod | null {

@@ -3,6 +3,7 @@ export type FoodCategoryStatus = "active" | "inactive";
 export type FoodProductStatus = "available" | "hidden" | "unavailable";
 export type FoodPaymentMethod = "card" | "cash" | "other" | "pix";
 export type FoodPaymentStatus = "cancelled" | "paid" | "pending";
+export type FoodStoreHourKind = "delivery" | "ordering";
 export type FoodOrderStatus =
   | "accepted"
   | "cancelled"
@@ -32,6 +33,29 @@ export type UpsertFoodStoreInput = {
   contactPhone?: string | null;
   preparationTimeMinutes?: number | null;
   deliveryNotes?: string | null;
+};
+
+export type FoodStoreHourContract = {
+  id: string;
+  companyId: string;
+  storeId: string;
+  kind: FoodStoreHourKind;
+  weekday: number;
+  opensAt: string;
+  closesAt: string;
+  isActive: boolean;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type UpsertFoodStoreHoursInput = {
+  hours: Array<{
+    kind: FoodStoreHourKind;
+    weekday: number;
+    opensAt: string;
+    closesAt: string;
+    isActive?: boolean | null;
+  }>;
 };
 
 export type FoodCategoryContract = {
@@ -88,7 +112,14 @@ export type FoodMenuCategoryContract = FoodCategoryContract & {
 
 export type FoodMenuContract = {
   store: FoodStoreContract;
+  availability: {
+    checkedAt: string;
+    isDeliveryOpen: boolean;
+    isOrderingOpen: boolean;
+    message: string;
+  };
   categories: FoodMenuCategoryContract[];
+  hours: FoodStoreHourContract[];
   uncategorizedProducts: FoodProductContract[];
 };
 
