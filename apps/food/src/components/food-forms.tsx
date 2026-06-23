@@ -165,14 +165,16 @@ export function StoreHoursForm({
 
       <div className="hours-layout">
         {hourKindOptions.map((group) => (
-          <section className="hours-card" key={group.kind}>
-            <div className="hours-card-heading">
+          <section className="content-panel stack-panel hours-card" key={group.kind}>
+            <div className="panel-heading">
               <div>
-                <span>{group.summary}</span>
                 <h2>{group.label}</h2>
                 <p>{group.description}</p>
               </div>
-              {group.allDayLabel ? <strong>{group.allDayLabel}</strong> : null}
+              <div className="panel-heading-actions">
+                <span>{group.summary}</span>
+                {group.allDayLabel ? <strong className="hours-card-badge">{group.allDayLabel}</strong> : null}
+              </div>
             </div>
 
             <div className="hours-list">
@@ -203,10 +205,12 @@ export function StoreHoursForm({
         ))}
       </div>
 
-      <div className="form-footer">
-        <span>Sem dias ativos em funcionamento, a loja segue aceitando pedidos enquanto o status estiver Aberta.</span>
-        <PendingSubmitButton pendingLabel="Salvando...">Salvar horarios</PendingSubmitButton>
-      </div>
+      <section className="content-panel stack-panel hours-actions-panel">
+        <div className="form-footer">
+          <span>Sem dias ativos em funcionamento, a loja segue aceitando pedidos enquanto o status estiver Aberta.</span>
+          <PendingSubmitButton pendingLabel="Salvando...">Salvar horarios</PendingSubmitButton>
+        </div>
+      </section>
     </form>
   );
 }

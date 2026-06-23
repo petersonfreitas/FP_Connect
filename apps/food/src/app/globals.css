@@ -673,36 +673,17 @@ textarea {
 }
 
 .hours-card {
-  background: #ffffff;
-  border: 1px solid var(--line);
-  border-radius: 8px;
   display: grid;
   gap: 18px;
-  padding: 18px;
 }
 
-.hours-card-heading {
-  align-items: start;
-  display: flex;
-  gap: 16px;
-  justify-content: space-between;
-}
-
-.hours-card-heading > strong {
+.hours-card-badge {
   background: var(--accent-soft);
   border-radius: 999px;
   color: var(--accent-strong);
   font-size: 12px;
   padding: 7px 10px;
   white-space: nowrap;
-}
-
-.hours-card-heading span {
-  color: var(--muted);
-  font-size: 12px;
-  font-weight: 900;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
 }
 
 .hours-card h2 {
@@ -716,6 +697,10 @@ textarea {
   color: var(--muted);
   line-height: 1.5;
   margin: 0;
+}
+
+.hours-actions-panel {
+  margin-bottom: 0;
 }
 
 .hours-row {
@@ -1719,7 +1704,6 @@ textarea {
   .workspace-account,
   .panel-heading,
   .panel-heading-actions,
-  .hours-card-heading,
   .pagination-bar,
   .form-footer {
     align-items: stretch;

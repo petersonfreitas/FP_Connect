@@ -62,16 +62,21 @@ export default async function StoreHoursPage({ searchParams }: StoreHoursPagePro
       ) : missingStore ? (
         <Notice tone="warning" message="Configure a loja antes de definir horarios." />
       ) : (
-        <section className="content-panel">
-          <div className="panel-heading">
-            <div>
-              <h1>{displayCompanyName(selectedCompany)}</h1>
-              <p>Separe o funcionamento da loja da janela de entrega para controlar a vitrine publica com mais clareza.</p>
+        <>
+          <section className="content-panel">
+            <div className="panel-heading">
+              <div>
+                <h1>{displayCompanyName(selectedCompany)}</h1>
+                <p>Separe o funcionamento da loja da janela de entrega para controlar a vitrine publica com mais clareza.</p>
+              </div>
+              <span>{storeResult.data?.status === "open" ? "Loja aberta" : "Loja nao aberta"}</span>
             </div>
-            <span>{storeResult.data?.status === "open" ? "Loja aberta" : "Loja nao aberta"}</span>
-          </div>
+            <p className="muted-copy">
+              A vitrine permanece disponivel para consulta. As regras abaixo controlam quando o cliente pode enviar pedidos e quando a entrega fica disponivel.
+            </p>
+          </section>
           <StoreHoursForm companyId={selectedCompany.company.id} hours={hoursResult.data ?? []} />
-        </section>
+        </>
       )}
     </FoodShell>
   );
