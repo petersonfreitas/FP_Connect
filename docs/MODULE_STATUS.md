@@ -26,7 +26,7 @@ Este arquivo controla o avanco dos modulos do ecossistema.
 | FP Tickets | Futura | 0 | Fundacao de acesso preparada | Endpoint interno `/api/tickets/access` ja valida empresa, modulo contratado e permissao; entrara apos base operacional. |
 | FP Sales | Futura | 0 | Fundacao de acesso preparada | Endpoint interno `/api/sales/access` ja valida empresa, modulo contratado e permissao; entrara apos base operacional. |
 | FP Marketing | Futura | 0 | Fundacao de acesso preparada | Endpoint interno `/api/marketing/access` ja valida empresa, modulo contratado e permissao; entrara apos base operacional. |
-| FP Gateway | Alta | 2 | Base funcional em evolucao produtiva | Painel operacional em `/gateway`, schema `gateway`, catalogo de provedores, configuracao SMTP por empresa, teste/envio SMTP com timeout controlado, OAuth Mercado Pago por empresa iniciado, sandbox manual Mercado Pago, contrato interno de solicitacao de pagamento, PIX e cartao tokenizado via Orders API, webhook Mercado Pago V0 e eventos `gateway.*` para Robots. SMTP por socket fica como laboratorio; e-mail transacional de producao deve priorizar API HTTPS de provedor dedicado. |
+| FP Gateway | Alta | 2 | Base funcional em evolucao produtiva | Painel operacional em `/gateway`, subareas internas para pagamentos, Mercado Pago, SMTP, provedores e eventos, schema `gateway`, catalogo de provedores, configuracao SMTP por empresa, teste/envio SMTP com timeout controlado, OAuth Mercado Pago por empresa iniciado, sandbox manual Mercado Pago, contrato interno de solicitacao de pagamento, PIX e cartao tokenizado via Orders API, webhook Mercado Pago V0 e eventos `gateway.*` para Robots. SMTP por socket fica como laboratorio; e-mail transacional de producao deve priorizar API HTTPS de provedor dedicado. |
 | FP Fiscal | Alta/Media | 0 | Backlog criado | Modulo fiscal proprio, com foco inicial na evolucao fiscal do FP Food. |
 | FP Sign | Media | 0 | Backlog criado | Aceite simples, contratos, propostas e arquivamento documental; sem assinatura digital avancada no MVP. |
 | FP BI | Media/Baixa | 0 | Backlog criado | Indicadores e dashboards; evoluir apos maturidade dos modulos transacionais. |
@@ -155,6 +155,7 @@ Este arquivo controla o avanco dos modulos do ecossistema.
 
 - [x] Shell visual V0 no FP Console
 - [x] Shell visual V0 organizado por subareas internas no FP Console
+- [x] Area dedicada para configuracao Mercado Pago, separada da operacao de pagamentos
 - [x] Schema `gateway`
 - [x] Catalogo do modulo no `core`
 - [x] Permissao `gateway.access`

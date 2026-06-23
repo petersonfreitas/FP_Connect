@@ -80,6 +80,7 @@ O FP Gateway foi iniciado como shell no FP Console:
 - catalogo, permissao e role no `core`;
 - endpoint interno `/gateway/access` com guard de modulo contratado;
 - tela `/gateway` para selecionar empresa e validar fronteiras do modulo;
+- painel organizado em subareas internas para pagamentos, Mercado Pago, SMTP, provedores e eventos;
 - catalogo inicial de provedores com SMTP, Mercado Pago, WhatsApp e Meta;
 - configuracao SMTP por empresa com segredo server-side;
 - teste basico de conexao SMTP e evento `gateway.smtp.validated` para FP Robots;

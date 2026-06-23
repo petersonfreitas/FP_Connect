@@ -131,7 +131,7 @@ export async function startGatewayMercadoPagoOAuthAction(formData: FormData) {
       buildGatewayUrl({
         companyId,
         error: result.error ?? "Nao foi possivel iniciar OAuth Mercado Pago.",
-        tab: "payments"
+        tab: "mercado-pago"
       })
     );
   }
@@ -154,10 +154,10 @@ export async function saveGatewayMercadoPagoManualConfigAction(formData: FormDat
   });
 
   if (result.error) {
-    redirect(buildGatewayUrl({ companyId, error: result.error, tab: "payments" }));
+    redirect(buildGatewayUrl({ companyId, error: result.error, tab: "mercado-pago" }));
   }
 
-  redirect(buildGatewayUrl({ companyId, mpManualSaved: "1", tab: "payments" }));
+  redirect(buildGatewayUrl({ companyId, mpManualSaved: "1", tab: "mercado-pago" }));
 }
 
 export async function syncGatewayPaymentRequestStatusAction(formData: FormData) {

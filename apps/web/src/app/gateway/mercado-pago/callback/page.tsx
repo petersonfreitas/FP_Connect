@@ -22,7 +22,7 @@ export default async function MercadoPagoCallbackPage({
     redirect(
       buildGatewayUrl({
         error: query.error_description ?? query.error ?? "Callback Mercado Pago sem empresa valida.",
-        tab: "payments"
+        tab: "mercado-pago"
       })
     );
   }
@@ -32,7 +32,7 @@ export default async function MercadoPagoCallbackPage({
       buildGatewayUrl({
         companyId,
         error: query.error_description ?? query.error ?? "Mercado Pago nao retornou codigo OAuth.",
-        tab: "payments"
+        tab: "mercado-pago"
       })
     );
   }
@@ -43,10 +43,10 @@ export default async function MercadoPagoCallbackPage({
   });
 
   if (result.error) {
-    redirect(buildGatewayUrl({ companyId, error: result.error, tab: "payments" }));
+    redirect(buildGatewayUrl({ companyId, error: result.error, tab: "mercado-pago" }));
   }
 
-  redirect(`/gateway?companyId=${companyId}&tab=payments&mpOAuth=connected`);
+  redirect(`/gateway?companyId=${companyId}&tab=mercado-pago&mpOAuth=connected`);
 }
 
 function buildGatewayUrl(params: Record<string, string>): string {

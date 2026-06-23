@@ -63,7 +63,12 @@ type GatewayPageProps = {
 
 const pageSize = 20;
 
-type GatewayTab = "events" | "overview" | "payments" | "providers" | "smtp";
+type GatewayTab = "events" | "mercado-pago" | "overview" | "payments" | "providers" | "smtp";
+
+type MercadoPagoPublicConfig = {
+  mode?: string | null;
+  userId?: number | string | null;
+};
 
 const gatewayTabs: Array<{
   description: string;
@@ -79,6 +84,11 @@ const gatewayTabs: Array<{
     description: "Mercado Pago, PIX, cartoes e solicitacoes internas.",
     key: "payments",
     label: "Pagamentos"
+  },
+  {
+    description: "OAuth, sandbox e credenciais de pagamento.",
+    key: "mercado-pago",
+    label: "Mercado Pago"
   },
   {
     description: "Servidor de e-mail e envio de teste.",
@@ -307,12 +317,15 @@ export default async function GatewayPage({ searchParams }: GatewayPageProps) {
       {selectedTab === "payments" ? (
         <GatewayPaymentsPanel
           companyId={selectedCompanyId}
-          mercadoPagoConfig={mercadoPagoConfig}
           paymentFilters={paymentFilters}
           paymentPagination={paymentRequestsPagination}
           paymentProviders={paymentProviders}
           paymentRequests={paymentRequests}
         />
+      ) : null}
+
+      {selectedTab === "mercado-pago" ? (
+        <GatewayMercadoPagoPanel companyId={selectedCompanyId} config={mercadoPagoConfig} />
       ) : null}
 
       {selectedTab === "smtp" ? (
@@ -404,14 +417,12 @@ function GatewayOverview({ gatewayAccessGranted }: { gatewayAccessGranted: boole
 
 function GatewayPaymentsPanel({
   companyId,
-  mercadoPagoConfig,
   paymentFilters,
   paymentPagination,
   paymentProviders,
   paymentRequests
 }: {
   companyId: string;
-  mercadoPagoConfig: GatewayCompanyProviderConfigContract | null;
   paymentFilters: {
     dateFrom?: string;
     dateTo?: string;
@@ -445,7 +456,6 @@ function GatewayPaymentsPanel({
 
       <PaymentRequestForm
         companyId={companyId}
-        mercadoPagoConfig={mercadoPagoConfig}
         paymentProviders={paymentProviders}
       />
       <PaymentRequestFilters
@@ -479,6 +489,107 @@ function GatewayPaymentsPanel({
         />
       ) : null}
     </section>
+  );
+}
+
+function GatewayMercadoPagoPanel({
+  companyId,
+  config
+}: {
+  companyId: string;
+  config: GatewayCompanyProviderConfigContract | null;
+}) {
+  const publicConfig = readMercadoPagoPublicConfig(config);
+  const statusLabel = getMercadoPagoStatusLabel(config, publicConfig);
+
+  return (
+    <>
+      <section className="content-panel">
+        <div className="panel-heading">
+          <div>
+            <h1>Mercado Pago</h1>
+            <p>Configuracao da conta usada pelo Gateway para PIX, credito e debito.</p>
+          </div>
+          <span>{statusLabel}</span>
+        </div>
+
+        <div className="summary-strip compact-summary" aria-label="Status Mercado Pago">
+          <div className="summary-item">
+            <span>Status</span>
+            <strong>{config ? getCompanyProviderStatusLabel(config.status) : "Nao configurado"}</strong>
+            <small>Controla se o provedor pode ser usado pela empresa.</small>
+          </div>
+          <div className="summary-item">
+            <span>Modo</span>
+            <strong>{publicConfig.mode === "manual_sandbox" ? "Sandbox manual" : "OAuth"}</strong>
+            <small>{publicConfig.userId ? `Conta ${publicConfig.userId}` : "Conta ainda nao vinculada."}</small>
+          </div>
+          <div className="summary-item">
+            <span>Validacao</span>
+            <strong>
+              {config?.lastValidationStatus
+                ? getValidationStatusLabel(config.lastValidationStatus)
+                : "Nao testado"}
+            </strong>
+            <small>{config?.lastValidationMessage ?? "Sem retorno recente do provedor."}</small>
+          </div>
+        </div>
+
+        <div className="form-alert neutral inline-alert" role="status">
+          Para producao, a estrategia principal sera OAuth por empresa. O sandbox manual permanece
+          como apoio para testes controlados e validacao rapida do Checkout Transparente.
+        </div>
+
+        <form action={startGatewayMercadoPagoOAuthAction} className="form-actions">
+          <input name="companyId" type="hidden" value={companyId} />
+          <PendingSubmitButton className="secondary-action" pendingLabel="Abrindo OAuth...">
+            Conectar Mercado Pago via OAuth
+          </PendingSubmitButton>
+        </form>
+      </section>
+
+      <section className="content-panel stack-panel">
+        <div className="panel-heading">
+          <div>
+            <h1>Sandbox manual</h1>
+            <p>Credenciais de teste para validar PIX e cartoes antes do OAuth definitivo.</p>
+          </div>
+          <span>Ambiente de teste</span>
+        </div>
+
+        <form action={saveGatewayMercadoPagoManualConfigAction} className="form-grid">
+          <input name="companyId" type="hidden" value={companyId} />
+          <label>
+            Access Token de teste ou conta de teste
+            <input
+              autoComplete="new-password"
+              maxLength={255}
+              name="accessToken"
+              placeholder="TEST-... ou APP_USR-... de conta de teste"
+              required
+              type="password"
+            />
+          </label>
+          <label>
+            Public Key
+            <input maxLength={255} name="publicKey" placeholder="TEST-..." />
+          </label>
+          <label>
+            N. da aplicacao
+            <input maxLength={80} name="appId" />
+          </label>
+          <label>
+            User ID
+            <input maxLength={80} name="userId" />
+          </label>
+          <div className="form-actions">
+            <PendingSubmitButton className="secondary-action" pendingLabel="Salvando sandbox...">
+              Salvar sandbox manual
+            </PendingSubmitButton>
+          </div>
+        </form>
+      </section>
+    </>
   );
 }
 
@@ -647,74 +758,19 @@ function GatewayEventsPanel() {
 
 function PaymentRequestForm({
   companyId,
-  mercadoPagoConfig,
   paymentProviders
 }: {
   companyId: string;
-  mercadoPagoConfig: GatewayCompanyProviderConfigContract | null;
   paymentProviders: GatewayProviderContract[];
 }) {
-  const mercadoPagoStatus =
-    mercadoPagoConfig?.status === "active" ? "Conectado via OAuth" : "Nao conectado";
-  const mercadoPagoPublicConfig = mercadoPagoConfig?.publicConfig as
-    | { mode?: string | null; userId?: number | string | null }
-    | undefined;
-  const mercadoPagoMode =
-    mercadoPagoPublicConfig?.mode === "manual_sandbox" ? "Sandbox manual" : mercadoPagoStatus;
-
   return (
     <>
       <div className="form-alert neutral inline-alert" role="status">
-        Mercado Pago: {mercadoPagoMode}
-        {mercadoPagoPublicConfig?.userId ? ` / Conta ${mercadoPagoPublicConfig.userId}` : ""}
+        Para PIX, informe um e-mail de pagador diferente da conta vendedora. No sandbox manual, o
+        Gateway usa o nome APRO no payload enviado ao Mercado Pago e exige e-mail com dominio
+        @testuser.com. Para cartao, informe apenas o token gerado pelo MercadoPago.js ou Card
+        Payment Brick; nunca informe numero/CVV no FP Console.
       </div>
-      <div className="form-alert neutral inline-alert" role="status">
-        Para teste local, use credenciais de teste ou credenciais de producao de uma conta de
-        teste do Mercado Pago. Para PIX, informe um e-mail valido de pagador diferente da conta
-        vendedora usada no Access Token. No sandbox manual, o Gateway usa o nome APRO no payload
-        enviado ao Mercado Pago e exige e-mail com dominio @testuser.com, conforme o roteiro
-        oficial de teste de Pix. Para cartao, informe apenas o token gerado pelo MercadoPago.js ou
-        Card Payment Brick; nunca informe numero/CVV no FP Console.
-      </div>
-
-      <form action={startGatewayMercadoPagoOAuthAction} className="form-actions">
-        <input name="companyId" type="hidden" value={companyId} />
-        <PendingSubmitButton className="secondary-action" pendingLabel="Abrindo OAuth...">
-          Conectar Mercado Pago
-        </PendingSubmitButton>
-      </form>
-
-      <form action={saveGatewayMercadoPagoManualConfigAction} className="form-grid">
-        <input name="companyId" type="hidden" value={companyId} />
-        <label>
-          Access Token de teste ou conta de teste
-          <input
-            autoComplete="new-password"
-            maxLength={255}
-            name="accessToken"
-            placeholder="TEST-... ou APP_USR-... de conta de teste"
-            required
-            type="password"
-          />
-        </label>
-        <label>
-          Public Key
-          <input maxLength={255} name="publicKey" placeholder="TEST-..." />
-        </label>
-        <label>
-          N. da aplicacao
-          <input maxLength={80} name="appId" />
-        </label>
-        <label>
-          User ID
-          <input maxLength={80} name="userId" />
-        </label>
-        <div className="form-actions">
-          <PendingSubmitButton className="secondary-action" pendingLabel="Salvando sandbox...">
-            Salvar sandbox manual
-          </PendingSubmitButton>
-        </div>
-      </form>
 
       <form action={createGatewayPaymentRequestAction} className="form-grid">
         <input name="companyId" type="hidden" value={companyId} />
@@ -1222,6 +1278,31 @@ function readSmtpConfig(
     secure: false,
     username: null
   };
+}
+
+function readMercadoPagoPublicConfig(
+  config: GatewayCompanyProviderConfigContract | null
+): MercadoPagoPublicConfig {
+  if (config?.providerKey !== "mercado_pago") {
+    return {};
+  }
+
+  return config.publicConfig as MercadoPagoPublicConfig;
+}
+
+function getMercadoPagoStatusLabel(
+  config: GatewayCompanyProviderConfigContract | null,
+  publicConfig: MercadoPagoPublicConfig
+): string {
+  if (!config) {
+    return "Nao configurado";
+  }
+
+  if (publicConfig.mode === "manual_sandbox") {
+    return "Sandbox manual";
+  }
+
+  return config.status === "active" ? "Conectado via OAuth" : getCompanyProviderStatusLabel(config.status);
 }
 
 function getProviderCategoryLabel(category: GatewayProviderContract["category"]): string {

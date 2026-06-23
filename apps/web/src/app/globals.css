@@ -597,6 +597,15 @@ button.primary-action {
   max-width: 1180px;
 }
 
+.compact-summary {
+  margin-bottom: 20px;
+  max-width: none;
+}
+
+.compact-summary .summary-item strong {
+  font-size: 24px;
+}
+
 .summary-item {
   background: var(--panel);
   border: 1px solid var(--line);
@@ -637,7 +646,7 @@ button.primary-action {
 .module-subnav {
   display: grid;
   gap: 10px;
-  grid-template-columns: repeat(5, minmax(0, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
   margin: 0 auto;
   max-width: 1180px;
 }
