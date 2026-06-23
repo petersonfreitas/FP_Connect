@@ -9,6 +9,13 @@ import type {
 import { AppShell } from "@/components/app-shell";
 import { PendingSubmitButton } from "@/components/pending-submit-button";
 import {
+  ContextSummary,
+  getCompanyContextName,
+  getCompanyContextPlanLabel,
+  getCompanyContextStatusLabel,
+  getModuleContextAccessLabel
+} from "@/components/context-summary";
+import {
   getCurrentAdminAccess,
   listRobotsEventCatalog,
   listRobotsEvents,
@@ -123,6 +130,9 @@ export default async function RobotsPage({ searchParams }: RobotsPageProps) {
   const selectedCompany = access.companies.find(
     (companyAccess) => companyAccess.company.id === selectedCompanyId
   );
+  const robotsModule = selectedCompany?.modules.find(
+    (moduleAccess) => moduleAccess.applicationKey === "robots"
+  );
 
   return (
     <AppShell access={access} activePath="/robots">
@@ -161,6 +171,32 @@ export default async function RobotsPage({ searchParams }: RobotsPageProps) {
           </span>
         </section>
       ) : null}
+
+      <ContextSummary
+        items={[
+          {
+            label: "Empresa atual",
+            tone: "strong",
+            value: getCompanyContextName(selectedCompany)
+          },
+          {
+            label: "Modulo",
+            value: robotsModule?.applicationName ?? "FP Robots"
+          },
+          {
+            label: "Status",
+            value: getCompanyContextStatusLabel(selectedCompany?.company.status)
+          },
+          {
+            label: "Plano",
+            value: getCompanyContextPlanLabel(selectedCompany)
+          },
+          {
+            label: "Acesso",
+            value: getModuleContextAccessLabel(robotsModule)
+          }
+        ]}
+      />
 
       <RobotsIntro />
 

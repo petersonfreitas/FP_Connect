@@ -1,6 +1,12 @@
 import Link from "next/link";
 import type { AdminCurrentUserCompanyAccessContract, FoodStoreContract } from "@fp/types";
 import { AppShell } from "@/components/app-shell";
+import {
+  ContextSummary,
+  getCompanyContextName,
+  getCompanyContextPlanLabel,
+  getModuleContextAccessLabel
+} from "@/components/context-summary";
 import { getCurrentAdminAccess, getFoodStore } from "@/lib/internal-api";
 import { loadServerEnv } from "@/lib/server-env";
 
@@ -37,6 +43,9 @@ export default async function FoodSystemHubPage({ searchParams }: FoodSystemHubP
     foodCompanies.find((companyAccess) => companyAccess.company.id === query.companyId) ??
     foodCompanies[0] ??
     null;
+  const foodModule = selectedCompany?.modules.find(
+    (moduleAccess) => moduleAccess.applicationKey === "food"
+  );
   const storeResult = selectedCompany
     ? await readFoodStore(selectedCompany.company.id)
     : { error: null, store: null };
@@ -70,6 +79,34 @@ export default async function FoodSystemHubPage({ searchParams }: FoodSystemHubP
 
       {foodCompanies.length > 0 ? (
         <>
+          <ContextSummary
+            items={[
+              {
+                label: "Empresa atual",
+                tone: "strong",
+                value: getCompanyContextName(selectedCompany)
+              },
+              {
+                label: "Modulo",
+                value: foodModule?.applicationName ?? "FP Food"
+              },
+              {
+                label: "Status",
+                value: storeResult.store
+                  ? storeStatusLabels[storeResult.store.status]
+                  : "Loja pendente"
+              },
+              {
+                label: "Plano",
+                value: getCompanyContextPlanLabel(selectedCompany)
+              },
+              {
+                label: "Acesso",
+                value: getModuleContextAccessLabel(foodModule)
+              }
+            ]}
+          />
+
           <section className="content-panel stack-panel">
             <div className="panel-heading">
               <div>

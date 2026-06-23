@@ -7,6 +7,13 @@ import type {
   GatewaySmtpPublicConfig
 } from "@fp/types";
 import { AppShell } from "@/components/app-shell";
+import {
+  ContextSummary,
+  getCompanyContextName,
+  getCompanyContextPlanLabel,
+  getCompanyContextStatusLabel,
+  getModuleContextAccessLabel
+} from "@/components/context-summary";
 import { PendingSubmitButton } from "@/components/pending-submit-button";
 import {
   getCurrentAdminAccess,
@@ -137,6 +144,9 @@ export default async function GatewayPage({ searchParams }: GatewayPageProps) {
   const selectedCompany = access.companies.find(
     (companyAccess) => companyAccess.company.id === selectedCompanyId
   );
+  const gatewayModule = selectedCompany?.modules.find(
+    (moduleAccess) => moduleAccess.applicationKey === "gateway"
+  );
 
   return (
     <AppShell access={access} activePath="/gateway">
@@ -216,6 +226,32 @@ export default async function GatewayPage({ searchParams }: GatewayPageProps) {
           <span>Credencial de teste configurada para gerar pagamentos PIX.</span>
         </section>
       ) : null}
+
+      <ContextSummary
+        items={[
+          {
+            label: "Empresa atual",
+            tone: "strong",
+            value: getCompanyContextName(selectedCompany)
+          },
+          {
+            label: "Modulo",
+            value: gatewayModule?.applicationName ?? "FP Gateway"
+          },
+          {
+            label: "Status",
+            value: getCompanyContextStatusLabel(selectedCompany?.company.status)
+          },
+          {
+            label: "Plano",
+            value: getCompanyContextPlanLabel(selectedCompany)
+          },
+          {
+            label: "Acesso",
+            value: getModuleContextAccessLabel(gatewayModule)
+          }
+        ]}
+      />
 
       <GatewayIntro />
 
