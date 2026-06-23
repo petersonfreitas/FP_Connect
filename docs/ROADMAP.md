@@ -80,11 +80,12 @@ O FP Gateway foi iniciado como shell no FP Console:
 - catalogo, permissao e role no `core`;
 - endpoint interno `/gateway/access` com guard de modulo contratado;
 - tela `/gateway` para selecionar empresa e validar fronteiras do modulo;
-- painel organizado em subareas internas para pagamentos, Mercado Pago, SMTP, provedores e eventos;
+- painel organizado em subareas internas para pagamentos, Mercado Pago, e-mail, provedores e eventos;
 - catalogo inicial de provedores com SMTP, Mercado Pago, WhatsApp e Meta;
 - configuracao SMTP por empresa com segredo server-side;
 - teste basico de conexao SMTP e evento `gateway.smtp.validated` para FP Robots;
 - envio real de e-mail SMTP de teste com eventos `gateway.smtp.test_email_sent` e `gateway.smtp.test_email_failed`;
+- tela de e-mail reposicionada para API HTTPS futura, mantendo SMTP por socket como laboratorio/fallback;
 - SMTP segue com pendencia operacional de timeout em alguns provedores/rede e nao deve travar o MVP;
 - OAuth Mercado Pago por empresa, usando app OAuth, callback no web e troca de token server-side pela API;
 - modo sandbox manual Mercado Pago por empresa para validar PIX no Checkout Transparente em localhost antes de Vercel/webhook;

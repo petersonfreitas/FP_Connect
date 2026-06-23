@@ -91,9 +91,9 @@ const gatewayTabs: Array<{
     label: "Mercado Pago"
   },
   {
-    description: "Servidor de e-mail e envio de teste.",
+    description: "API HTTPS futura e SMTP laboratorio.",
     key: "smtp",
-    label: "SMTP"
+    label: "E-mail"
   },
   {
     description: "Catalogo e configuracoes por empresa.",
@@ -605,8 +605,68 @@ function GatewaySmtpPanel({
       <section className="content-panel">
         <div className="panel-heading">
           <div>
-            <h1>SMTP</h1>
-            <p>Configuracao simples para validar servidor de e-mail antes de conectar ao Robots.</p>
+            <h1>E-mail transacional</h1>
+            <p>Direcao produtiva para envio de e-mails por provedor HTTP/HTTPS no FP Gateway.</p>
+          </div>
+          <span>API HTTPS</span>
+        </div>
+
+        <section className="summary-strip compact-summary" aria-label="Estrategia de e-mail">
+          <div className="summary-item">
+            <span>Caminho recomendado</span>
+            <strong>API HTTPS</strong>
+            <small>Melhor para Render, Vercel e provedores que bloqueiam portas SMTP.</small>
+          </div>
+          <div className="summary-item">
+            <span>Fallback MVP</span>
+            <strong>SMTP</strong>
+            <small>Permanece como laboratorio para teste manual de credenciais por empresa.</small>
+          </div>
+          <div className="summary-item">
+            <span>Consumidor futuro</span>
+            <strong>Robots</strong>
+            <small>Automacoes deverao solicitar envio ao Gateway, sem guardar credenciais.</small>
+          </div>
+        </section>
+
+        <section className="module-grid" aria-label="Provedores de e-mail planejados">
+          {[
+            {
+              status: "Planejado",
+              title: "Resend API",
+              description:
+                "Envio por HTTPS com API key server-side, evitando portas SMTP e reduzindo timeout em PaaS."
+            },
+            {
+              status: "Planejado",
+              title: "SendGrid/Mailgun",
+              description:
+                "Estrutura deve permitir novos provedores transacionais sem alterar Food ou Robots."
+            },
+            {
+              status: "Fallback",
+              title: "SMTP por socket",
+              description:
+                "Mantido apenas para validacoes pontuais, provedores legados e ambientes onde a rede permitir."
+            }
+          ].map((provider) => (
+            <article className="module-card" key={provider.title}>
+              <div className="module-card-top">
+                <span>E-mail</span>
+                <small>{provider.status}</small>
+              </div>
+              <h3>{provider.title}</h3>
+              <p>{provider.description}</p>
+            </article>
+          ))}
+        </section>
+      </section>
+
+      <section className="content-panel">
+        <div className="panel-heading">
+          <div>
+            <h1>SMTP por socket</h1>
+            <p>Laboratorio/fallback para validar servidor de e-mail enquanto a API HTTPS nao entra.</p>
           </div>
           {smtpConfig ? (
             <form action={testGatewaySmtpConfigAction}>
@@ -621,9 +681,9 @@ function GatewaySmtpPanel({
         </div>
 
         <div className="form-alert neutral inline-alert" role="status">
-          Resend: host `smtp.resend.com`, usuario `resend`, senha com API key. Use porta 587 ou
-          2587 sem TLS direta, ou 465/2465 com TLS direta. Outlook/Office 365 costuma exigir SMTP
-          AUTH habilitado e pode precisar de app password.
+          SMTP por socket pode falhar em PaaS ou redes com portas bloqueadas. Para producao, o
+          caminho preferencial sera provedor transacional por API HTTPS dentro do FP Gateway.
+          Enquanto isso, use esta area apenas como validacao manual ou fallback controlado.
         </div>
 
         <SmtpConfigForm companyId={companyId} config={smtpConfig} />
@@ -633,7 +693,7 @@ function GatewaySmtpPanel({
         <section className="content-panel stack-panel">
           <div className="panel-heading">
             <div>
-              <h1>E-mail de teste</h1>
+              <h1>Teste SMTP manual</h1>
               <p>Envia uma mensagem real usando a configuracao SMTP salva para esta empresa.</p>
             </div>
             <span>{smtpConfig.status === "active" ? "SMTP ativo" : "SMTP configurado"}</span>
