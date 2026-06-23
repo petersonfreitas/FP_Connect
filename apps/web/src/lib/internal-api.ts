@@ -91,6 +91,8 @@ type PaginationParams = {
   module?: string;
   page?: number;
   pageSize?: number;
+  paymentMethodType?: string;
+  providerKey?: string;
   q?: string;
   scope?: "all" | "company" | "platform";
   source?: string;
@@ -253,13 +255,17 @@ export async function listGatewayProviderConfigs(
 }
 
 export async function listGatewayPaymentRequests(
-  companyId: string
-): Promise<InternalApiResult<GatewayPaymentRequestContract[]>> {
-  return fetchInternal<GatewayPaymentRequestContract[]>("gateway/payments/requests", {
-    headers: {
-      "X-FP-Company-Id": companyId
+  companyId: string,
+  pagination: PaginationParams = {}
+): Promise<InternalApiResult<PaginatedContract<GatewayPaymentRequestContract>>> {
+  return fetchInternal<PaginatedContract<GatewayPaymentRequestContract>>(
+    `gateway/payments/requests${formatPaginationSearch(pagination)}`,
+    {
+      headers: {
+        "X-FP-Company-Id": companyId
+      }
     }
-  });
+  );
 }
 
 export async function createGatewayPaymentRequest(
@@ -673,6 +679,8 @@ function formatPaginationSearch({
   module,
   page,
   pageSize,
+  paymentMethodType,
+  providerKey,
   q,
   scope,
   source,
@@ -702,6 +710,14 @@ function formatPaginationSearch({
 
   if (pageSize) {
     params.set("pageSize", String(pageSize));
+  }
+
+  if (paymentMethodType) {
+    params.set("paymentMethodType", paymentMethodType);
+  }
+
+  if (providerKey) {
+    params.set("providerKey", providerKey);
   }
 
   if (scope && scope !== "all") {

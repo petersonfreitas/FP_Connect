@@ -9,6 +9,14 @@ export type GatewayCompanyProviderStatus =
   | "not_configured";
 export type GatewayValidationStatus = "failed" | "succeeded" | "untested";
 
+export type PaginatedContract<T> = {
+  items: T[];
+  page: number;
+  pageSize: number;
+  total: number;
+  totalPages: number;
+};
+
 export type GatewayProviderContract = {
   authType: GatewayProviderAuthType;
   category: GatewayProviderCategory;

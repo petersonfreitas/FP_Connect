@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Headers, Param, Post, UseGuards } from "@nestjs/common";
+import { Body, Controller, Get, Headers, Param, Post, Query, UseGuards } from "@nestjs/common";
 import { InternalApiGuard } from "../../auth/internal-api.guard";
 import { ModuleAccessGuard } from "../../auth/module-access.guard";
 import { ModuleAccessPolicy } from "../../auth/module-access-policy.decorator";
@@ -97,8 +97,27 @@ export class GatewayController {
     companyHeader: "x-fp-company-id",
     permissionKey: "gateway.access"
   })
-  listPaymentRequests(@Headers("x-fp-company-id") companyId: string) {
-    return this.gatewayService.listPaymentRequests(companyId);
+  listPaymentRequests(
+    @Headers("x-fp-company-id") companyId: string,
+    @Query("page") page: string | undefined,
+    @Query("pageSize") pageSize: string | undefined,
+    @Query("status") status: string | undefined,
+    @Query("paymentMethodType") paymentMethodType: string | undefined,
+    @Query("providerKey") providerKey: string | undefined,
+    @Query("q") q: string | undefined,
+    @Query("dateFrom") dateFrom: string | undefined,
+    @Query("dateTo") dateTo: string | undefined
+  ) {
+    return this.gatewayService.listPaymentRequests(companyId, {
+      dateFrom,
+      dateTo,
+      page,
+      pageSize,
+      paymentMethodType,
+      providerKey,
+      q,
+      status
+    });
   }
 
   @Post("payments/requests")

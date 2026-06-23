@@ -31,10 +31,22 @@ import type {
   GatewaySmtpPublicConfig,
   GatewaySmtpTestEmailContract,
   GatewayValidationStatus,
+  PaginatedContract,
   SendGatewaySmtpTestEmailInput,
   UpsertGatewayMercadoPagoManualConfigInput,
   UpsertGatewaySmtpConfigInput
 } from "./gateway.contracts";
+
+type GatewayPaymentRequestListOptions = {
+  dateFrom?: string;
+  dateTo?: string;
+  page?: string;
+  pageSize?: string;
+  paymentMethodType?: string;
+  providerKey?: string;
+  q?: string;
+  status?: string;
+};
 
 type ProviderRow = {
   auth_type: GatewayProviderAuthType;
@@ -164,6 +176,23 @@ type NormalizedPaymentRequestInput = Required<
   paymentMethodType: GatewayPaymentMethodType;
 };
 
+const defaultPage = 1;
+const defaultPageSize = 20;
+const maxPageSize = 100;
+const gatewayPaymentRequestStatuses: GatewayPaymentRequestStatus[] = [
+  "cancelled",
+  "expired",
+  "failed",
+  "paid",
+  "requested",
+  "requires_provider_config"
+];
+const gatewayPaymentMethodTypes: GatewayPaymentMethodType[] = [
+  "credit_card",
+  "debit_card",
+  "pix"
+];
+
 const providerSelect = [
   "id",
   "key",
@@ -250,21 +279,72 @@ export class GatewayService {
       .filter((config): config is GatewayCompanyProviderConfigContract => Boolean(config));
   }
 
-  async listPaymentRequests(companyId: string): Promise<GatewayPaymentRequestContract[]> {
-    const [providers, paymentRequests] = await Promise.all([
-      this.listProviders(),
-      this.listPaymentRequestRows(companyId)
-    ]);
+  async listPaymentRequests(
+    companyId: string,
+    options: GatewayPaymentRequestListOptions = {}
+  ): Promise<PaginatedContract<GatewayPaymentRequestContract>> {
+    const providers = await this.listProviders();
     const providerById = new Map(providers.map((provider) => [provider.id, provider]));
+    const providerByKey = new Map(providers.map((provider) => [provider.key, provider]));
+    const pagination = normalizePagination(options);
+    const range = getPaginationRange(pagination);
+    const status = normalizePaymentRequestStatus(options.status);
+    const paymentMethodType = normalizePaymentMethodTypeFilter(options.paymentMethodType);
+    const providerKey = normalizeProviderKeyFilter(options.providerKey);
+    const provider = providerKey ? providerByKey.get(providerKey) : null;
+    const dateFrom = normalizeDateFilter(options.dateFrom, "start");
+    const dateTo = normalizeDateFilter(options.dateTo, "end");
+    const search = normalizeSearchTerm(options.q);
+    let query = this.supabase.gateway
+      .from("payment_requests")
+      .select(paymentRequestSelect, { count: "exact" })
+      .eq("company_id", companyId)
+      .is("deleted_at", null)
+      .order("created_at", { ascending: false });
 
-    return paymentRequests
+    if (status) {
+      query = query.eq("status", status);
+    }
+
+    if (paymentMethodType) {
+      query = query.eq("request_payload->>paymentMethodType", paymentMethodType);
+    }
+
+    if (provider) {
+      query = query.eq("provider_id", provider.id);
+    }
+
+    if (dateFrom) {
+      query = query.gte("created_at", dateFrom);
+    }
+
+    if (dateTo) {
+      query = query.lte("created_at", dateTo);
+    }
+
+    if (search) {
+      const escaped = escapePostgrestOrValue(search);
+      query = query.or(
+        `description.ilike.%${escaped}%,source_reference_id.ilike.%${escaped}%,customer_email.ilike.%${escaped}%`
+      );
+    }
+
+    const { data, error, count } = await query.range(range.from, range.to);
+
+    if (error) {
+      throwSupabaseError(error);
+    }
+
+    const items = ((data ?? []) as unknown as PaymentRequestRow[])
       .map((paymentRequest) => {
-        const provider = providerById.get(paymentRequest.provider_id);
-        return provider ? mapPaymentRequest(paymentRequest, provider) : null;
+        const paymentProvider = providerById.get(paymentRequest.provider_id);
+        return paymentProvider ? mapPaymentRequest(paymentRequest, paymentProvider) : null;
       })
       .filter((paymentRequest): paymentRequest is GatewayPaymentRequestContract =>
         Boolean(paymentRequest)
       );
+
+    return toPaginated(items, pagination, count ?? 0);
   }
 
   async createPaymentRequest(
@@ -376,7 +456,7 @@ export class GatewayService {
     const provider = await this.getProviderById(paymentRequestRow.provider_id);
 
     if (provider.key !== "mercado_pago") {
-      throw new BadRequestException("Consulta de status V0 disponivel apenas para Mercado Pago");
+      throw new BadRequestException("Consulta de status disponivel apenas para Mercado Pago");
     }
 
     if (!paymentRequestRow.provider_reference) {
@@ -909,22 +989,6 @@ export class GatewayService {
     return (data ?? []) as unknown as CompanyProviderConfigRow[];
   }
 
-  private async listPaymentRequestRows(companyId: string): Promise<PaymentRequestRow[]> {
-    const { data, error } = await this.supabase.gateway
-      .from("payment_requests")
-      .select(paymentRequestSelect)
-      .eq("company_id", companyId)
-      .is("deleted_at", null)
-      .order("created_at", { ascending: false })
-      .limit(25);
-
-    if (error) {
-      throwSupabaseError(error);
-    }
-
-    return (data ?? []) as unknown as PaymentRequestRow[];
-  }
-
   private async getPaymentRequestByIdempotencyKey(
     companyId: string,
     idempotencyKey: string
@@ -1379,6 +1443,116 @@ function mapPaymentRequest(
     sourceReferenceType: row.source_reference_type,
     status: row.status,
     updatedAt: row.updated_at
+  };
+}
+
+function normalizePagination(options: GatewayPaymentRequestListOptions): {
+  page: number;
+  pageSize: number;
+} {
+  const page = normalizePositiveInteger(options.page, defaultPage);
+  const pageSize = normalizePositiveInteger(options.pageSize, defaultPageSize);
+
+  return {
+    page,
+    pageSize: Math.min(pageSize, maxPageSize)
+  };
+}
+
+function normalizePositiveInteger(value: string | undefined, fallback: number): number {
+  const parsed = Number(value);
+
+  if (!Number.isInteger(parsed) || parsed < 1) {
+    return fallback;
+  }
+
+  return parsed;
+}
+
+function normalizePaymentRequestStatus(
+  value: string | undefined
+): GatewayPaymentRequestStatus | null {
+  return gatewayPaymentRequestStatuses.includes(value as GatewayPaymentRequestStatus)
+    ? (value as GatewayPaymentRequestStatus)
+    : null;
+}
+
+function normalizePaymentMethodTypeFilter(
+  value: string | undefined
+): GatewayPaymentMethodType | null {
+  return gatewayPaymentMethodTypes.includes(value as GatewayPaymentMethodType)
+    ? (value as GatewayPaymentMethodType)
+    : null;
+}
+
+function normalizeProviderKeyFilter(value: string | undefined): string | null {
+  const normalized = value?.trim().toLowerCase() ?? "";
+
+  if (!/^[a-z0-9]+(?:_[a-z0-9]+)*$/.test(normalized)) {
+    return null;
+  }
+
+  return normalized;
+}
+
+function normalizeSearchTerm(value: string | undefined): string | null {
+  const normalized = value?.replace(/\s+/g, " ").trim() ?? "";
+
+  if (normalized.length < 2) {
+    return null;
+  }
+
+  return normalized.slice(0, 80);
+}
+
+function normalizeDateFilter(value: string | undefined, boundary: "end" | "start"): string | null {
+  const normalized = value?.trim();
+
+  if (!normalized) {
+    return null;
+  }
+
+  const date =
+    /^\d{4}-\d{2}-\d{2}$/.test(normalized) && boundary === "start"
+      ? new Date(`${normalized}T00:00:00.000Z`)
+      : /^\d{4}-\d{2}-\d{2}$/.test(normalized)
+        ? new Date(`${normalized}T23:59:59.999Z`)
+        : new Date(normalized);
+
+  if (Number.isNaN(date.getTime())) {
+    throw new BadRequestException("Filtro de data invalido");
+  }
+
+  return date.toISOString();
+}
+
+function escapePostgrestOrValue(value: string): string {
+  return value.replace(/[,%]/g, " ").replace(/\s+/g, " ").trim();
+}
+
+function getPaginationRange(pagination: { page: number; pageSize: number }): {
+  from: number;
+  to: number;
+} {
+  const from = (pagination.page - 1) * pagination.pageSize;
+
+  return {
+    from,
+    to: from + pagination.pageSize - 1
+  };
+}
+
+function toPaginated<T>(
+  items: T[],
+  pagination: { page: number; pageSize: number },
+  total: number
+): PaginatedContract<T> {
+  return {
+    items,
+    page: pagination.page,
+    pageSize: pagination.pageSize,
+    total,
+    totalPages: Math.max(1, Math.ceil(total / pagination.pageSize))
   };
 }
 

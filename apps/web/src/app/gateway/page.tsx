@@ -2,9 +2,12 @@ import Link from "next/link";
 import type {
   AdminCurrentUserAccessContract,
   GatewayCompanyProviderConfigContract,
+  GatewayPaymentMethodType,
   GatewayPaymentRequestContract,
+  GatewayPaymentRequestStatus,
   GatewayProviderContract,
-  GatewaySmtpPublicConfig
+  GatewaySmtpPublicConfig,
+  PaginatedContract
 } from "@fp/types";
 import { AppShell } from "@/components/app-shell";
 import {
@@ -14,6 +17,7 @@ import {
   getCompanyContextStatusLabel,
   getModuleContextAccessLabel
 } from "@/components/context-summary";
+import { PaginationControls } from "@/components/pagination-controls";
 import { PendingSubmitButton } from "@/components/pending-submit-button";
 import {
   getCurrentAdminAccess,
@@ -37,18 +41,27 @@ export const dynamic = "force-dynamic";
 type GatewayPageProps = {
   searchParams?: Promise<{
     companyId?: string;
+    dateFrom?: string;
+    dateTo?: string;
     error?: string;
     message?: string;
     mpManualSaved?: string;
     mpOAuth?: string;
-  paymentCreated?: string;
-  paymentSynced?: string;
+    page?: string;
+    paymentCreated?: string;
+    paymentMethodType?: string;
+    paymentSynced?: string;
+    providerKey?: string;
+    q?: string;
     smtpEmailSent?: string;
     smtpSaved?: string;
     smtpTest?: string;
+    status?: string;
     tab?: string;
   }>;
 };
+
+const pageSize = 20;
 
 type GatewayTab = "events" | "overview" | "payments" | "providers" | "smtp";
 
@@ -63,9 +76,9 @@ const gatewayTabs: Array<{
     label: "Visao geral"
   },
   {
-    description: "Mercado Pago, PIX e solicitacoes internas.",
+    description: "Mercado Pago, PIX, cartoes e solicitacoes internas.",
     key: "payments",
-    label: "Pagamentos V0"
+    label: "Pagamentos"
   },
   {
     description: "Servidor de e-mail e envio de teste.",
@@ -95,17 +108,42 @@ const gatewayEvents = [
   "gateway.whatsapp.message.sent"
 ];
 
+const paymentStatusOptions: Array<{ label: string; value: GatewayPaymentRequestStatus }> = [
+  { label: "Solicitado", value: "requested" },
+  { label: "Pago", value: "paid" },
+  { label: "Falhou", value: "failed" },
+  { label: "Aguardando provedor", value: "requires_provider_config" },
+  { label: "Expirado", value: "expired" },
+  { label: "Cancelado", value: "cancelled" }
+];
+
+const paymentMethodOptions: Array<{ label: string; value: GatewayPaymentMethodType }> = [
+  { label: "Pix", value: "pix" },
+  { label: "Cartao de credito", value: "credit_card" },
+  { label: "Cartao de debito", value: "debit_card" }
+];
+
 export default async function GatewayPage({ searchParams }: GatewayPageProps) {
   const query = searchParams ? await searchParams : {};
   const accessResult = await getCurrentAdminAccess();
   const access = accessResult.data;
   const selectedCompanyId = resolveSelectedCompanyId(query.companyId, access);
   const selectedTab = resolveGatewayTab(query.tab);
+  const page = normalizePage(query.page);
+  const paymentFilters = {
+    dateFrom: selectedTab === "payments" ? normalizeFilterValue(query.dateFrom) : undefined,
+    dateTo: selectedTab === "payments" ? normalizeFilterValue(query.dateTo) : undefined,
+    paymentMethodType:
+      selectedTab === "payments" ? normalizeFilterValue(query.paymentMethodType) : undefined,
+    providerKey: selectedTab === "payments" ? normalizeFilterValue(query.providerKey) : undefined,
+    q: selectedTab === "payments" ? normalizeFilterValue(query.q) : undefined,
+    status: selectedTab === "payments" ? normalizeFilterValue(query.status) : undefined
+  };
 
   if (!access || !selectedCompanyId) {
     return (
       <AppShell access={access ?? null} accessError={accessResult.error} activePath="/gateway">
-        <GatewayHeader badge="Shell V0" />
+        <GatewayHeader badge="Sem empresa" />
 
         {accessResult.error ? (
           <section className="data-alert" role="status">
@@ -125,7 +163,11 @@ export default async function GatewayPage({ searchParams }: GatewayPageProps) {
     ? await Promise.all([
         listGatewayProviders(selectedCompanyId),
         listGatewayProviderConfigs(selectedCompanyId),
-        listGatewayPaymentRequests(selectedCompanyId)
+        listGatewayPaymentRequests(selectedCompanyId, {
+          ...paymentFilters,
+          page: selectedTab === "payments" ? page : 1,
+          pageSize
+        })
       ])
     : [
         { data: null, error: null },
@@ -134,7 +176,8 @@ export default async function GatewayPage({ searchParams }: GatewayPageProps) {
       ];
   const providers = providersResult.data ?? [];
   const configs = configsResult.data ?? [];
-  const paymentRequests = paymentRequestsResult.data ?? [];
+  const paymentRequestsPagination = paymentRequestsResult.data;
+  const paymentRequests = paymentRequestsPagination?.items ?? [];
   const mercadoPagoConfig =
     configs.find((config) => config.providerKey === "mercado_pago") ?? null;
   const smtpConfig = configs.find((config) => config.providerKey === "smtp") ?? null;
@@ -151,7 +194,7 @@ export default async function GatewayPage({ searchParams }: GatewayPageProps) {
   return (
     <AppShell access={access} activePath="/gateway">
       <GatewayHeader
-        badge={selectedCompany?.company.tradeName ?? selectedCompany?.company.legalName ?? "Shell V0"}
+        badge={selectedCompany?.company.tradeName ?? selectedCompany?.company.legalName ?? "Operacao"}
       />
 
       {gatewayAccessResult.error ? (
@@ -265,6 +308,8 @@ export default async function GatewayPage({ searchParams }: GatewayPageProps) {
         <GatewayPaymentsPanel
           companyId={selectedCompanyId}
           mercadoPagoConfig={mercadoPagoConfig}
+          paymentFilters={paymentFilters}
+          paymentPagination={paymentRequestsPagination}
           paymentProviders={paymentProviders}
           paymentRequests={paymentRequests}
         />
@@ -360,22 +405,42 @@ function GatewayOverview({ gatewayAccessGranted }: { gatewayAccessGranted: boole
 function GatewayPaymentsPanel({
   companyId,
   mercadoPagoConfig,
+  paymentFilters,
+  paymentPagination,
   paymentProviders,
   paymentRequests
 }: {
   companyId: string;
   mercadoPagoConfig: GatewayCompanyProviderConfigContract | null;
+  paymentFilters: {
+    dateFrom?: string;
+    dateTo?: string;
+    paymentMethodType?: string;
+    providerKey?: string;
+    q?: string;
+    status?: string;
+  };
+  paymentPagination: PaginatedContract<GatewayPaymentRequestContract> | null | undefined;
   paymentProviders: GatewayProviderContract[];
   paymentRequests: GatewayPaymentRequestContract[];
 }) {
+  const hasFilters = Boolean(
+    paymentFilters.dateFrom ||
+      paymentFilters.dateTo ||
+      paymentFilters.paymentMethodType ||
+      paymentFilters.providerKey ||
+      paymentFilters.q ||
+      paymentFilters.status
+  );
+
   return (
     <section className="content-panel">
       <div className="panel-heading">
         <div>
-          <h1>Pagamentos V0</h1>
+          <h1>Pagamentos</h1>
           <p>Contrato interno para o Food solicitar pagamento sem falar direto com o provedor.</p>
         </div>
-        <span>{paymentRequests.length} solicitacao(oes)</span>
+        <span>{paymentPagination?.total ?? 0} solicitacao(oes)</span>
       </div>
 
       <PaymentRequestForm
@@ -383,7 +448,36 @@ function GatewayPaymentsPanel({
         mercadoPagoConfig={mercadoPagoConfig}
         paymentProviders={paymentProviders}
       />
-      <PaymentRequestsTable companyId={companyId} paymentRequests={paymentRequests} />
+      <PaymentRequestFilters
+        companyId={companyId}
+        filters={paymentFilters}
+        hasFilters={hasFilters}
+        paymentProviders={paymentProviders}
+      />
+      <PaymentRequestsTable
+        companyId={companyId}
+        hasFilters={hasFilters}
+        paymentRequests={paymentRequests}
+      />
+      {paymentPagination ? (
+        <PaginationControls
+          basePath="/gateway"
+          page={paymentPagination.page}
+          pageSize={paymentPagination.pageSize}
+          searchParams={{
+            companyId,
+            dateFrom: paymentFilters.dateFrom,
+            dateTo: paymentFilters.dateTo,
+            paymentMethodType: paymentFilters.paymentMethodType,
+            providerKey: paymentFilters.providerKey,
+            q: paymentFilters.q,
+            status: paymentFilters.status,
+            tab: "payments"
+          }}
+          total={paymentPagination.total}
+          totalPages={paymentPagination.totalPages}
+        />
+      ) : null}
     </section>
   );
 }
@@ -452,7 +546,7 @@ function GatewayProvidersPanel({
     <>
       <section className="section-heading">
         <div>
-          <div className="eyebrow">Catalogo V0</div>
+          <div className="eyebrow">Catalogo</div>
           <h2>Provedores do Gateway</h2>
         </div>
         <span className="muted">{providers.length} provedor(es)</span>
@@ -475,7 +569,7 @@ function GatewayProvidersPanel({
           ))
         ) : (
           <div className="empty-state">
-            Nenhum provedor retornado. Aplique a migration do catalogo Gateway V0.
+            Nenhum provedor retornado. Aplique a migration do catalogo Gateway.
           </div>
         )}
       </section>
@@ -708,7 +802,7 @@ function PaymentRequestForm({
         </label>
         <div className="form-actions">
           <PendingSubmitButton pendingLabel="Registrando pagamento...">
-            Criar solicitacao V0
+            Criar solicitacao
           </PendingSubmitButton>
         </div>
       </form>
@@ -716,15 +810,109 @@ function PaymentRequestForm({
   );
 }
 
+function PaymentRequestFilters({
+  companyId,
+  filters,
+  hasFilters,
+  paymentProviders
+}: {
+  companyId: string;
+  filters: {
+    dateFrom?: string;
+    dateTo?: string;
+    paymentMethodType?: string;
+    providerKey?: string;
+    q?: string;
+    status?: string;
+  };
+  hasFilters: boolean;
+  paymentProviders: GatewayProviderContract[];
+}) {
+  return (
+    <form action="/gateway" className="filter-bar">
+      <input name="companyId" type="hidden" value={companyId} />
+      <input name="tab" type="hidden" value="payments" />
+      <label>
+        Buscar
+        <input
+          defaultValue={filters.q ?? ""}
+          maxLength={80}
+          name="q"
+          placeholder="Descricao, referencia ou e-mail"
+        />
+      </label>
+      <label>
+        Status
+        <select defaultValue={filters.status ?? ""} name="status">
+          <option value="">Todos</option>
+          {paymentStatusOptions.map((status) => (
+            <option key={status.value} value={status.value}>
+              {status.label}
+            </option>
+          ))}
+        </select>
+      </label>
+      <label>
+        Meio
+        <select defaultValue={filters.paymentMethodType ?? ""} name="paymentMethodType">
+          <option value="">Todos</option>
+          {paymentMethodOptions.map((method) => (
+            <option key={method.value} value={method.value}>
+              {method.label}
+            </option>
+          ))}
+        </select>
+      </label>
+      <label>
+        Provedor
+        <select defaultValue={filters.providerKey ?? ""} name="providerKey">
+          <option value="">Todos</option>
+          {paymentProviders.map((provider) => (
+            <option key={provider.id} value={provider.key}>
+              {provider.name}
+            </option>
+          ))}
+        </select>
+      </label>
+      <label>
+        De
+        <input defaultValue={filters.dateFrom ?? ""} name="dateFrom" type="date" />
+      </label>
+      <label>
+        Ate
+        <input defaultValue={filters.dateTo ?? ""} name="dateTo" type="date" />
+      </label>
+      <div className="filter-actions">
+        <button className="primary-action" type="submit">
+          Filtrar
+        </button>
+        {hasFilters ? (
+          <Link className="secondary-action" href={buildGatewayTabHref(companyId, "payments")}>
+            Limpar
+          </Link>
+        ) : null}
+      </div>
+    </form>
+  );
+}
+
 function PaymentRequestsTable({
   companyId,
+  hasFilters,
   paymentRequests
 }: {
   companyId: string;
+  hasFilters: boolean;
   paymentRequests: GatewayPaymentRequestContract[];
 }) {
   if (paymentRequests.length === 0) {
-    return <div className="empty-state">Nenhuma solicitacao de pagamento registrada ainda.</div>;
+    return (
+      <div className="empty-state">
+        {hasFilters
+          ? "Nenhuma solicitacao de pagamento encontrada para os filtros informados."
+          : "Nenhuma solicitacao de pagamento registrada ainda."}
+      </div>
+    );
   }
 
   return (
@@ -998,6 +1186,25 @@ function resolveGatewayTab(value: string | undefined): GatewayTab {
   const tab = gatewayTabs.find((item) => item.key === value);
 
   return tab?.key ?? "overview";
+}
+
+function normalizePage(value: string | undefined): number {
+  const page = Number(value);
+  return Number.isInteger(page) && page > 0 ? page : 1;
+}
+
+function normalizeFilterValue(value: string | undefined): string | undefined {
+  const normalized = value?.trim();
+  return normalized || undefined;
+}
+
+function buildGatewayTabHref(companyId: string, tab: GatewayTab): string {
+  const params = new URLSearchParams({
+    companyId,
+    tab
+  });
+
+  return `/gateway?${params.toString()}`;
 }
 
 function readSmtpConfig(
