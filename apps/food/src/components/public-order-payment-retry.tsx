@@ -11,6 +11,7 @@ import type {
 
 type PublicOrderPaymentRetryProps = {
   checkout: FoodPublicCheckoutContract | null;
+  isAuthenticated: boolean;
   order: FoodOrderContract;
   slug: string;
 };
@@ -63,6 +64,7 @@ declare global {
 
 export function PublicOrderPaymentRetry({
   checkout,
+  isAuthenticated,
   order,
   slug
 }: PublicOrderPaymentRetryProps) {
@@ -71,10 +73,20 @@ export function PublicOrderPaymentRetry({
   const [mercadoPagoReady, setMercadoPagoReady] = useState(false);
   const [payingWithCard, setPayingWithCard] = useState(false);
   const publicKey = checkout?.mercadoPago.enabled ? checkout.mercadoPago.publicKey : null;
-  const canRetry = Boolean(publicKey) && order.paymentStatus === "pending" && order.status !== "cancelled";
+  const loginHref = `/login?next=${encodeURIComponent(
+    `/l/${slug}/pedido/${order.orderNumber}`
+  )}`;
+  const hasPendingPayment =
+    Boolean(publicKey) && order.paymentStatus === "pending" && order.status !== "cancelled";
+  const canRetry = isAuthenticated && hasPendingPayment;
 
   const submitCardPayment = useCallback(
     async (formData: CardPaymentFormData, additionalData: CardPaymentAdditionalData) => {
+      if (!isAuthenticated) {
+        window.location.href = loginHref;
+        return;
+      }
+
       const payload = buildRetryPayload({
         additionalData,
         formData,
@@ -109,7 +121,7 @@ export function PublicOrderPaymentRetry({
         order.orderNumber
       )}?retry=1&payment=${encodeURIComponent(body.data.paymentStatus)}`;
     },
-    [order.orderNumber, slug]
+    [isAuthenticated, loginHref, order.orderNumber, slug]
   );
 
   useEffect(() => {
@@ -175,8 +187,23 @@ export function PublicOrderPaymentRetry({
     };
   }, [canRetry, mercadoPagoReady, order.totalCents, publicKey, submitCardPayment]);
 
-  if (!canRetry) {
+  if (!hasPendingPayment) {
     return null;
+  }
+
+  if (!isAuthenticated) {
+    return (
+      <section className="public-online-payment">
+        <div>
+          <div className="eyebrow">Pagamento pendente</div>
+          <h2>Entre para pagar novamente</h2>
+          <p>A nova tentativa de pagamento exige login para proteger o pedido.</p>
+        </div>
+        <a className="primary-action" href={loginHref}>
+          Entrar
+        </a>
+      </section>
+    );
   }
 
   return (

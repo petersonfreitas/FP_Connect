@@ -4,7 +4,12 @@ import {
 } from "@/app/actions";
 import { PublicStorefront } from "@/components/public-storefront";
 import { Notice } from "@/components/page-feedback";
-import { getPublicFoodCheckout, getPublicFoodMenu } from "@/lib/internal-api";
+import { getCurrentUser } from "@/lib/auth";
+import {
+  ensurePublicFoodCustomerStoreAccess,
+  getPublicFoodCheckout,
+  getPublicFoodMenu
+} from "@/lib/internal-api";
 
 type PublicStorePageProps = {
   params: Promise<{
@@ -22,9 +27,10 @@ export default async function PublicStorePage({
   searchParams
 }: PublicStorePageProps) {
   const [{ slug }, query] = await Promise.all([params, searchParams]);
-  const [menuResult, checkoutResult] = await Promise.all([
+  const [menuResult, checkoutResult, currentUser] = await Promise.all([
     getPublicFoodMenu(slug),
-    getPublicFoodCheckout(slug)
+    getPublicFoodCheckout(slug),
+    getCurrentUser()
   ]);
 
   if (menuResult.error || !menuResult.data) {
@@ -41,12 +47,26 @@ export default async function PublicStorePage({
     );
   }
 
+  const customerSessionResult = currentUser
+    ? await ensurePublicFoodCustomerStoreAccess(slug, {
+        authUserId: currentUser.id,
+        email: currentUser.email
+      })
+    : null;
+
   return (
     <>
       {query?.error ? <Notice tone="danger" message={query.error} /> : null}
+      {customerSessionResult?.error ? (
+        <Notice
+          tone="danger"
+          message={`Nao foi possivel preparar seu cadastro nesta loja: ${customerSessionResult.error}`}
+        />
+      ) : null}
       <PublicStorefront
         checkout={checkoutResult.data}
         createOrderAction={createPublicFoodOrderAction}
+        isAuthenticated={Boolean(currentUser)}
         menu={menuResult.data}
         trackOrderAction={trackPublicFoodOrderAction}
       />

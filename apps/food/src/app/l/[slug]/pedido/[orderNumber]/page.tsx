@@ -3,7 +3,12 @@ import type { FoodPaymentStatus } from "@fp/types";
 import { Notice } from "@/components/page-feedback";
 import { PublicCustomerMenu } from "@/components/public-customer-menu";
 import { PublicOrderPaymentRetry } from "@/components/public-order-payment-retry";
-import { getPublicFoodCheckout, getPublicFoodOrder } from "@/lib/internal-api";
+import { getCurrentUser } from "@/lib/auth";
+import {
+  ensurePublicFoodCustomerStoreAccess,
+  getPublicFoodCheckout,
+  getPublicFoodOrder
+} from "@/lib/internal-api";
 
 type PublicOrderPageProps = {
   params: Promise<{
@@ -49,9 +54,10 @@ export default async function PublicOrderPage({
   searchParams
 }: PublicOrderPageProps) {
   const [{ orderNumber, slug }, query] = await Promise.all([params, searchParams]);
-  const [orderResult, checkoutResult] = await Promise.all([
+  const [orderResult, checkoutResult, currentUser] = await Promise.all([
     getPublicFoodOrder(slug, orderNumber),
-    getPublicFoodCheckout(slug)
+    getPublicFoodCheckout(slug),
+    getCurrentUser()
   ]);
 
   if (orderResult.error || !orderResult.data) {
@@ -72,6 +78,12 @@ export default async function PublicOrderPage({
   }
 
   const order = orderResult.data;
+  const customerSessionResult = currentUser
+    ? await ensurePublicFoodCustomerStoreAccess(slug, {
+        authUserId: currentUser.id,
+        email: currentUser.email
+      })
+    : null;
 
   return (
     <main className="public-store">
@@ -97,6 +109,12 @@ export default async function PublicOrderPage({
         <Notice
           tone="warning"
           message="Pagamento pendente. Aguarde a confirmacao ou tente novamente com outro cartao."
+        />
+      ) : null}
+      {customerSessionResult?.error ? (
+        <Notice
+          tone="danger"
+          message={`Nao foi possivel preparar seu cadastro nesta loja: ${customerSessionResult.error}`}
         />
       ) : null}
 
@@ -162,6 +180,7 @@ export default async function PublicOrderPage({
 
       <PublicOrderPaymentRetry
         checkout={checkoutResult.data}
+        isAuthenticated={Boolean(currentUser)}
         order={order}
         slug={slug}
       />

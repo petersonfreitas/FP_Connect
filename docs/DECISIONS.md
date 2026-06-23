@@ -99,6 +99,7 @@ Este arquivo registra decisoes arquiteturais e operacionais para evitar retrabal
 | DEC-091 | A evolucao imediata passa a tratar Food, Gateway, Robots e Console com mentalidade de entrega para producao: melhorar UX, regras, validacoes, observabilidade e processos reais antes de iniciar FP Tracking como modulo operacional completo. | Aprovada |
 | DEC-092 | FP Tracking entra somente depois que os fluxos base de pedido, pagamento, eventos, permissoes e operacao estiverem suficientemente estabilizados; ate la, a entrega simples do Food segue como fallback operacional do MVP. | Aprovada |
 | DEC-093 | Modulos com areas internas devem usar navegacao superior em cards (`module-subnav`) como padrao visual, seguindo FP Robots/Gateway: um card por area, descricao curta e destaque no item ativo. | Aprovada |
+| DEC-094 | A vitrine publica do FP Food deve nascer preparada para dominio proprio por loja como rota principal futura (`lojaA.com.br`), mantendo `/l/[slug]` como fallback tecnico; rotas e links publicos devem evoluir para usar resolucao de loja por `host + path`, sem acoplar componentes permanentemente ao prefixo `/l`. | Aprovada |
 
 ---
 

@@ -3,6 +3,7 @@ import { InternalApiGuard } from "../../auth/internal-api.guard";
 import type {
   CreateFoodOrderInput,
   CreatePublicFoodCheckoutInput,
+  EnsureFoodPublicCustomerInput,
   RetryPublicFoodPaymentInput
 } from "./food.contracts";
 import { FoodService } from "./food.service";
@@ -20,6 +21,14 @@ export class FoodPublicController {
   @Get("stores/:publicSlug/checkout")
   getPublicCheckout(@Param("publicSlug") publicSlug: string) {
     return this.foodService.getPublicCheckout(publicSlug);
+  }
+
+  @Post("stores/:publicSlug/customers/me")
+  ensurePublicCustomerStoreAccess(
+    @Body() input: EnsureFoodPublicCustomerInput,
+    @Param("publicSlug") publicSlug: string
+  ) {
+    return this.foodService.ensurePublicCustomerStoreAccess(publicSlug, input);
   }
 
   @Get("stores/:publicSlug/orders/:orderNumber")

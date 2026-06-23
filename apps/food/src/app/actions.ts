@@ -22,6 +22,7 @@ import {
   createFoodCategory,
   createFoodProduct,
   createPublicFoodOrder,
+  ensurePublicFoodCustomerStoreAccess,
   saveFoodStoreHours,
   updateFoodCategory,
   updateFoodOrderPayment,
@@ -29,6 +30,7 @@ import {
   updateFoodProduct,
   upsertFoodStore
 } from "@/lib/internal-api";
+import { getCurrentUser } from "@/lib/auth";
 
 const validStatuses = new Set<FoodStoreStatus>([
   "closed",
@@ -284,6 +286,26 @@ export async function updateFoodOrderPaymentAction(formData: FormData): Promise<
 
 export async function createPublicFoodOrderAction(formData: FormData): Promise<void> {
   const publicSlug = normalizePublicSlug(formData.get("publicSlug"));
+  const currentUser = await getCurrentUser();
+  const basePath = `/l/${encodeURIComponent(publicSlug)}`;
+
+  if (!currentUser) {
+    redirect(`/login?next=${encodeURIComponent(basePath)}`);
+  }
+
+  const customerSessionResult = await ensurePublicFoodCustomerStoreAccess(publicSlug, {
+    authUserId: currentUser.id,
+    email: currentUser.email
+  });
+
+  if (customerSessionResult.error) {
+    redirect(
+      `${basePath}?error=${encodeURIComponent(
+        truncateQueryValue(customerSessionResult.error)
+      )}`
+    );
+  }
+
   const productIds = formData.getAll("productId").map((value) => String(value));
   const items = productIds
     .map((productId) => ({
@@ -298,7 +320,6 @@ export async function createPublicFoodOrderAction(formData: FormData): Promise<v
     items
   };
   const result = await createPublicFoodOrder(publicSlug, input);
-  const basePath = `/l/${encodeURIComponent(publicSlug)}`;
 
   if (result.error || !result.data) {
     redirect(

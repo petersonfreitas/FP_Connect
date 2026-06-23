@@ -12,6 +12,10 @@ type SupabaseTokenResponse = {
 };
 
 export async function proxy(request: NextRequest) {
+  if (isPublicStorefrontPath(request.nextUrl.pathname)) {
+    return NextResponse.next();
+  }
+
   const accessToken = request.cookies.get(ACCESS_TOKEN_COOKIE)?.value;
   const refreshToken = request.cookies.get(REFRESH_TOKEN_COOKIE)?.value;
 
@@ -54,8 +58,12 @@ export async function proxy(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ["/((?!_next/static|_next/image|favicon.ico|api|login).*)"]
+  matcher: ["/((?!_next/static|_next/image|favicon.ico|api|login|l(?:/|$)).*)"]
 };
+
+function isPublicStorefrontPath(pathname: string): boolean {
+  return pathname === "/l" || pathname.startsWith("/l/");
+}
 
 async function refreshSupabaseSession(
   refreshToken: string

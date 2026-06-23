@@ -15,6 +15,7 @@ import { PublicCustomerMenu } from "@/components/public-customer-menu";
 type PublicStorefrontProps = {
   checkout: FoodPublicCheckoutContract | null;
   createOrderAction: (formData: FormData) => void | Promise<void>;
+  isAuthenticated: boolean;
   menu: FoodMenuContract;
   trackOrderAction: (formData: FormData) => void | Promise<void>;
 };
@@ -68,6 +69,7 @@ declare global {
 export function PublicStorefront({
   checkout,
   createOrderAction,
+  isAuthenticated,
   menu,
   trackOrderAction
 }: PublicStorefrontProps) {
@@ -88,10 +90,16 @@ export function PublicStorefront({
     0
   );
   const canOrderNow = menu.availability.isOrderingOpen;
+  const loginHref = `/login?next=${encodeURIComponent(`/l/${menu.store.publicSlug}`)}`;
   const publicKey = checkout?.mercadoPago.enabled ? checkout.mercadoPago.publicKey : null;
 
   const submitCardPayment = useCallback(
     async (formData: CardPaymentFormData, additionalData: CardPaymentAdditionalData) => {
+      if (!isAuthenticated) {
+        window.location.href = loginHref;
+        return;
+      }
+
       const payload = buildCardCheckoutPayload({
         additionalData,
         formData,
@@ -128,11 +136,18 @@ export function PublicStorefront({
         body.data.order.orderNumber
       )}?created=1&payment=${encodeURIComponent(body.data.paymentStatus)}`;
     },
-    [menu.store.publicSlug, products, quantities]
+    [isAuthenticated, loginHref, menu.store.publicSlug, products, quantities]
   );
 
   useEffect(() => {
-    if (!canOrderNow || !publicKey || !mercadoPagoReady || selectedItems.length === 0 || totalCents <= 0) {
+    if (
+      !isAuthenticated ||
+      !canOrderNow ||
+      !publicKey ||
+      !mercadoPagoReady ||
+      selectedItems.length === 0 ||
+      totalCents <= 0
+    ) {
       return undefined;
     }
 
@@ -192,7 +207,15 @@ export function PublicStorefront({
       window.fpFoodCardPaymentBrick?.unmount();
       window.fpFoodCardPaymentBrick = undefined;
     };
-  }, [canOrderNow, mercadoPagoReady, publicKey, selectedItems.length, submitCardPayment, totalCents]);
+  }, [
+    canOrderNow,
+    isAuthenticated,
+    mercadoPagoReady,
+    publicKey,
+    selectedItems.length,
+    submitCardPayment,
+    totalCents
+  ]);
 
   function changeQuantity(productId: string, delta: number) {
     setQuantities((current) => {
@@ -409,12 +432,18 @@ export function PublicStorefront({
             </p>
           ) : null}
 
-          <PendingSubmitButton
-            disabled={selectedItems.length === 0 || !canOrderNow}
-            pendingLabel="Enviando pedido..."
-          >
-            Enviar pedido
-          </PendingSubmitButton>
+          {isAuthenticated ? (
+            <PendingSubmitButton
+              disabled={selectedItems.length === 0 || !canOrderNow}
+              pendingLabel="Enviando pedido..."
+            >
+              Enviar pedido
+            </PendingSubmitButton>
+          ) : (
+            <a className="primary-action" href={loginHref}>
+              Entrar para finalizar
+            </a>
+          )}
         </aside>
       </form>
 
@@ -428,7 +457,14 @@ export function PublicStorefront({
             </p>
           </div>
 
-          {!canOrderNow ? (
+          {!isAuthenticated ? (
+            <div className="empty-state public-empty-cart">
+              Entre para finalizar o pedido e habilitar pagamento online.
+              <a className="secondary-action compact-action" href={loginHref}>
+                Entrar
+              </a>
+            </div>
+          ) : !canOrderNow ? (
             <div className="empty-state public-empty-cart">
               Pagamento online indisponivel fora do horario de pedidos.
             </div>

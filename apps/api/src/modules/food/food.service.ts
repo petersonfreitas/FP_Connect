@@ -12,8 +12,12 @@ import type {
   CreatePublicFoodCheckoutContract,
   CreatePublicFoodCheckoutInput,
   CreateFoodOrderInput,
+  EnsureFoodPublicCustomerInput,
   FoodCategoryContract,
   FoodCategoryStatus,
+  FoodCustomerOrigin,
+  FoodCustomerPreferredContactMethod,
+  FoodCustomerStatus,
   FoodDashboardContract,
   FoodOrderDetailContract,
   FoodMenuContract,
@@ -26,6 +30,10 @@ import type {
   FoodProductContract,
   FoodProductStatus,
   FoodPublicCheckoutContract,
+  FoodPublicCustomerAccountContract,
+  FoodPublicCustomerContract,
+  FoodPublicCustomerSessionContract,
+  FoodPublicCustomerStoreAccessContract,
   FoodStoreContract,
   FoodStoreHourContract,
   FoodStoreHourKind,
@@ -134,6 +142,37 @@ type FoodOrderStatusHistoryRow = {
   status: FoodOrderStatus;
   actor_user_id: string | null;
   changed_at: string;
+};
+
+type FoodCustomerAccountRow = {
+  auth_user_id: string;
+  email_confirmed_at: string | null;
+  id: string;
+  phone_confirmed_at: string | null;
+  privacy_accepted_at: string | null;
+  status: FoodCustomerStatus;
+  terms_accepted_at: string | null;
+};
+
+type FoodCustomerRow = {
+  account_id: string | null;
+  company_id: string;
+  cpf_last4: string | null;
+  full_name: string | null;
+  id: string;
+  origin: FoodCustomerOrigin;
+  preferred_contact_method: FoodCustomerPreferredContactMethod | null;
+  status: FoodCustomerStatus;
+};
+
+type FoodCustomerStoreAccessRow = {
+  company_id: string;
+  customer_id: string;
+  id: string;
+  last_access_at: string | null;
+  registered_at: string;
+  status: FoodCustomerStatus;
+  store_id: string;
 };
 
 type FoodDashboardOrderRow = {
@@ -269,6 +308,37 @@ const orderStatusHistorySelect = [
   "status",
   "actor_user_id",
   "changed_at"
+].join(",");
+
+const customerAccountSelect = [
+  "id",
+  "auth_user_id",
+  "status",
+  "email_confirmed_at",
+  "phone_confirmed_at",
+  "terms_accepted_at",
+  "privacy_accepted_at"
+].join(",");
+
+const customerSelect = [
+  "id",
+  "company_id",
+  "account_id",
+  "full_name",
+  "cpf_last4",
+  "preferred_contact_method",
+  "origin",
+  "status"
+].join(",");
+
+const customerStoreAccessSelect = [
+  "id",
+  "company_id",
+  "store_id",
+  "customer_id",
+  "status",
+  "registered_at",
+  "last_access_at"
 ].join(",");
 
 const validStatuses = new Set<FoodStoreStatus>([
@@ -653,6 +723,30 @@ export class FoodService {
     const store = await this.getStoreByPublicSlug(publicSlug);
     await this.ensurePublicStoreAvailable(store);
     return this.getPublicCheckoutForCompany(store.company_id);
+  }
+
+  async ensurePublicCustomerStoreAccess(
+    publicSlug: string,
+    input: EnsureFoodPublicCustomerInput
+  ): Promise<FoodPublicCustomerSessionContract> {
+    const store = await this.getStoreByPublicSlug(publicSlug);
+    await this.ensurePublicStoreReadable(store);
+    const normalized = normalizePublicCustomerInput(input);
+    const account = await this.findOrCreateCustomerAccount(normalized.authUserId);
+    const customer = await this.findOrCreateCustomer(store.company_id, account.id);
+    const storeAccess = await this.findOrCreateCustomerStoreAccess(
+      store.company_id,
+      store.id,
+      customer.id,
+      normalized.authUserId
+    );
+
+    return {
+      account,
+      customer,
+      isCompleteForCheckout: isCustomerCompleteForCheckout(account, customer),
+      storeAccess
+    };
   }
 
   async createPublicOrder(
@@ -1134,6 +1228,157 @@ export class FoodService {
     await this.emitPaymentMarkedAsPaid(companyId, null, order);
 
     return order;
+  }
+
+  private async findOrCreateCustomerAccount(
+    authUserId: string
+  ): Promise<FoodPublicCustomerAccountContract> {
+    const { data: current, error: currentError } = await this.supabase.food
+      .from("customer_accounts")
+      .select(customerAccountSelect)
+      .eq("auth_user_id", authUserId)
+      .is("deleted_at", null)
+      .maybeSingle();
+
+    if (currentError) {
+      throwSupabaseError(currentError);
+    }
+
+    if (current) {
+      const account = mapCustomerAccount(current as unknown as FoodCustomerAccountRow);
+
+      if (account.status !== "active") {
+        throw new ForbiddenException("Conta de consumidor Food nao esta ativa");
+      }
+
+      return account;
+    }
+
+    const { data, error } = await this.supabase.food
+      .from("customer_accounts")
+      .insert({
+        auth_user_id: authUserId,
+        status: "active"
+      })
+      .select(customerAccountSelect)
+      .single();
+
+    if (error) {
+      throwSupabaseError(error);
+    }
+
+    return mapCustomerAccount(data as unknown as FoodCustomerAccountRow);
+  }
+
+  private async findOrCreateCustomer(
+    companyId: string,
+    accountId: string
+  ): Promise<FoodPublicCustomerContract> {
+    const { data: current, error: currentError } = await this.supabase.food
+      .from("customers")
+      .select(customerSelect)
+      .eq("company_id", companyId)
+      .eq("account_id", accountId)
+      .is("deleted_at", null)
+      .maybeSingle();
+
+    if (currentError) {
+      throwSupabaseError(currentError);
+    }
+
+    if (current) {
+      const customer = mapCustomer(current as unknown as FoodCustomerRow);
+
+      if (customer.status !== "active") {
+        throw new ForbiddenException("Cliente Food nao esta ativo");
+      }
+
+      return customer;
+    }
+
+    const { data, error } = await this.supabase.food
+      .from("customers")
+      .insert({
+        account_id: accountId,
+        company_id: companyId,
+        origin: "online",
+        status: "active"
+      })
+      .select(customerSelect)
+      .single();
+
+    if (error) {
+      throwSupabaseError(error);
+    }
+
+    const customer = mapCustomer(data as unknown as FoodCustomerRow);
+    await this.emitCustomerRegistered(companyId, customer);
+
+    return customer;
+  }
+
+  private async findOrCreateCustomerStoreAccess(
+    companyId: string,
+    storeId: string,
+    customerId: string,
+    authUserId: string
+  ): Promise<FoodPublicCustomerStoreAccessContract> {
+    const { data: current, error: currentError } = await this.supabase.food
+      .from("customer_store_access")
+      .select(customerStoreAccessSelect)
+      .eq("company_id", companyId)
+      .eq("store_id", storeId)
+      .eq("customer_id", customerId)
+      .is("deleted_at", null)
+      .maybeSingle();
+
+    if (currentError) {
+      throwSupabaseError(currentError);
+    }
+
+    if (current) {
+      const access = mapCustomerStoreAccess(current as unknown as FoodCustomerStoreAccessRow);
+
+      if (access.status !== "active") {
+        throw new ForbiddenException("Acesso do cliente a loja Food nao esta ativo");
+      }
+
+      const { data, error } = await this.supabase.food
+        .from("customer_store_access")
+        .update({
+          last_access_at: new Date().toISOString()
+        })
+        .eq("id", access.id)
+        .select(customerStoreAccessSelect)
+        .single();
+
+      if (error) {
+        throwSupabaseError(error);
+      }
+
+      return mapCustomerStoreAccess(data as unknown as FoodCustomerStoreAccessRow);
+    }
+
+    const { data, error } = await this.supabase.food
+      .from("customer_store_access")
+      .insert({
+        company_id: companyId,
+        customer_id: customerId,
+        last_access_at: new Date().toISOString(),
+        status: "active",
+        store_id: storeId
+      })
+      .select(customerStoreAccessSelect)
+      .single();
+
+    if (error) {
+      throwSupabaseError(error);
+    }
+
+    const access = mapCustomerStoreAccess(data as unknown as FoodCustomerStoreAccessRow);
+    await this.emitCustomerStoreAccessCreated(companyId, authUserId, access);
+
+    return access;
   }
 
   private async findStore(companyId: string): Promise<FoodStoreRow | null> {
@@ -1673,6 +1918,48 @@ export class FoodService {
       sourceEventId: order.id
     });
   }
+
+  private async emitCustomerRegistered(
+    companyId: string,
+    customer: FoodPublicCustomerContract
+  ): Promise<void> {
+    await this.robots.createEvent(companyId, null, {
+      eventCode: "food.customer.registered",
+      idempotencyKey: `food-customer-registered:${customer.id}`,
+      originMetadata: {
+        generatedBy: "fp-food",
+        source: "public-customer-v0"
+      },
+      payload: {
+        customerId: customer.id,
+        origin: customer.origin
+      },
+      sourceApplicationKey: "food",
+      sourceEventId: customer.id
+    });
+  }
+
+  private async emitCustomerStoreAccessCreated(
+    companyId: string,
+    actorUserId: string,
+    storeAccess: FoodPublicCustomerStoreAccessContract
+  ): Promise<void> {
+    await this.robots.createEvent(companyId, actorUserId, {
+      eventCode: "food.customer.store_access_created",
+      idempotencyKey: `food-customer-store-access:${storeAccess.id}`,
+      originMetadata: {
+        generatedBy: "fp-food",
+        source: "public-customer-v0"
+      },
+      payload: {
+        customerId: storeAccess.customerId,
+        storeAccessId: storeAccess.id,
+        storeId: storeAccess.storeId
+      },
+      sourceApplicationKey: "food",
+      sourceEventId: storeAccess.id
+    });
+  }
 }
 
 function normalizeStoreInput(input: UpsertFoodStoreInput) {
@@ -1711,6 +1998,30 @@ function normalizeStoreHoursInput(input: UpsertFoodStoreHoursInput) {
 
       return hour;
     });
+}
+
+function normalizePublicCustomerInput(input: EnsureFoodPublicCustomerInput): {
+  authUserId: string;
+  email: string | null;
+} {
+  if (!input || typeof input !== "object") {
+    throw new BadRequestException("Dados do consumidor sao obrigatorios");
+  }
+
+  return {
+    authUserId: normalizeUuid(input.authUserId, "authUserId"),
+    email: input.email ? normalizeEmail(input.email, "email") : null
+  };
+}
+
+function normalizeUuid(value: unknown, field: string): string {
+  const normalized = normalizeRequiredText(value, field, 80).toLowerCase();
+
+  if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/.test(normalized)) {
+    throw new BadRequestException(`${field} invalido`);
+  }
+
+  return normalized;
 }
 
 function normalizeStoreHourKind(value: unknown): FoodStoreHourKind {
@@ -2243,6 +2554,58 @@ function mapOrderStatusHistory(row: FoodOrderStatusHistoryRow): FoodOrderStatusH
     previousStatus: row.previous_status,
     status: row.status
   };
+}
+
+function mapCustomerAccount(row: FoodCustomerAccountRow): FoodPublicCustomerAccountContract {
+  return {
+    authUserId: row.auth_user_id,
+    emailConfirmedAt: row.email_confirmed_at,
+    id: row.id,
+    phoneConfirmedAt: row.phone_confirmed_at,
+    privacyAcceptedAt: row.privacy_accepted_at,
+    status: row.status,
+    termsAcceptedAt: row.terms_accepted_at
+  };
+}
+
+function mapCustomer(row: FoodCustomerRow): FoodPublicCustomerContract {
+  return {
+    accountId: row.account_id,
+    companyId: row.company_id,
+    cpfLast4: row.cpf_last4,
+    fullName: row.full_name,
+    id: row.id,
+    origin: row.origin,
+    preferredContactMethod: row.preferred_contact_method,
+    status: row.status
+  };
+}
+
+function mapCustomerStoreAccess(
+  row: FoodCustomerStoreAccessRow
+): FoodPublicCustomerStoreAccessContract {
+  return {
+    companyId: row.company_id,
+    customerId: row.customer_id,
+    id: row.id,
+    lastAccessAt: row.last_access_at,
+    registeredAt: row.registered_at,
+    status: row.status,
+    storeId: row.store_id
+  };
+}
+
+function isCustomerCompleteForCheckout(
+  account: FoodPublicCustomerAccountContract,
+  customer: FoodPublicCustomerContract
+): boolean {
+  return Boolean(
+    account.status === "active" &&
+      customer.status === "active" &&
+      customer.fullName &&
+      account.termsAcceptedAt &&
+      account.privacyAcceptedAt
+  );
 }
 
 function toPaginated<T>(

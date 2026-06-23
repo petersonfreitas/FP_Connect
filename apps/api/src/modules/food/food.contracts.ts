@@ -3,6 +3,13 @@ export type FoodCategoryStatus = "active" | "inactive";
 export type FoodProductStatus = "available" | "hidden" | "unavailable";
 export type FoodPaymentMethod = "card" | "cash" | "other" | "pix";
 export type FoodPaymentStatus = "cancelled" | "paid" | "pending";
+export type FoodCustomerStatus = "active" | "blocked" | "inactive";
+export type FoodCustomerOrigin = "counter" | "online" | "phone";
+export type FoodCustomerPreferredContactMethod =
+  | "cellphone"
+  | "email"
+  | "landline"
+  | "whatsapp";
 export type FoodStoreHourKind = "delivery" | "ordering";
 export type FoodOrderStatus =
   | "accepted"
@@ -131,6 +138,44 @@ export type FoodPublicCheckoutContract = {
   };
 };
 
+export type FoodPublicCustomerAccountContract = {
+  authUserId: string;
+  emailConfirmedAt: string | null;
+  id: string;
+  phoneConfirmedAt: string | null;
+  privacyAcceptedAt: string | null;
+  status: FoodCustomerStatus;
+  termsAcceptedAt: string | null;
+};
+
+export type FoodPublicCustomerContract = {
+  accountId: string | null;
+  companyId: string;
+  cpfLast4: string | null;
+  fullName: string | null;
+  id: string;
+  origin: FoodCustomerOrigin;
+  preferredContactMethod: FoodCustomerPreferredContactMethod | null;
+  status: FoodCustomerStatus;
+};
+
+export type FoodPublicCustomerStoreAccessContract = {
+  companyId: string;
+  customerId: string;
+  id: string;
+  lastAccessAt: string | null;
+  registeredAt: string;
+  status: FoodCustomerStatus;
+  storeId: string;
+};
+
+export type FoodPublicCustomerSessionContract = {
+  account: FoodPublicCustomerAccountContract;
+  customer: FoodPublicCustomerContract;
+  isCompleteForCheckout: boolean;
+  storeAccess: FoodPublicCustomerStoreAccessContract;
+};
+
 export type FoodOrderItemContract = {
   id: string;
   companyId: string;
@@ -211,6 +256,11 @@ export type CreatePublicFoodCheckoutInput = CreateFoodOrderInput & {
     paymentMethodId?: string | null;
     paymentMethodType?: "credit_card" | "debit_card" | "pix" | null;
   } | null;
+};
+
+export type EnsureFoodPublicCustomerInput = {
+  authUserId: string;
+  email?: string | null;
 };
 
 export type CreatePublicFoodCheckoutContract = {

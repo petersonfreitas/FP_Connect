@@ -5,12 +5,14 @@ import type {
   CreatePublicFoodCheckoutContract,
   CreatePublicFoodCheckoutInput,
   CreateFoodOrderInput,
+  EnsureFoodPublicCustomerInput,
   FoodCategoryContract,
   FoodDashboardContract,
   FoodMenuContract,
   FoodOrderContract,
   FoodOrderDetailContract,
   FoodPublicCheckoutContract,
+  FoodPublicCustomerSessionContract,
   FoodOrderStatus,
   FoodProductContract,
   FoodStoreContract,
@@ -259,6 +261,19 @@ export async function getPublicFoodCheckout(
 ): Promise<InternalApiResult<FoodPublicCheckoutContract>> {
   return fetchPublicInternal<FoodPublicCheckoutContract>(
     `food/public/stores/${encodeURIComponent(publicSlug)}/checkout`
+  );
+}
+
+export async function ensurePublicFoodCustomerStoreAccess(
+  publicSlug: string,
+  input: EnsureFoodPublicCustomerInput
+): Promise<InternalApiResult<FoodPublicCustomerSessionContract>> {
+  return fetchPublicInternal<FoodPublicCustomerSessionContract>(
+    `food/public/stores/${encodeURIComponent(publicSlug)}/customers/me`,
+    {
+      body: JSON.stringify(input),
+      method: "POST"
+    }
   );
 }
 
