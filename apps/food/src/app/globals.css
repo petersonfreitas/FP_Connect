@@ -729,6 +729,11 @@ textarea {
   padding: 12px;
 }
 
+.hours-row.all-day {
+  background: var(--accent-soft);
+  border-color: #b8ddd0;
+}
+
 .hours-toggle {
   align-items: start;
   display: flex;
@@ -758,6 +763,12 @@ textarea {
 
 .hours-placeholder {
   display: block;
+}
+
+.hours-row input:disabled {
+  background: #edf3f1;
+  color: var(--muted);
+  cursor: not-allowed;
 }
 
 label {

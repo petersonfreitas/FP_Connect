@@ -8,6 +8,7 @@ import type {
   FoodStoreHourKind
 } from "@fp/types";
 import { PendingSubmitButton } from "@/components/pending-submit-button";
+import { StoreHoursRow } from "@/components/store-hours-row";
 import {
   saveFoodCategoryAction,
   saveFoodProductAction,
@@ -183,51 +184,18 @@ export function StoreHoursForm({
                 const isAllDay = current?.opensAt === "00:00" && current?.closesAt === "23:59";
 
                 return (
-                  <div className="hours-row" key={key}>
-                    <input name="hourKey" type="hidden" value={key} />
-                    <label className="hours-toggle">
-                      <input
-                        defaultChecked={Boolean(current)}
-                        name={`isActive:${key}`}
-                        type="checkbox"
-                      />
-                      <span>
-                        {label}
-                        <small>{current ? `${current.opensAt} ate ${current.closesAt}` : "Inativo"}</small>
-                      </span>
-                    </label>
-                    {group.allDayLabel ? (
-                      <label className="hours-toggle subtle-toggle">
-                        <input
-                          defaultChecked={isAllDay}
-                          name={`isAllDay:${key}`}
-                          type="checkbox"
-                        />
-                        <span>
-                          {group.allDayLabel}
-                          <small>Ignora abre/fecha</small>
-                        </span>
-                      </label>
-                    ) : (
-                      <span className="hours-placeholder" aria-hidden="true" />
-                    )}
-                    <label>
-                      Abre
-                      <input
-                        defaultValue={current?.opensAt ?? group.defaultOpensAt}
-                        name={`opensAt:${key}`}
-                        type="time"
-                      />
-                    </label>
-                    <label>
-                      Fecha
-                      <input
-                        defaultValue={current?.closesAt ?? group.defaultClosesAt}
-                        name={`closesAt:${key}`}
-                        type="time"
-                      />
-                    </label>
-                  </div>
+                  <StoreHoursRow
+                    allDayLabel={group.allDayLabel}
+                    closesAt={current?.closesAt ?? group.defaultClosesAt}
+                    defaultClosesAt={group.defaultClosesAt}
+                    defaultOpensAt={group.defaultOpensAt}
+                    isActive={Boolean(current)}
+                    isAllDay={isAllDay}
+                    key={key}
+                    label={label}
+                    nameKey={key}
+                    opensAt={current?.opensAt ?? group.defaultOpensAt}
+                  />
                 );
               })}
             </div>
