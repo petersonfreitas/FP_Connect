@@ -88,32 +88,6 @@ export class RobotsController {
     return this.robots.createEvent(companyId, actorUserId, input);
   }
 
-  @Post("test-event")
-  @ModuleAccessPolicy({
-    applicationKey: "robots",
-    companyHeader: "x-fp-company-id",
-    permissionKey: "robots.events.write"
-  })
-  createTestEvent(
-    @Headers("x-fp-company-id") companyId: string,
-    @Headers("x-fp-actor-user-id") actorUserId: string
-  ) {
-    return this.robots.createTestEvent(companyId, actorUserId);
-  }
-
-  @Post("test-failure")
-  @ModuleAccessPolicy({
-    applicationKey: "robots",
-    companyHeader: "x-fp-company-id",
-    permissionKey: "robots.events.write"
-  })
-  createTestFailure(
-    @Headers("x-fp-company-id") companyId: string,
-    @Headers("x-fp-actor-user-id") actorUserId: string
-  ) {
-    return this.robots.createTestFailure(companyId, actorUserId);
-  }
-
   @Post("executions/:id/reprocess")
   @ModuleAccessPolicy({
     applicationKey: "robots",

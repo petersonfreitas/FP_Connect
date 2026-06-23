@@ -41,8 +41,6 @@ import type {
   PaginatedContract,
   CreateRobotsEventContract,
   CreateRobotsEventInput,
-  CreateRobotsTestEventContract,
-  CreateRobotsTestFailureContract,
   ReprocessRobotsExecutionContract,
   RobotsEventCatalogContract,
   RobotsEventContract,
@@ -428,28 +426,6 @@ export async function createRobotsEvent(
 ): Promise<InternalApiResult<CreateRobotsEventContract>> {
   return fetchInternal<CreateRobotsEventContract>("robots/events", {
     body: JSON.stringify(input),
-    headers: {
-      "X-FP-Company-Id": companyId
-    },
-    method: "POST"
-  });
-}
-
-export async function createRobotsTestEvent(
-  companyId: string
-): Promise<InternalApiResult<CreateRobotsTestEventContract>> {
-  return fetchInternal<CreateRobotsTestEventContract>("robots/test-event", {
-    headers: {
-      "X-FP-Company-Id": companyId
-    },
-    method: "POST"
-  });
-}
-
-export async function createRobotsTestFailure(
-  companyId: string
-): Promise<InternalApiResult<CreateRobotsTestFailureContract>> {
-  return fetchInternal<CreateRobotsTestFailureContract>("robots/test-failure", {
     headers: {
       "X-FP-Company-Id": companyId
     },

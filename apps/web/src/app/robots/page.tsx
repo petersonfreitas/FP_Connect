@@ -22,11 +22,7 @@ import {
   listRobotsExecutions,
   listRobotsRules
 } from "@/lib/internal-api";
-import {
-  createRobotsTestEventAction,
-  createRobotsTestFailureAction,
-  reprocessRobotsExecutionAction
-} from "./actions";
+import { reprocessRobotsExecutionAction } from "./actions";
 
 export const dynamic = "force-dynamic";
 
@@ -34,12 +30,44 @@ type RobotsPageProps = {
   searchParams?: Promise<{
     companyId?: string;
     error?: string;
-    eventCreated?: string;
-    executions?: string;
-    failureCreated?: string;
     reprocessed?: string;
+    tab?: string;
   }>;
 };
+
+type RobotsTab = "catalog" | "events" | "executions" | "overview" | "rules";
+
+const robotsTabs: Array<{
+  description: string;
+  key: RobotsTab;
+  label: string;
+}> = [
+  {
+    description: "Indicadores e leitura do modulo.",
+    key: "overview",
+    label: "Visao geral"
+  },
+  {
+    description: "Fatos recebidos pelos modulos.",
+    key: "events",
+    label: "Eventos"
+  },
+  {
+    description: "Tentativas, falhas e reprocessos.",
+    key: "executions",
+    label: "Execucoes"
+  },
+  {
+    description: "Regras ativas de automacao.",
+    key: "rules",
+    label: "Regras"
+  },
+  {
+    description: "Eventos permitidos no ecossistema.",
+    key: "catalog",
+    label: "Catalogo"
+  }
+];
 
 const eventStatusLabels = {
   failed: "Falhou",
@@ -65,11 +93,12 @@ export default async function RobotsPage({ searchParams }: RobotsPageProps) {
   const accessResult = await getCurrentAdminAccess();
   const access = accessResult.data;
   const selectedCompanyId = resolveSelectedCompanyId(query.companyId, access);
+  const selectedTab = resolveRobotsTab(query.tab);
 
   if (!access || !selectedCompanyId) {
     return (
       <AppShell access={access ?? null} accessError={accessResult.error} activePath="/robots">
-        <RobotsHeader badge="V0" />
+        <RobotsHeader badge="Sem empresa" />
 
         {accessResult.error ? (
           <section className="data-alert" role="status">
@@ -136,19 +165,9 @@ export default async function RobotsPage({ searchParams }: RobotsPageProps) {
 
   return (
     <AppShell access={access} activePath="/robots">
-      <RobotsHeader badge={selectedCompany?.company.tradeName ?? selectedCompany?.company.legalName ?? "V0"} />
-
-      {query.eventCreated ? (
-        <section className="form-alert neutral page-feedback" role="status">
-          Evento de teste registrado. Execucoes criadas: {query.executions ?? "0"}.
-        </section>
-      ) : null}
-
-      {query.failureCreated ? (
-        <section className="form-alert neutral page-feedback" role="status">
-          Falha de teste registrada. Use a tabela de execucoes para reprocessar.
-        </section>
-      ) : null}
+      <RobotsHeader
+        badge={selectedCompany?.company.tradeName ?? selectedCompany?.company.legalName ?? "Operacao"}
+      />
 
       {query.reprocessed ? (
         <section className="form-alert neutral page-feedback" role="status">
@@ -200,90 +219,70 @@ export default async function RobotsPage({ searchParams }: RobotsPageProps) {
 
       <RobotsIntro />
 
-      <section className="summary-strip" aria-label="Resumo inicial do FP Robots">
-        <div className="summary-item">
-          <span>Eventos recebidos</span>
-          <strong>{events.length}</strong>
-          <small>Ultimos 50 registros da empresa selecionada.</small>
-        </div>
-        <div className="summary-item">
-          <span>Catalogo ativo</span>
-          <strong>{catalog.filter((event) => event.status === "active").length}</strong>
-          <small>Eventos permitidos no V0.</small>
-        </div>
-        <div className="summary-item">
-          <span>Regras ativas</span>
-          <strong>{rules.filter((rule) => rule.status === "active").length}</strong>
-          <small>Evento para acao no V0.</small>
-        </div>
-        <div className="summary-item">
-          <span>Execucoes</span>
-          <strong>{executions.length}</strong>
-          <small>Ultimas 50 tentativas registradas.</small>
-        </div>
-      </section>
+      <RobotsSubnav companyId={selectedCompanyId} selectedTab={selectedTab} />
 
-      <section className="robots-workspace" aria-label="Areas do FP Robots V0">
-        <RobotsCatalogCard catalog={catalog} />
-        <RobotsRulesCard rules={rules} selectedCompanyId={selectedCompanyId} />
-      </section>
+      {selectedTab === "overview" ? (
+        <RobotsOverview
+          catalog={catalog}
+          events={events}
+          executions={executions}
+          rules={rules}
+        />
+      ) : null}
 
-      <section className="content-panel">
-        <div className="panel-heading">
-          <div>
-            <h1>Teste controlado</h1>
-            <p>Cria uma regra `food.order.created {"->"} internal_log` e publica um evento de teste.</p>
+      {selectedTab === "events" ? (
+        <section className="content-panel">
+          <div className="panel-heading">
+            <div>
+              <h1>Eventos recebidos</h1>
+              <p>Fatos aceitos pelo catalogo do Robots, sempre com empresa e origem identificadas.</p>
+            </div>
+            <span>{events.length} registro(s)</span>
           </div>
-          <form action={createRobotsTestEventAction}>
-            <input name="companyId" type="hidden" value={selectedCompanyId} />
-            <PendingSubmitButton pendingLabel="Gerando evento...">Gerar evento de teste</PendingSubmitButton>
-          </form>
-          <form action={createRobotsTestFailureAction}>
-            <input name="companyId" type="hidden" value={selectedCompanyId} />
-            <PendingSubmitButton className="secondary-action" pendingLabel="Gerando falha...">
-              Gerar falha de teste
-            </PendingSubmitButton>
-          </form>
-        </div>
-      </section>
 
-      <section className="content-panel">
-        <div className="panel-heading">
-          <div>
-            <h1>Eventos recebidos</h1>
-            <p>Fatos aceitos pelo catalogo do Robots, sempre com empresa e origem identificadas.</p>
-          </div>
-          <span>{events.length} registro(s)</span>
-        </div>
+          {events.length > 0 ? (
+            <RobotsEventsTable events={events} selectedCompanyId={selectedCompanyId} />
+          ) : (
+            <div className="empty-state">
+              Nenhum evento recebido ainda. O endpoint interno ja esta preparado para Food, Tracking
+              e Gateway publicarem eventos padronizados.
+            </div>
+          )}
+        </section>
+      ) : null}
 
-        {events.length > 0 ? (
-          <RobotsEventsTable events={events} selectedCompanyId={selectedCompanyId} />
-        ) : (
-          <div className="empty-state">
-            Nenhum evento recebido ainda. O endpoint interno ja esta preparado para Food, Tracking
-            e Gateway publicarem eventos padronizados.
+      {selectedTab === "executions" ? (
+        <section className="content-panel">
+          <div className="panel-heading">
+            <div>
+              <h1>Execucoes</h1>
+              <p>Acoes criadas a partir das regras ativas do Robots.</p>
+            </div>
+            <span>{executions.length} registro(s)</span>
           </div>
-        )}
-      </section>
 
-      <section className="content-panel">
-        <div className="panel-heading">
-          <div>
-            <h1>Execucoes</h1>
-            <p>Acoes criadas a partir das regras ativas do Robots.</p>
-          </div>
-          <span>{executions.length} registro(s)</span>
-        </div>
+          {executions.length > 0 ? (
+            <RobotsExecutionsTable executions={executions} selectedCompanyId={selectedCompanyId} />
+          ) : (
+            <div className="empty-state">
+              Nenhuma execucao registrada ainda. As execucoes aparecerao quando eventos reais
+              encontrarem regras ativas para esta empresa.
+            </div>
+          )}
+        </section>
+      ) : null}
 
-        {executions.length > 0 ? (
-          <RobotsExecutionsTable executions={executions} selectedCompanyId={selectedCompanyId} />
-        ) : (
-          <div className="empty-state">
-            Nenhuma execucao registrada ainda. Gere um evento de teste para validar a cadeia
-            evento, regra e acao interna.
-          </div>
-        )}
-      </section>
+      {selectedTab === "rules" ? (
+        <section className="robots-workspace" aria-label="Regras do FP Robots">
+          <RobotsRulesCard rules={rules} />
+        </section>
+      ) : null}
+
+      {selectedTab === "catalog" ? (
+        <section className="robots-workspace" aria-label="Catalogo do FP Robots">
+          <RobotsCatalogCard catalog={catalog} />
+        </section>
+      ) : null}
     </AppShell>
   );
 }
@@ -323,6 +322,105 @@ function RobotsIntro() {
   );
 }
 
+function RobotsSubnav({
+  companyId,
+  selectedTab
+}: {
+  companyId: string;
+  selectedTab: RobotsTab;
+}) {
+  return (
+    <nav className="module-subnav" aria-label="Areas do FP Robots">
+      {robotsTabs.map((tab) => (
+        <Link
+          aria-current={selectedTab === tab.key ? "page" : undefined}
+          className={selectedTab === tab.key ? "active" : undefined}
+          href={`/robots?companyId=${companyId}&tab=${tab.key}`}
+          key={tab.key}
+        >
+          <strong>{tab.label}</strong>
+          <span>{tab.description}</span>
+        </Link>
+      ))}
+    </nav>
+  );
+}
+
+function RobotsOverview({
+  catalog,
+  events,
+  executions,
+  rules
+}: {
+  catalog: RobotsEventCatalogContract[];
+  events: RobotsEventContract[];
+  executions: RobotsExecutionContract[];
+  rules: RobotsRuleContract[];
+}) {
+  const failedEvents = events.filter((event) => event.status === "failed").length;
+  const pendingExecutions = executions.filter(
+    (execution) => execution.status === "pending" || execution.status === "running"
+  ).length;
+  const failedExecutions = executions.filter((execution) => execution.status === "failed").length;
+  const activeRules = rules.filter((rule) => rule.status === "active").length;
+
+  return (
+    <>
+      <section className="summary-strip" aria-label="Resumo operacional do FP Robots">
+        <div className="summary-item">
+          <span>Eventos recebidos</span>
+          <strong>{events.length}</strong>
+          <small>Ultimos registros da empresa selecionada.</small>
+        </div>
+        <div className="summary-item">
+          <span>Falhas em eventos</span>
+          <strong>{failedEvents}</strong>
+          <small>Eventos recusados ou com falha de catalogo.</small>
+        </div>
+        <div className="summary-item">
+          <span>Execucoes pendentes</span>
+          <strong>{pendingExecutions}</strong>
+          <small>Acoes aguardando processamento ou em andamento.</small>
+        </div>
+        <div className="summary-item">
+          <span>Execucoes com falha</span>
+          <strong>{failedExecutions}</strong>
+          <small>Podem exigir reprocessamento operacional.</small>
+        </div>
+      </section>
+
+      <section className="module-grid" aria-label="Resumo das areas do FP Robots">
+        <article className="module-card">
+          <div className="module-card-top">
+            <span>Catalogo</span>
+            <small>{catalog.length} evento(s)</small>
+          </div>
+          <h3>Eventos permitidos</h3>
+          <p>Base de eventos reconhecidos para Food, Gateway, Tracking e futuros modulos.</p>
+        </article>
+
+        <article className="module-card">
+          <div className="module-card-top">
+            <span>Regras</span>
+            <small>{activeRules} ativa(s)</small>
+          </div>
+          <h3>Automacoes configuradas</h3>
+          <p>Regras conectam eventos do catalogo a acoes internas ou integracoes futuras.</p>
+        </article>
+
+        <article className="module-card">
+          <div className="module-card-top">
+            <span>Operacao</span>
+            <small>{executions.length} execucao(oes)</small>
+          </div>
+          <h3>Reprocessamento</h3>
+          <p>Falhas operacionais permanecem auditaveis e podem ser reprocessadas quando permitido.</p>
+        </article>
+      </section>
+    </>
+  );
+}
+
 function RobotsCatalogCard({ catalog }: { catalog: RobotsEventCatalogContract[] }) {
   const bySource = catalog.reduce<Record<string, number>>((accumulator, event) => {
     accumulator[event.sourceApplicationKey] = (accumulator[event.sourceApplicationKey] ?? 0) + 1;
@@ -336,14 +434,18 @@ function RobotsCatalogCard({ catalog }: { catalog: RobotsEventCatalogContract[] 
         <small>{catalog.length} evento(s)</small>
       </div>
       <h2>Eventos permitidos</h2>
-      <p>Catalogo inicial ja padronizado em `food.*`, `tracking.*` e `gateway.*`.</p>
-      <ul>
-        {Object.entries(bySource).map(([source, total]) => (
-          <li key={source}>
-            {source}: {total} evento(s)
-          </li>
-        ))}
-      </ul>
+      <p>Catalogo padronizado para eventos `food.*`, `tracking.*` e `gateway.*`.</p>
+      {catalog.length > 0 ? (
+        <ul>
+          {Object.entries(bySource).map(([source, total]) => (
+            <li key={source}>
+              {source}: {total} evento(s)
+            </li>
+          ))}
+        </ul>
+      ) : (
+        <div className="empty-state">Nenhum evento cadastrado no catalogo do Robots.</div>
+      )}
       {catalog.length > 0 ? (
         <small>{catalogStatusLabels[catalog[0].status]} como status padrao inicial.</small>
       ) : null}
@@ -351,13 +453,7 @@ function RobotsCatalogCard({ catalog }: { catalog: RobotsEventCatalogContract[] 
   );
 }
 
-function RobotsRulesCard({
-  rules,
-  selectedCompanyId
-}: {
-  rules: RobotsRuleContract[];
-  selectedCompanyId: string;
-}) {
+function RobotsRulesCard({ rules }: { rules: RobotsRuleContract[] }) {
   return (
     <article className="robots-section-card">
       <div className="module-card-top">
@@ -365,22 +461,20 @@ function RobotsRulesCard({
         <small>{rules.length} regra(s)</small>
       </div>
       <h2>Evento para acao</h2>
-      <p>O V0 executa `internal_log` para validar a cadeia sem chamar provedores externos.</p>
+      <p>Regras conectam eventos catalogados a acoes internas ou solicitacoes para outros modulos.</p>
       {rules.length > 0 ? (
         <ul>
-          {rules.slice(0, 4).map((rule) => (
+          {rules.map((rule) => (
             <li key={rule.id}>
               {rule.eventCode}: {rule.actions.length} acao(oes)
             </li>
           ))}
         </ul>
       ) : (
-        <form action={createRobotsTestEventAction}>
-          <input name="companyId" type="hidden" value={selectedCompanyId} />
-          <PendingSubmitButton className="secondary-action" pendingLabel="Criando...">
-            Criar regra de teste
-          </PendingSubmitButton>
-        </form>
+        <div className="empty-state">
+          Nenhuma regra configurada ainda. As regras serao criadas pelos proximos fluxos
+          operacionais do Robots.
+        </div>
       )}
     </article>
   );
@@ -409,7 +503,9 @@ function RobotsEventsTable({
             <small>{event.idempotencyKey ?? event.id}</small>
           </span>
           <span>{event.sourceApplicationKey}</span>
-          <span>{eventStatusLabels[event.status]}</span>
+          <span className={`table-status table-status-${event.status}`}>
+            {eventStatusLabels[event.status]}
+          </span>
           <span>{formatDate(event.createdAt)}</span>
           <Link href={`/robots/eventos/${event.id}?companyId=${selectedCompanyId}`}>Detalhar</Link>
         </div>
@@ -440,7 +536,9 @@ function RobotsExecutionsTable({
             <strong>{execution.actionType}</strong>
             <small>{execution.ruleActionId ?? execution.id}</small>
           </span>
-          <span>{executionStatusLabels[execution.status]}</span>
+          <span className={`table-status table-status-${execution.status}`}>
+            {executionStatusLabels[execution.status]}
+          </span>
           <span>
             {execution.attemptCount}/{execution.maxAttempts}
           </span>
@@ -479,6 +577,12 @@ function resolveSelectedCompanyId(
   );
 
   return firstRobotsCompany?.company.id ?? null;
+}
+
+function resolveRobotsTab(value: string | undefined): RobotsTab {
+  const tab = robotsTabs.find((item) => item.key === value);
+
+  return tab?.key ?? "overview";
 }
 
 function formatDate(value: string): string {

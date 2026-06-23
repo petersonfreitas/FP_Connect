@@ -833,6 +833,45 @@ button.primary-action {
   padding: 7px 10px;
 }
 
+.table-status {
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  color: var(--muted);
+  display: inline-flex;
+  font-size: 12px;
+  font-weight: 900;
+  justify-content: center;
+  padding: 6px 9px;
+  width: fit-content;
+}
+
+.table-status-received,
+.table-status-succeeded {
+  background: #ecfdf5;
+  border-color: #a7f3d0;
+  color: var(--success);
+}
+
+.table-status-failed {
+  background: #fff7ed;
+  border-color: #fed7aa;
+  color: #9a3412;
+}
+
+.table-status-pending,
+.table-status-running {
+  background: var(--accent-soft);
+  border-color: #c6d8df;
+  color: var(--accent);
+}
+
+.table-status-cancelled,
+.table-status-ignored_duplicate {
+  background: #f1f5f9;
+  border-color: #d6e0e8;
+  color: #475569;
+}
+
 .form-grid {
   display: grid;
   gap: 18px;

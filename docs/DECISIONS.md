@@ -65,7 +65,7 @@ Este arquivo registra decisoes arquiteturais e operacionais para evitar retrabal
 | DEC-057 | Eventos novos do FP Food devem usar namespace `food.*`; referencias antigas `menu.*` em backlogs ficam como legado documental ate revisao futura e nao devem guiar codigo novo. | Aprovada |
 | DEC-058 | Modulo contratado em `implementation` ou `active` pode ser acessado operacionalmente por usuarios com permissao; `suspended` e `cancelled` continuam bloqueados. | Aprovada |
 | DEC-059 | Schemas de modulo consultados pela API Nest via Supabase/PostgREST devem ser expostos na configuracao de API do Supabase; isso nao substitui guards, RLS, policies e service role server-side. | Aprovada |
-| DEC-060 | FP Robots V0 pode usar acao `internal_log` para validar a cadeia evento, regra e execucao sem depender de SMTP, webhook, Food, Tracking ou Gateway reais. | Aprovada |
+| DEC-060 | FP Robots pode usar acao `internal_log` como primeira automacao interna, mantendo a cadeia evento, regra e execucao independente de SMTP, webhook, Food, Tracking ou Gateway reais. | Aprovada |
 | DEC-061 | Reprocessamento V0 do FP Robots fica limitado a execucoes falhadas de `internal_log`; conectores reais devem implementar retry/reprocessamento especifico quando SMTP, webhook ou Gateway entrarem. | Aprovada |
 | DEC-062 | FP Food nasce como frontend separado em `apps/food`, consumindo a API interna central `apps/api`, o Supabase Auth unico, o banco unico e o controle de acesso do `core`. | Aprovada |
 | DEC-063 | Alteracoes operacionais relevantes do FP Food devem publicar eventos `food.*` no FP Robots; a primeira integracao oficial e `food.store.configured`. | Aprovada |

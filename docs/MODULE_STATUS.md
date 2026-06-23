@@ -19,7 +19,7 @@ Este arquivo controla o avanco dos modulos do ecossistema.
 | Modulo | Prioridade atual | Nivel | Status | Observacao |
 |---|---:|---:|---|---|
 | FP Connect Admin Console | Alta | 2 | Base funcional estabilizada | Empresas, usuarios, papel de plataforma, permissoes, modulos contratados, suporte por carteira, catalogo, auditoria, guards, bloqueios, paginacao inicial e inativacao operacional ja possuem API e telas principais. |
-| FP Robots | Alta | 2 | Base funcional em evolucao | Schema `robots`, catalogo de eventos, event log, regras simples `evento -> acao`, execucoes, falha simulada, reprocessamento basico, API interna e tela inicial no Console criados. |
+| FP Robots | Alta | 2 | Base funcional em evolucao | Schema `robots`, catalogo de eventos, event log, regras simples `evento -> acao`, execucoes, reprocessamento basico, API interna e painel operacional inicial no Console criados. |
 | FP Food | Alta | 2 | Base funcional em evolucao produtiva | Frontend separado `apps/food`, dashboard operacional V0, menu lateral por Cadastro/Movimentacao, configuracao da loja, categorias/produtos paginados, cardapio derivado, pedido interno V0, vitrine publica V0 por slug, acompanhamento publico de pedido, checkout publico com cartao Mercado Pago via Gateway V0, painel de pedidos com filtro/status, detalhe de pedido com historico simples, pagamento manual V0, Cozinha V0, Entrega simples V0 e eventos `food.*` iniciais criados. Proximas melhorias devem priorizar experiencia, validacoes e processos reais. |
 | FP Tracking | Alta | 0 | Preparado para ciclo futuro | Endpoint interno `/api/tracking/access` ja valida empresa, modulo contratado e permissao; deve nascer como frontend separado e assumir entrega/rastreio real do Food depois da estabilizacao produtiva de Food, Gateway, Robots e Console. |
 | FP Billing | Futura | 0 | Fundacao de acesso preparada | Endpoint interno `/api/billing/access` ja valida empresa, modulo contratado e permissao; entrara apos base operacional. |
@@ -104,10 +104,10 @@ Este arquivo controla o avanco dos modulos do ecossistema.
 - [x] Listagem de eventos
 - [x] Detalhe de evento
 - [x] Regras simples `evento -> acao`
-- [x] Acao `internal_log` para teste controlado
+- [x] Acao `internal_log` para primeira automacao interna
 - [x] Execucoes geradas por regras ativas
-- [x] Botao de evento de teste no Console
-- [x] Botao de falha simulada no Console
+- [x] Painel operacional inicial com visao geral, eventos, execucoes, regras e catalogo
+- [x] Remocao dos atalhos de teste do Console
 - [x] Reprocessamento basico
 - [x] Integracao inicial com Food
 - [ ] Integracao inicial com Tracking

@@ -3,8 +3,6 @@ import { SupabaseService } from "../../supabase/supabase.service";
 import type {
   CreateRobotsEventContract,
   CreateRobotsEventInput,
-  CreateRobotsTestEventContract,
-  CreateRobotsTestFailureContract,
   ReprocessRobotsExecutionContract,
   RobotsActionStatus,
   RobotsActionType,
@@ -254,90 +252,6 @@ export class RobotsService {
     };
   }
 
-  async createTestEvent(
-    companyId: string,
-    actorUserId: string
-  ): Promise<CreateRobotsTestEventContract> {
-    const ruleCreated = await this.ensureDefaultInternalLogRule(companyId, actorUserId);
-    const now = new Date().toISOString();
-    const result = await this.createEvent(companyId, actorUserId, {
-      eventCode: "food.order.created",
-      idempotencyKey: `robots-test:${now}`,
-      occurredAt: now,
-      originMetadata: {
-        generatedBy: "fp-console",
-        purpose: "robots-v0-smoke-test"
-      },
-      payload: {
-        customerEmail: "cliente.teste@example.com",
-        customerPhone: "+5511999999999",
-        orderId: `test-${Date.now()}`,
-        source: "robots-test",
-        totalAmount: 99.9
-      },
-      sourceApplicationKey: "food",
-      sourceEventId: `robots-test-${Date.now()}`
-    });
-
-    return {
-      ...result,
-      ruleCreated
-    };
-  }
-
-  async createTestFailure(
-    companyId: string,
-    actorUserId: string
-  ): Promise<CreateRobotsTestFailureContract> {
-    const now = new Date().toISOString();
-    const eventResult = await this.createEvent(companyId, actorUserId, {
-      eventCode: "food.order.rejected",
-      idempotencyKey: `robots-test-failure:${now}`,
-      occurredAt: now,
-      originMetadata: {
-        generatedBy: "fp-console",
-        purpose: "robots-v0-reprocess-test"
-      },
-      payload: {
-        customerEmail: "cliente.falha@example.com",
-        orderId: `failed-test-${Date.now()}`,
-        reason: "Falha simulada para reprocessamento",
-        source: "robots-test"
-      },
-      sourceApplicationKey: "food",
-      sourceEventId: `robots-test-failure-${Date.now()}`
-    });
-
-    const { data, error } = await this.supabase.robots
-      .from("event_executions")
-      .insert({
-        action_type: "internal_log",
-        attempt_count: 1,
-        company_id: companyId,
-        created_by: actorUserId,
-        event_id: eventResult.event.id,
-        last_error: "Falha simulada pelo Console para validar reprocessamento.",
-        max_attempts: 3,
-        request_payload: {
-          eventCode: eventResult.event.eventCode,
-          testMode: true
-        },
-        response_payload: {},
-        status: "failed"
-      })
-      .select(executionSelect)
-      .single();
-
-    if (error) {
-      throwSupabaseError(error);
-    }
-
-    return {
-      event: eventResult.event,
-      execution: mapExecution(data as unknown as RobotExecutionRow)
-    };
-  }
-
   async reprocessExecution(
     companyId: string,
     actorUserId: string,
@@ -350,7 +264,7 @@ export class RobotsService {
     }
 
     if (execution.action_type !== "internal_log") {
-      throw new BadRequestException("Reprocessamento V0 suporta apenas internal_log");
+      throw new BadRequestException("Reprocessamento atual suporta apenas internal_log");
     }
 
     const { data, error } = await this.supabase.robots
@@ -359,7 +273,7 @@ export class RobotsService {
         attempt_count: execution.attempt_count + 1,
         last_error: null,
         response_payload: {
-          message: "Falha reprocessada pelo FP Robots V0.",
+          message: "Falha reprocessada pelo FP Robots.",
           reprocessedAt: new Date().toISOString(),
           reprocessedBy: actorUserId
         },
@@ -485,9 +399,7 @@ export class RobotsService {
             eventCode: event.eventCode,
             ruleName: rule.name
           },
-          response_payload: isInternalLog
-            ? { message: "Log interno registrado pelo FP Robots V0." }
-            : {},
+          response_payload: isInternalLog ? { message: "Log interno registrado pelo FP Robots." } : {},
           rule_action_id: action.id,
           rule_id: rule.id,
           status: isInternalLog ? "succeeded" : "pending"
@@ -506,95 +418,6 @@ export class RobotsService {
     }
 
     return rows.length;
-  }
-
-  private async ensureDefaultInternalLogRule(
-    companyId: string,
-    actorUserId: string
-  ): Promise<boolean> {
-    const catalog = await this.getActiveCatalogEvent("food.order.created", "food");
-    const ruleName = "Log interno - pedido Food criado";
-    const { data: currentData, error: currentError } = await this.supabase.robots
-      .from("automation_rules")
-      .select(ruleSelect)
-      .eq("company_id", companyId)
-      .eq("name", ruleName)
-      .is("deleted_at", null)
-      .maybeSingle();
-
-    if (currentError) {
-      throwSupabaseError(currentError);
-    }
-
-    const current = currentData as unknown as RobotRuleRow | null;
-
-    if (current) {
-      await this.ensureDefaultInternalLogAction(companyId, current.id, actorUserId);
-      return false;
-    }
-
-    const { data, error } = await this.supabase.robots
-      .from("automation_rules")
-      .insert({
-        company_id: companyId,
-        created_by: actorUserId,
-        description: "Regra inicial para validar evento -> execucao sem integracao externa.",
-        event_catalog_id: catalog.id,
-        event_code: catalog.code,
-        name: ruleName,
-        status: "active"
-      })
-      .select(ruleSelect)
-      .single();
-
-    if (error) {
-      throwSupabaseError(error);
-    }
-
-    const rule = data as unknown as RobotRuleRow;
-    await this.ensureDefaultInternalLogAction(companyId, rule.id, actorUserId);
-    return true;
-  }
-
-  private async ensureDefaultInternalLogAction(
-    companyId: string,
-    ruleId: string,
-    actorUserId: string
-  ): Promise<void> {
-    const { data, error } = await this.supabase.robots
-      .from("automation_rule_actions")
-      .select(actionSelect)
-      .eq("company_id", companyId)
-      .eq("rule_id", ruleId)
-      .eq("action_type", "internal_log")
-      .is("deleted_at", null)
-      .maybeSingle();
-
-    if (error) {
-      throwSupabaseError(error);
-    }
-
-    if (data) {
-      return;
-    }
-
-    const { error: insertError } = await this.supabase.robots.from("automation_rule_actions").insert({
-      action_config: {
-        severity: "info",
-        target: "robots-executions"
-      },
-      action_type: "internal_log",
-      company_id: companyId,
-      created_by: actorUserId,
-      name: "Registrar log interno do evento",
-      sort_order: 10,
-      status: "active",
-      rule_id: ruleId
-    });
-
-    if (insertError) {
-      throwSupabaseError(insertError);
-    }
   }
 
   private async listActionsByRuleIds(

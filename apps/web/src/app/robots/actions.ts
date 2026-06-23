@@ -1,49 +1,7 @@
 "use server";
 
 import { redirect } from "next/navigation";
-import {
-  createRobotsTestEvent,
-  createRobotsTestFailure,
-  reprocessRobotsExecution
-} from "@/lib/internal-api";
-
-export async function createRobotsTestEventAction(formData: FormData) {
-  const companyId = String(formData.get("companyId") ?? "").trim();
-
-  if (!companyId) {
-    redirect("/robots?error=company");
-  }
-
-  const result = await createRobotsTestEvent(companyId);
-
-  if (result.error) {
-    redirect(buildRobotsUrl({ companyId, error: result.error }));
-  }
-
-  const data = result.data;
-
-  if (!data) {
-    redirect(buildRobotsUrl({ companyId, error: "Resposta vazia da API" }));
-  }
-
-  redirect(`/robots?companyId=${companyId}&eventCreated=1&executions=${data.executionsCreated}`);
-}
-
-export async function createRobotsTestFailureAction(formData: FormData) {
-  const companyId = String(formData.get("companyId") ?? "").trim();
-
-  if (!companyId) {
-    redirect("/robots?error=company");
-  }
-
-  const result = await createRobotsTestFailure(companyId);
-
-  if (result.error) {
-    redirect(buildRobotsUrl({ companyId, error: result.error }));
-  }
-
-  redirect(`/robots?companyId=${companyId}&failureCreated=1`);
-}
+import { reprocessRobotsExecution } from "@/lib/internal-api";
 
 export async function reprocessRobotsExecutionAction(formData: FormData) {
   const companyId = String(formData.get("companyId") ?? "").trim();

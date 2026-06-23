@@ -93,15 +93,6 @@ export type RobotsExecutionContract = {
   updatedAt: string;
 };
 
-export type CreateRobotsTestEventContract = CreateRobotsEventContract & {
-  ruleCreated: boolean;
-};
-
-export type CreateRobotsTestFailureContract = {
-  event: RobotsEventContract;
-  execution: RobotsExecutionContract;
-};
-
 export type ReprocessRobotsExecutionContract = {
   reprocessed: true;
   execution: RobotsExecutionContract;

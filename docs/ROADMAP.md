@@ -47,11 +47,10 @@ O FP Robots ja possui a primeira base funcional:
 - event log por empresa;
 - regras simples `evento -> acao`;
 - execucoes por regra ativa;
-- falha simulada e reprocessamento basico;
+- reprocessamento basico de execucoes falhadas;
 - API interna para registrar/listar/detalhar eventos;
-- tela `/robots` com contexto empresarial;
+- painel `/robots` com contexto empresarial, visao geral e abas operacionais;
 - detalhe de evento com payload mascarado.
-- botao de evento de teste no Console.
 
 O FP Food foi iniciado como frontend separado:
 
@@ -131,10 +130,9 @@ Objetivo: concluir a primeira camada operacional para eventos e automacoes inter
 Escopo inicial:
 
 - aplicar e validar migration do event log;
-- publicar evento interno de teste;
+- registrar eventos internos pelos modulos consumidores;
 - validar regras simples `evento -> acao`;
 - criar execucoes por regra ativa;
-- registrar falha basica;
 - reprocessar falha manualmente;
 - nenhuma integracao externa real no V0.
 
