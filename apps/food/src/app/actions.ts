@@ -25,6 +25,8 @@ import {
   createFoodProduct,
   createPublicFoodOrder,
   ensurePublicFoodCustomerStoreAccess,
+  savePublicFoodCustomerAddress,
+  setPrimaryPublicFoodCustomerAddress,
   saveFoodStoreHours,
   updateFoodCategory,
   updateFoodOrderPayment,
@@ -341,6 +343,7 @@ export async function createPublicFoodOrderAction(formData: FormData): Promise<v
   const input: CreatePublicFoodOrderInput = {
     authUserId: currentUser.id,
     customerName: customerSessionResult.data.customer.fullName,
+    deliveryAddressId: optionalText(formData.get("deliveryAddressId")),
     email: currentUser.email,
     customerNote: optionalText(formData.get("customerNote")),
     customerPhone: customerSessionResult.data.primaryPhone?.phoneE164 ?? null,
@@ -401,6 +404,67 @@ export async function savePublicCustomerProfileAction(formData: FormData): Promi
   }
 
   redirect(`${accountPath}?saved=1`);
+}
+
+export async function savePublicCustomerAddressAction(formData: FormData): Promise<void> {
+  const publicSlug = normalizePublicSlug(formData.get("publicSlug"));
+  const storeContext = createFallbackPublicStoreContext(publicSlug);
+  const accountPath = storeUrl(storeContext, "/conta");
+  const currentUser = await getCurrentPublicStoreUser(publicSlug);
+
+  if (!currentUser) {
+    redirect(storeLoginUrl(storeContext, accountPath));
+  }
+
+  const result = await savePublicFoodCustomerAddress(publicSlug, {
+    authUserId: currentUser.id,
+    city: String(formData.get("city") ?? ""),
+    complement: optionalText(formData.get("complement")),
+    district: optionalText(formData.get("district")),
+    email: currentUser.email,
+    isPrimary: formData.get("isPrimary") === "on",
+    label: optionalText(formData.get("label")),
+    number: String(formData.get("number") ?? ""),
+    postalCode: optionalText(formData.get("postalCode")),
+    reference: optionalText(formData.get("reference")),
+    state: String(formData.get("state") ?? ""),
+    street: String(formData.get("street") ?? "")
+  });
+
+  if (result.error) {
+    redirect(`${accountPath}?error=${encodeURIComponent(truncateQueryValue(result.error))}`);
+  }
+
+  redirect(`${accountPath}?addressSaved=1`);
+}
+
+export async function setPublicCustomerPrimaryAddressAction(
+  formData: FormData
+): Promise<void> {
+  const publicSlug = normalizePublicSlug(formData.get("publicSlug"));
+  const addressId = String(formData.get("addressId") ?? "").trim();
+  const storeContext = createFallbackPublicStoreContext(publicSlug);
+  const accountPath = storeUrl(storeContext, "/conta");
+  const currentUser = await getCurrentPublicStoreUser(publicSlug);
+
+  if (!currentUser) {
+    redirect(storeLoginUrl(storeContext, accountPath));
+  }
+
+  if (!addressId) {
+    redirect(`${accountPath}?error=${encodeURIComponent("Endereco nao informado.")}`);
+  }
+
+  const result = await setPrimaryPublicFoodCustomerAddress(publicSlug, addressId, {
+    authUserId: currentUser.id,
+    email: currentUser.email
+  });
+
+  if (result.error) {
+    redirect(`${accountPath}?error=${encodeURIComponent(truncateQueryValue(result.error))}`);
+  }
+
+  redirect(`${accountPath}?addressPrimary=1`);
 }
 
 function requireCompanyId(formData: FormData): string {

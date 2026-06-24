@@ -68,6 +68,7 @@ export default async function PublicStorePage({
         />
       ) : null}
       <PublicStorefront
+        addresses={customerSessionResult?.data?.addresses ?? []}
         checkout={checkoutResult.data}
         createOrderAction={createPublicFoodOrderAction}
         isAuthenticated={Boolean(currentUser)}

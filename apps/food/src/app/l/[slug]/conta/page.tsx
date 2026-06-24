@@ -1,6 +1,11 @@
 import { redirect } from "next/navigation";
-import { savePublicCustomerProfileAction } from "@/app/actions";
+import {
+  savePublicCustomerAddressAction,
+  savePublicCustomerProfileAction,
+  setPublicCustomerPrimaryAddressAction
+} from "@/app/actions";
 import { Notice } from "@/components/page-feedback";
+import { PublicCustomerAddressesForm } from "@/components/public-customer-addresses-form";
 import { PublicCustomerMenu } from "@/components/public-customer-menu";
 import { PublicCustomerProfileForm } from "@/components/public-customer-profile-form";
 import { getCurrentPublicStoreUser } from "@/lib/auth";
@@ -19,6 +24,8 @@ type PublicCustomerAccountPageProps = {
     slug: string;
   }>;
   searchParams?: Promise<{
+    addressPrimary?: string;
+    addressSaved?: string;
     error?: string;
     saved?: string;
   }>;
@@ -58,6 +65,10 @@ export default async function PublicCustomerAccountPage({
       />
 
       {query?.saved ? <Notice tone="success" message="Cadastro atualizado." /> : null}
+      {query?.addressSaved ? <Notice tone="success" message="Endereco cadastrado." /> : null}
+      {query?.addressPrimary ? (
+        <Notice tone="success" message="Endereco padrao atualizado." />
+      ) : null}
       {query?.error ? <Notice tone="danger" message={query.error} /> : null}
       {customerSessionResult.error ? (
         <Notice
@@ -98,6 +109,13 @@ export default async function PublicCustomerAccountPage({
           session={session}
         />
       </section>
+
+      <PublicCustomerAddressesForm
+        addresses={session?.addresses ?? []}
+        publicSlug={storeContext.publicSlug}
+        saveAction={savePublicCustomerAddressAction}
+        setPrimaryAction={setPublicCustomerPrimaryAddressAction}
+      />
     </main>
   );
 }

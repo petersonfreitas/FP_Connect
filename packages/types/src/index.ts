@@ -380,12 +380,43 @@ export type FoodPublicCustomerPhoneContract = {
   type: "cellphone" | "landline" | "other" | "whatsapp";
 };
 
+export type FoodPublicCustomerAddressContract = {
+  city: string;
+  complement: string | null;
+  customerId: string;
+  district: string | null;
+  id: string;
+  isPrimary: boolean;
+  label: string | null;
+  number: string;
+  postalCode: string | null;
+  reference: string | null;
+  state: string;
+  storeId: string | null;
+  street: string;
+};
+
 export type FoodPublicCustomerSessionContract = {
   account: FoodPublicCustomerAccountContract;
+  addresses: FoodPublicCustomerAddressContract[];
   customer: FoodPublicCustomerContract;
   isCompleteForCheckout: boolean;
+  primaryAddress: FoodPublicCustomerAddressContract | null;
   primaryPhone: FoodPublicCustomerPhoneContract | null;
   storeAccess: FoodPublicCustomerStoreAccessContract;
+};
+
+export type FoodOrderDeliveryAddressContract = {
+  city: string;
+  complement: string | null;
+  customerAddressId: string | null;
+  district: string | null;
+  label: string | null;
+  number: string;
+  postalCode: string | null;
+  reference: string | null;
+  state: string;
+  street: string;
 };
 
 export type FoodOrderItemContract = {
@@ -416,6 +447,7 @@ export type FoodOrderContract = {
   customerAccountId: string | null;
   customerId: string | null;
   customerStoreAccessId: string | null;
+  deliveryAddress: FoodOrderDeliveryAddressContract | null;
   orderNumber: string;
   status: FoodOrderStatus;
   customerName: string | null;
@@ -459,6 +491,7 @@ export type CreateFoodOrderItemInput = {
 export type CreateFoodOrderInput = {
   customerName?: string | null;
   customerPhone?: string | null;
+  deliveryAddressId?: string | null;
   customerNote?: string | null;
   items: CreateFoodOrderItemInput[];
 };
@@ -515,6 +548,21 @@ export type UpdateFoodPublicCustomerProfileInput = EnsureFoodPublicCustomerInput
   phone: string;
   preferredContactMethod: FoodCustomerPreferredContactMethod;
 };
+
+export type UpsertFoodPublicCustomerAddressInput = EnsureFoodPublicCustomerInput & {
+  city: string;
+  complement?: string | null;
+  district?: string | null;
+  isPrimary?: boolean | null;
+  label?: string | null;
+  number: string;
+  postalCode?: string | null;
+  reference?: string | null;
+  state: string;
+  street: string;
+};
+
+export type SetFoodPublicCustomerPrimaryAddressInput = EnsureFoodPublicCustomerInput;
 
 export type CreatePublicFoodCheckoutContract = {
   order: FoodOrderContract;

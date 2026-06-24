@@ -9,6 +9,7 @@ import type {
   FoodProductContract,
   FoodPublicCartValidationContract,
   FoodPublicCheckoutContract,
+  FoodPublicCustomerAddressContract,
   ValidatePublicFoodCartInput
 } from "@fp/types";
 import { PendingSubmitButton } from "@/components/pending-submit-button";
@@ -21,6 +22,7 @@ import {
 } from "@/lib/public-store-urls";
 
 type PublicStorefrontProps = {
+  addresses: FoodPublicCustomerAddressContract[];
   checkout: FoodPublicCheckoutContract | null;
   createOrderAction: (formData: FormData) => void | Promise<void>;
   isAuthenticated: boolean;
@@ -77,6 +79,7 @@ declare global {
 }
 
 export function PublicStorefront({
+  addresses,
   checkout,
   createOrderAction,
   isAuthenticated,
@@ -118,6 +121,11 @@ export function PublicStorefront({
   );
   const validatedTotalCents = cartValidation?.totalCents ?? totalCents;
   const isCartValidForCheckout = cartValidation?.isValidForCheckout ?? false;
+  const primaryAddress = useMemo(
+    () => addresses.find((address) => address.isPrimary) ?? addresses[0] ?? null,
+    [addresses]
+  );
+  const [selectedAddressId, setSelectedAddressId] = useState(primaryAddress?.id ?? "");
   const canOrderNow = menu.availability.isOrderingOpen;
   const loginHref = storeLoginUrl(storeContext);
   const accountHref = storeUrl(storeContext, "/conta");
@@ -542,6 +550,24 @@ export function PublicStorefront({
             </p>
           ) : null}
 
+          {addresses.length > 0 ? (
+            <label>
+              Endereco de entrega
+              <select
+                name="deliveryAddressId"
+                onChange={(event) => setSelectedAddressId(event.target.value)}
+                required
+                value={selectedAddressId}
+              >
+                {addresses.map((address) => (
+                  <option key={address.id} value={address.id}>
+                    {formatAddressOption(address)}
+                  </option>
+                ))}
+              </select>
+            </label>
+          ) : null}
+
           <label>
             Observacao
             <textarea maxLength={600} name="customerNote" rows={3} />
@@ -554,17 +580,24 @@ export function PublicStorefront({
           ) : null}
 
           {isAuthenticated && isCustomerCompleteForCheckout ? (
-            <PendingSubmitButton
-              disabled={
-                selectedItems.length === 0 ||
-                !canOrderNow ||
-                cartValidationPending ||
-                !isCartValidForCheckout
-              }
-              pendingLabel="Enviando pedido..."
-            >
-              Enviar pedido
-            </PendingSubmitButton>
+            addresses.length === 0 ? (
+              <a className="primary-action" href={accountHref}>
+                Cadastrar endereco
+              </a>
+            ) : (
+              <PendingSubmitButton
+                disabled={
+                  selectedItems.length === 0 ||
+                  !canOrderNow ||
+                  cartValidationPending ||
+                  !isCartValidForCheckout ||
+                  !selectedAddressId
+                }
+                pendingLabel="Enviando pedido..."
+              >
+                Enviar pedido
+              </PendingSubmitButton>
+            )
           ) : isAuthenticated ? (
             <a className="primary-action" href={accountHref}>
               Completar cadastro
@@ -597,6 +630,13 @@ export function PublicStorefront({
           ) : !isCustomerCompleteForCheckout ? (
             <div className="empty-state public-empty-cart">
               Complete seu cadastro para habilitar pagamento online.
+              <a className="secondary-action compact-action" href={accountHref}>
+                Minha conta
+              </a>
+            </div>
+          ) : addresses.length === 0 || !selectedAddressId ? (
+            <div className="empty-state public-empty-cart">
+              Cadastre um endereco de entrega antes de pagar online.
               <a className="secondary-action compact-action" href={accountHref}>
                 Minha conta
               </a>
@@ -704,6 +744,7 @@ function buildCardCheckoutPayload({
 
   const orderFormData = new FormData(formElement);
   const customerNote = normalizeFormText(orderFormData.get("customerNote"));
+  const deliveryAddressId = normalizeFormText(orderFormData.get("deliveryAddressId"));
   const items = products
     .map((product) => ({
       productId: product.id,
@@ -727,6 +768,7 @@ function buildCardCheckoutPayload({
 
   return {
     customerNote,
+    deliveryAddressId,
     items,
     payment: {
       cardToken,
@@ -754,6 +796,12 @@ function normalizeFormText(value: FormDataEntryValue | string | null | undefined
 
   const normalized = value.trim();
   return normalized.length > 0 ? normalized : null;
+}
+
+function formatAddressOption(address: FoodPublicCustomerAddressContract): string {
+  const label = address.label ? `${address.label} - ` : "";
+  const primary = address.isPrimary ? " (padrao)" : "";
+  return `${label}${address.street}, ${address.number} - ${address.city}/${address.state}${primary}`;
 }
 
 function getErrorMessage(error: unknown): string {

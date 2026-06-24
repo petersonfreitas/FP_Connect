@@ -70,6 +70,7 @@ export async function POST(request: Request) {
     customerName: customerSessionResult.data.customer.fullName,
     customerNote: body?.customerNote,
     customerPhone: customerSessionResult.data.primaryPhone?.phoneE164 ?? null,
+    deliveryAddressId: body?.deliveryAddressId,
     email: currentUser.email,
     items: body?.items ?? [],
     payment: body?.payment

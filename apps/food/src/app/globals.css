@@ -1336,6 +1336,28 @@ textarea {
   margin: 0;
 }
 
+.public-address-list {
+  display: grid;
+  gap: 10px;
+}
+
+.public-address-item {
+  align-items: center;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  display: flex;
+  gap: 12px;
+  justify-content: space-between;
+  padding: 14px;
+}
+
+.public-address-item p,
+.public-address-item small {
+  color: var(--muted);
+  display: block;
+  margin: 4px 0 0;
+}
+
 .public-store-message {
   min-height: 100vh;
   place-content: center;

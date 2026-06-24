@@ -5,7 +5,9 @@ import type {
   CreatePublicFoodOrderInput,
   EnsureFoodPublicCustomerInput,
   RetryPublicFoodPaymentInput,
+  SetFoodPublicCustomerPrimaryAddressInput,
   UpdateFoodPublicCustomerProfileInput,
+  UpsertFoodPublicCustomerAddressInput,
   ValidatePublicFoodCartInput
 } from "./food.contracts";
 import { FoodService } from "./food.service";
@@ -47,6 +49,23 @@ export class FoodPublicController {
     @Param("publicSlug") publicSlug: string
   ) {
     return this.foodService.updatePublicCustomerProfile(publicSlug, input);
+  }
+
+  @Post("stores/:publicSlug/customers/me/addresses")
+  upsertPublicCustomerAddress(
+    @Body() input: UpsertFoodPublicCustomerAddressInput,
+    @Param("publicSlug") publicSlug: string
+  ) {
+    return this.foodService.upsertPublicCustomerAddress(publicSlug, input);
+  }
+
+  @Patch("stores/:publicSlug/customers/me/addresses/:addressId/primary")
+  setPublicCustomerPrimaryAddress(
+    @Body() input: SetFoodPublicCustomerPrimaryAddressInput,
+    @Param("addressId") addressId: string,
+    @Param("publicSlug") publicSlug: string
+  ) {
+    return this.foodService.setPublicCustomerPrimaryAddress(publicSlug, addressId, input);
   }
 
   @Get("stores/:publicSlug/orders/:orderNumber")

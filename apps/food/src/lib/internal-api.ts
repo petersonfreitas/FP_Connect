@@ -21,9 +21,11 @@ import type {
   ModuleAccessContract,
   PaginatedContract,
   RetryPublicFoodPaymentInput,
+  SetFoodPublicCustomerPrimaryAddressInput,
   UpdateFoodOrderPaymentInput,
   UpdateFoodOrderStatusInput,
   UpdateFoodPublicCustomerProfileInput,
+  UpsertFoodPublicCustomerAddressInput,
   ValidatePublicFoodCartInput,
   FoodPublicCartValidationContract,
   UpsertFoodCategoryInput,
@@ -300,6 +302,35 @@ export async function updatePublicFoodCustomerProfile(
 ): Promise<InternalApiResult<FoodPublicCustomerSessionContract>> {
   return fetchPublicInternal<FoodPublicCustomerSessionContract>(
     `food/public/stores/${encodeURIComponent(publicSlug)}/customers/me/profile`,
+    {
+      body: JSON.stringify(input),
+      method: "PATCH"
+    }
+  );
+}
+
+export async function savePublicFoodCustomerAddress(
+  publicSlug: string,
+  input: UpsertFoodPublicCustomerAddressInput
+): Promise<InternalApiResult<FoodPublicCustomerSessionContract>> {
+  return fetchPublicInternal<FoodPublicCustomerSessionContract>(
+    `food/public/stores/${encodeURIComponent(publicSlug)}/customers/me/addresses`,
+    {
+      body: JSON.stringify(input),
+      method: "POST"
+    }
+  );
+}
+
+export async function setPrimaryPublicFoodCustomerAddress(
+  publicSlug: string,
+  addressId: string,
+  input: SetFoodPublicCustomerPrimaryAddressInput
+): Promise<InternalApiResult<FoodPublicCustomerSessionContract>> {
+  return fetchPublicInternal<FoodPublicCustomerSessionContract>(
+    `food/public/stores/${encodeURIComponent(publicSlug)}/customers/me/addresses/${encodeURIComponent(
+      addressId
+    )}/primary`,
     {
       body: JSON.stringify(input),
       method: "PATCH"

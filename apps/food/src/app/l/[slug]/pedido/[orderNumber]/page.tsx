@@ -165,6 +165,12 @@ export default async function PublicOrderPage({
             <h2>{order.customerName ?? "Cliente nao informado"}</h2>
             {order.customerPhone ? <p>{order.customerPhone}</p> : null}
             {order.customerNote ? <p>Obs.: {order.customerNote}</p> : null}
+            {order.deliveryAddress ? (
+              <p>
+                Entrega: {order.deliveryAddress.street}, {order.deliveryAddress.number} -{" "}
+                {order.deliveryAddress.city}/{order.deliveryAddress.state}
+              </p>
+            ) : null}
           </div>
           <div>
             <div className="eyebrow">Total</div>

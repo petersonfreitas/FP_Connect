@@ -280,6 +280,8 @@ Endpoints internos publicos do FP Food, consumidos server-side pelo `apps/food`:
 - `POST /api/food/public/stores/:publicSlug/cart/validate`
 - `POST /api/food/public/stores/:publicSlug/customers/me`
 - `PATCH /api/food/public/stores/:publicSlug/customers/me/profile`
+- `POST /api/food/public/stores/:publicSlug/customers/me/addresses`
+- `PATCH /api/food/public/stores/:publicSlug/customers/me/addresses/:addressId/primary`
 - `GET /api/food/public/stores/:publicSlug/orders/:orderNumber`
 - `POST /api/food/public/stores/:publicSlug/orders`
 - `POST /api/food/public/stores/:publicSlug/checkout`

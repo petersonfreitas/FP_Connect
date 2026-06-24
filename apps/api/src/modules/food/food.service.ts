@@ -34,6 +34,7 @@ import type {
   FoodPublicCartValidationItemContract,
   FoodPublicCheckoutContract,
   FoodPublicCustomerAccountContract,
+  FoodPublicCustomerAddressContract,
   FoodPublicCustomerContract,
   FoodPublicCustomerPhoneContract,
   FoodPublicCustomerSessionContract,
@@ -44,9 +45,11 @@ import type {
   FoodStoreStatus,
   PaginatedContract,
   RetryPublicFoodPaymentInput,
+  SetFoodPublicCustomerPrimaryAddressInput,
   UpdateFoodOrderPaymentInput,
   UpdateFoodOrderStatusInput,
   UpdateFoodPublicCustomerProfileInput,
+  UpsertFoodPublicCustomerAddressInput,
   UpsertFoodCategoryInput,
   UpsertFoodProductInput,
   UpsertFoodStoreHoursInput,
@@ -121,6 +124,8 @@ type FoodOrderRow = {
   customer_account_id: string | null;
   customer_id: string | null;
   customer_store_access_id: string | null;
+  customer_address_id: string | null;
+  delivery_address_snapshot: Record<string, unknown> | null;
   paid_at: string | null;
   paid_by: string | null;
   payment_method: FoodPaymentMethod | null;
@@ -194,6 +199,22 @@ type FoodCustomerPhoneRow = {
   type: "cellphone" | "landline" | "other" | "whatsapp";
 };
 
+type FoodCustomerAddressRow = {
+  city: string;
+  complement: string | null;
+  customer_id: string;
+  district: string | null;
+  id: string;
+  is_primary: boolean;
+  label: string | null;
+  number: string;
+  postal_code: string | null;
+  reference: string | null;
+  state: string;
+  store_id: string | null;
+  street: string;
+};
+
 type FoodDashboardOrderRow = {
   id: string;
   status: FoodOrderStatus;
@@ -232,6 +253,7 @@ type OrderListOptions = PaginationOptions & {
 type CreateOrderOptions = {
   eventSource: "internal-order-v0" | "public-store-v0";
   customerSession?: FoodPublicCustomerSessionContract | null;
+  deliveryAddress?: FoodPublicCustomerAddressContract | null;
 };
 
 const storeSelect = [
@@ -301,6 +323,8 @@ const orderSelect = [
   "customer_account_id",
   "customer_id",
   "customer_store_access_id",
+  "customer_address_id",
+  "delivery_address_snapshot",
   "paid_at",
   "paid_by",
   "payment_method",
@@ -372,6 +396,22 @@ const customerPhoneSelect = [
   "type",
   "is_primary",
   "is_preferred"
+].join(",");
+
+const customerAddressSelect = [
+  "id",
+  "customer_id",
+  "store_id",
+  "label",
+  "postal_code",
+  "street",
+  "number",
+  "complement",
+  "district",
+  "city",
+  "state",
+  "reference",
+  "is_primary"
 ].join(",");
 
 const validStatuses = new Set<FoodStoreStatus>([
@@ -827,11 +867,24 @@ export class FoodService {
       store.id,
       customer.id
     );
+    const addresses = await this.listCustomerAddresses(
+      store.company_id,
+      store.id,
+      customer.id
+    );
+    const primaryAddress = addresses.find((address) => address.isPrimary) ?? null;
 
     return {
       account,
+      addresses,
       customer,
-      isCompleteForCheckout: isCustomerCompleteForCheckout(account, customer, primaryPhone),
+      isCompleteForCheckout: isCustomerCompleteForCheckout(
+        account,
+        customer,
+        primaryPhone,
+        primaryAddress
+      ),
+      primaryAddress,
       primaryPhone,
       storeAccess
     };
@@ -900,11 +953,88 @@ export class FoodService {
 
     return {
       account,
+      addresses: session.addresses,
       customer,
-      isCompleteForCheckout: isCustomerCompleteForCheckout(account, customer, primaryPhone),
+      isCompleteForCheckout: isCustomerCompleteForCheckout(
+        account,
+        customer,
+        primaryPhone,
+        session.primaryAddress
+      ),
+      primaryAddress: session.primaryAddress,
       primaryPhone,
       storeAccess: session.storeAccess
     };
+  }
+
+  async upsertPublicCustomerAddress(
+    publicSlug: string,
+    input: UpsertFoodPublicCustomerAddressInput
+  ): Promise<FoodPublicCustomerSessionContract> {
+    const store = await this.getStoreByPublicSlug(publicSlug);
+    await this.ensurePublicStoreReadable(store);
+    const session = await this.buildPublicCustomerSession(store, input);
+    const normalized = normalizePublicCustomerAddressInput(input);
+    const shouldSetPrimary = normalized.isPrimary || session.addresses.length === 0;
+
+    if (shouldSetPrimary) {
+      await this.clearPrimaryCustomerAddresses(store.company_id, store.id, session.customer.id);
+    }
+
+    const { error } = await this.supabase.food
+      .from("customer_addresses")
+      .insert({
+        city: normalized.city,
+        company_id: store.company_id,
+        complement: normalized.complement,
+        customer_id: session.customer.id,
+        district: normalized.district,
+        is_primary: shouldSetPrimary,
+        label: normalized.label,
+        number: normalized.number,
+        postal_code: normalized.postalCode,
+        reference: normalized.reference,
+        state: normalized.state,
+        store_id: store.id,
+        street: normalized.street
+      });
+
+    if (error) {
+      throwSupabaseError(error);
+    }
+
+    return this.buildPublicCustomerSession(store, input);
+  }
+
+  async setPublicCustomerPrimaryAddress(
+    publicSlug: string,
+    addressId: string,
+    input: SetFoodPublicCustomerPrimaryAddressInput
+  ): Promise<FoodPublicCustomerSessionContract> {
+    const store = await this.getStoreByPublicSlug(publicSlug);
+    await this.ensurePublicStoreReadable(store);
+    const session = await this.buildPublicCustomerSession(store, input);
+    const address = await this.getCustomerAddress(
+      store.company_id,
+      store.id,
+      session.customer.id,
+      addressId
+    );
+
+    await this.clearPrimaryCustomerAddresses(store.company_id, store.id, session.customer.id);
+
+    const { error } = await this.supabase.food
+      .from("customer_addresses")
+      .update({
+        is_primary: true
+      })
+      .eq("id", address.id);
+
+    if (error) {
+      throwSupabaseError(error);
+    }
+
+    return this.buildPublicCustomerSession(store, input);
   }
 
   async createPublicOrder(
@@ -915,6 +1045,7 @@ export class FoodService {
     await this.ensurePublicStoreAvailable(store);
     await this.ensureOrderingOpen(store);
     const customerSession = await this.ensurePublicCheckoutCustomerSession(store, input);
+    const deliveryAddress = this.resolveCheckoutAddress(customerSession, input.deliveryAddressId);
 
     return this.createOrder(
       store.company_id,
@@ -922,6 +1053,7 @@ export class FoodService {
       buildPublicOrderInput(input, customerSession),
       {
         customerSession,
+        deliveryAddress,
         eventSource: "public-store-v0"
       }
     );
@@ -935,6 +1067,7 @@ export class FoodService {
     await this.ensurePublicStoreAvailable(store);
     await this.ensureOrderingOpen(store);
     const customerSession = await this.ensurePublicCheckoutCustomerSession(store, input);
+    const deliveryAddress = this.resolveCheckoutAddress(customerSession, input.deliveryAddressId);
     const payment = normalizePublicCheckoutPayment(input.payment);
     const order = await this.createOrder(
       store.company_id,
@@ -942,6 +1075,7 @@ export class FoodService {
       buildPublicOrderInput(input, customerSession),
       {
         customerSession,
+        deliveryAddress,
         eventSource: "public-store-v0"
       }
     );
@@ -1065,6 +1199,22 @@ export class FoodService {
     };
   }
 
+  private resolveCheckoutAddress(
+    session: FoodPublicCustomerSessionContract,
+    deliveryAddressId: string | null | undefined
+  ): FoodPublicCustomerAddressContract {
+    const normalizedAddressId = typeof deliveryAddressId === "string" ? deliveryAddressId.trim() : "";
+    const address = normalizedAddressId
+      ? session.addresses.find((item) => item.id === normalizedAddressId)
+      : session.primaryAddress;
+
+    if (!address) {
+      throw new BadRequestException("Selecione um endereco de entrega.");
+    }
+
+    return address;
+  }
+
   async getPublicOrder(
     publicSlug: string,
     orderNumber: string
@@ -1178,11 +1328,15 @@ export class FoodService {
         company_id: companyId,
         created_by: actorUserId,
         customer_account_id: options.customerSession?.account.id ?? null,
+        customer_address_id: options.deliveryAddress?.id ?? null,
         customer_id: options.customerSession?.customer.id ?? null,
         customer_name: normalized.customerName,
         customer_note: normalized.customerNote,
         customer_phone: normalized.customerPhone,
         customer_store_access_id: options.customerSession?.storeAccess.id ?? null,
+        delivery_address_snapshot: options.deliveryAddress
+          ? buildDeliveryAddressSnapshot(options.deliveryAddress)
+          : null,
         order_number: orderNumber,
         status: "created",
         store_id: store.id,
@@ -1629,6 +1783,73 @@ export class FoodService {
     }
 
     return mapCustomerPhone(data as unknown as FoodCustomerPhoneRow);
+  }
+
+  private async listCustomerAddresses(
+    companyId: string,
+    storeId: string,
+    customerId: string
+  ): Promise<FoodPublicCustomerAddressContract[]> {
+    const { data, error } = await this.supabase.food
+      .from("customer_addresses")
+      .select(customerAddressSelect)
+      .eq("company_id", companyId)
+      .eq("customer_id", customerId)
+      .eq("store_id", storeId)
+      .eq("is_active", true)
+      .is("deleted_at", null)
+      .order("is_primary", { ascending: false })
+      .order("created_at", { ascending: true });
+
+    if (error) {
+      throwSupabaseError(error);
+    }
+
+    return ((data ?? []) as unknown as FoodCustomerAddressRow[]).map(mapCustomerAddress);
+  }
+
+  private async getCustomerAddress(
+    companyId: string,
+    storeId: string,
+    customerId: string,
+    addressId: string
+  ): Promise<FoodPublicCustomerAddressContract> {
+    const { data, error } = await this.supabase.food
+      .from("customer_addresses")
+      .select(customerAddressSelect)
+      .eq("id", normalizeUuid(addressId, "addressId"))
+      .eq("company_id", companyId)
+      .eq("customer_id", customerId)
+      .eq("store_id", storeId)
+      .eq("is_active", true)
+      .is("deleted_at", null)
+      .single();
+
+    if (error) {
+      throwSupabaseError(error);
+    }
+
+    return mapCustomerAddress(data as unknown as FoodCustomerAddressRow);
+  }
+
+  private async clearPrimaryCustomerAddresses(
+    companyId: string,
+    storeId: string,
+    customerId: string
+  ): Promise<void> {
+    const { error } = await this.supabase.food
+      .from("customer_addresses")
+      .update({
+        is_primary: false
+      })
+      .eq("company_id", companyId)
+      .eq("customer_id", customerId)
+      .eq("store_id", storeId)
+      .is("deleted_at", null);
+
+    if (error) {
+      throwSupabaseError(error);
+    }
   }
 
   private async findStore(companyId: string): Promise<FoodStoreRow | null> {
@@ -2354,6 +2575,58 @@ function normalizePublicCustomerProfileInput(input: UpdateFoodPublicCustomerProf
   };
 }
 
+function normalizePublicCustomerAddressInput(input: UpsertFoodPublicCustomerAddressInput): {
+  city: string;
+  complement: string | null;
+  district: string | null;
+  isPrimary: boolean;
+  label: string | null;
+  number: string;
+  postalCode: string | null;
+  reference: string | null;
+  state: string;
+  street: string;
+} {
+  return {
+    city: normalizeRequiredText(input.city, "city", 120),
+    complement: normalizeOptionalText(input.complement, "complement", 120),
+    district: normalizeOptionalText(input.district, "district", 120),
+    isPrimary: input.isPrimary === true,
+    label: normalizeOptionalText(input.label, "label", 80),
+    number: normalizeRequiredText(input.number, "number", 20),
+    postalCode: normalizeOptionalPostalCode(input.postalCode),
+    reference: normalizeOptionalText(input.reference, "reference", 160),
+    state: normalizeState(input.state),
+    street: normalizeRequiredText(input.street, "street", 160)
+  };
+}
+
+function normalizeOptionalPostalCode(value: unknown): string | null {
+  const text = normalizeOptionalText(value, "postalCode", 16);
+
+  if (!text) {
+    return null;
+  }
+
+  const digits = text.replace(/\D/g, "");
+
+  if (digits.length !== 8) {
+    throw new BadRequestException("postalCode deve conter 8 digitos");
+  }
+
+  return digits;
+}
+
+function normalizeState(value: unknown): string {
+  const state = normalizeRequiredText(value, "state", 2).toUpperCase();
+
+  if (!/^[A-Z]{2}$/.test(state)) {
+    throw new BadRequestException("state deve conter a UF com 2 letras");
+  }
+
+  return state;
+}
+
 function normalizeUuid(value: unknown, field: string): string {
   const normalized = normalizeRequiredText(value, field, 80).toLowerCase();
 
@@ -2499,6 +2772,23 @@ function buildPublicOrderInput(
     customerNote: input.customerNote,
     customerPhone: session.primaryPhone?.phoneE164 ?? null,
     items: input.items
+  };
+}
+
+function buildDeliveryAddressSnapshot(
+  address: FoodPublicCustomerAddressContract
+): Record<string, unknown> {
+  return {
+    city: address.city,
+    complement: address.complement,
+    customerAddressId: address.id,
+    district: address.district,
+    label: address.label,
+    number: address.number,
+    postalCode: address.postalCode,
+    reference: address.reference,
+    state: address.state,
+    street: address.street
   };
 }
 
@@ -2905,6 +3195,10 @@ function mapOrder(row: FoodOrderRow, items: FoodOrderItemContract[]): FoodOrderC
     customerNote: row.customer_note,
     customerPhone: row.customer_phone,
     customerStoreAccessId: row.customer_store_access_id,
+    deliveryAddress: mapDeliveryAddressSnapshot(
+      row.delivery_address_snapshot,
+      row.customer_address_id
+    ),
     id: row.id,
     items,
     orderNumber: row.order_number,
@@ -2997,16 +3291,59 @@ function mapCustomerPhone(row: FoodCustomerPhoneRow): FoodPublicCustomerPhoneCon
   };
 }
 
+function mapCustomerAddress(row: FoodCustomerAddressRow): FoodPublicCustomerAddressContract {
+  return {
+    city: row.city,
+    complement: row.complement,
+    customerId: row.customer_id,
+    district: row.district,
+    id: row.id,
+    isPrimary: row.is_primary,
+    label: row.label,
+    number: row.number,
+    postalCode: row.postal_code,
+    reference: row.reference,
+    state: row.state,
+    storeId: row.store_id,
+    street: row.street
+  };
+}
+
+function mapDeliveryAddressSnapshot(
+  snapshot: Record<string, unknown> | null,
+  customerAddressId: string | null
+): FoodOrderContract["deliveryAddress"] {
+  if (!snapshot) {
+    return null;
+  }
+
+  return {
+    city: typeof snapshot.city === "string" ? snapshot.city : "",
+    complement: typeof snapshot.complement === "string" ? snapshot.complement : null,
+    customerAddressId:
+      typeof snapshot.customerAddressId === "string" ? snapshot.customerAddressId : customerAddressId,
+    district: typeof snapshot.district === "string" ? snapshot.district : null,
+    label: typeof snapshot.label === "string" ? snapshot.label : null,
+    number: typeof snapshot.number === "string" ? snapshot.number : "",
+    postalCode: typeof snapshot.postalCode === "string" ? snapshot.postalCode : null,
+    reference: typeof snapshot.reference === "string" ? snapshot.reference : null,
+    state: typeof snapshot.state === "string" ? snapshot.state : "",
+    street: typeof snapshot.street === "string" ? snapshot.street : ""
+  };
+}
+
 function isCustomerCompleteForCheckout(
   account: FoodPublicCustomerAccountContract,
   customer: FoodPublicCustomerContract,
-  primaryPhone: FoodPublicCustomerPhoneContract | null
+  primaryPhone: FoodPublicCustomerPhoneContract | null,
+  primaryAddress: FoodPublicCustomerAddressContract | null
 ): boolean {
   return Boolean(
     account.status === "active" &&
       customer.status === "active" &&
       customer.fullName &&
       primaryPhone?.phoneE164 &&
+      primaryAddress?.id &&
       account.termsAcceptedAt &&
       account.privacyAcceptedAt
   );
