@@ -97,6 +97,9 @@ export type FoodProductContract = {
   priceCents: number;
   status: FoodProductStatus;
   imageUrl: string | null;
+  stockControlEnabled: boolean;
+  stockMinQuantity: number;
+  stockQuantity: number;
   sortOrder: number;
   createdAt: string;
   updatedAt: string;
@@ -110,6 +113,8 @@ export type UpsertFoodProductInput = {
   priceCents: number;
   status: FoodProductStatus;
   imageUrl?: string | null;
+  stockControlEnabled?: boolean | null;
+  stockMinQuantity?: number | null;
   sortOrder?: number | null;
 };
 
@@ -318,6 +323,7 @@ export type ValidatePublicFoodCartInput = {
 
 export type FoodPublicCartValidationItemStatus =
   | "available"
+  | "insufficient_stock"
   | "missing"
   | "unavailable";
 

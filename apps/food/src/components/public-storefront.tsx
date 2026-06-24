@@ -346,8 +346,14 @@ export function PublicStorefront({
   ]);
 
   function changeQuantity(productId: string, delta: number) {
+    const product = products.find((currentProduct) => currentProduct.id === productId);
+    const maxQuantity = product?.stockControlEnabled ? product.stockQuantity : 99;
+
     setQuantities((current) => {
-      const nextQuantity = Math.min(Math.max((current[productId] ?? 0) + delta, 0), 99);
+      const nextQuantity = Math.min(
+        Math.max((current[productId] ?? 0) + delta, 0),
+        maxQuantity
+      );
       return {
         ...current,
         [productId]: nextQuantity
@@ -689,6 +695,10 @@ function PublicProductCard({
   product: FoodProductContract;
   quantity: number;
 }) {
+  const isStockControlled = product.stockControlEnabled;
+  const isOutOfStock = isStockControlled && product.stockQuantity <= 0;
+  const reachedStockLimit = isStockControlled && quantity >= product.stockQuantity;
+
   return (
     <article className="public-product-card">
       {product.imageUrl ? (
@@ -698,6 +708,11 @@ function PublicProductCard({
         <div>
           <h3>{product.name}</h3>
           {product.description ? <p>{product.description}</p> : null}
+          {isStockControlled ? (
+            <small className="public-stock-note">
+              {isOutOfStock ? "Sem estoque" : `${product.stockQuantity} em estoque`}
+            </small>
+          ) : null}
         </div>
         <div className="public-product-footer">
           <strong>{formatMoney(product.priceCents)}</strong>
@@ -706,7 +721,12 @@ function PublicProductCard({
               -
             </button>
             <span>{quantity}</span>
-            <button aria-label={`Adicionar ${product.name}`} onClick={onIncrease} type="button">
+            <button
+              aria-label={`Adicionar ${product.name}`}
+              disabled={isOutOfStock || reachedStockLimit}
+              onClick={onIncrease}
+              type="button"
+            >
               +
             </button>
           </div>

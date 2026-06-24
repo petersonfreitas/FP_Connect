@@ -107,6 +107,9 @@ type FoodProductRow = {
   price_cents: number;
   status: FoodProductStatus;
   image_url: string | null;
+  stock_control_enabled: boolean;
+  stock_min_quantity: number;
+  stock_quantity: number;
   sort_order: number;
   created_at: string;
   updated_at: string;
@@ -306,6 +309,9 @@ const productSelect = [
   "price_cents",
   "status",
   "image_url",
+  "stock_control_enabled",
+  "stock_min_quantity",
+  "stock_quantity",
   "sort_order",
   "created_at",
   "updated_at"
@@ -705,6 +711,8 @@ export class FoodService {
       slug: normalized.slug,
       sort_order: normalized.sortOrder,
       status: normalized.status,
+      stock_control_enabled: normalized.stockControlEnabled,
+      stock_min_quantity: normalized.stockMinQuantity,
       store_id: store?.id ?? null,
       updated_by: actorUserId
     };
@@ -2071,7 +2079,9 @@ export class FoodService {
       priceCents: normalizePriceCents(input.priceCents),
       slug: normalizeOptionalSlug(input.slug, name),
       sortOrder: normalizeSortOrder(input.sortOrder),
-      status: normalizeProductStatus(input.status)
+      status: normalizeProductStatus(input.status),
+      stockControlEnabled: normalizeStockControlEnabled(input.stockControlEnabled),
+      stockMinQuantity: normalizeStockQuantity(input.stockMinQuantity)
     };
   }
 
@@ -2122,6 +2132,10 @@ export class FoodService {
 
         if (product.status !== "available") {
           throw new BadRequestException(`Produto indisponivel: ${product.name}`);
+        }
+
+        if (!hasEnoughStock(product, item.quantity)) {
+          throw new BadRequestException(buildInsufficientStockMessage(product));
         }
 
         return {
@@ -2183,6 +2197,18 @@ export class FoodService {
           productName: product.name,
           quantity: item.quantity,
           status: "unavailable",
+          totalPriceCents: 0,
+          unitPriceCents: product.priceCents
+        };
+      }
+
+      if (!hasEnoughStock(product, item.quantity)) {
+        return {
+          issue: buildInsufficientStockMessage(product),
+          productId: product.id,
+          productName: product.name,
+          quantity: item.quantity,
+          status: "insufficient_stock",
           totalPriceCents: 0,
           unitPriceCents: product.priceCents
         };
@@ -3096,6 +3122,24 @@ function normalizePriceCents(value: unknown): number {
   return parsed;
 }
 
+function normalizeStockControlEnabled(value: unknown): boolean {
+  return value === true;
+}
+
+function normalizeStockQuantity(value: unknown): number {
+  if (value === undefined || value === null || value === "") {
+    return 0;
+  }
+
+  const parsed = Number(value);
+
+  if (!Number.isInteger(parsed) || parsed < 0 || parsed > 1000000) {
+    throw new BadRequestException("stockMinQuantity deve estar entre 0 e 1000000");
+  }
+
+  return parsed;
+}
+
 function normalizeQuantity(value: unknown): number {
   const parsed = Number(value);
 
@@ -3104,6 +3148,18 @@ function normalizeQuantity(value: unknown): number {
   }
 
   return parsed;
+}
+
+function hasEnoughStock(product: FoodProductContract, quantity: number): boolean {
+  return !product.stockControlEnabled || quantity <= product.stockQuantity;
+}
+
+function buildInsufficientStockMessage(product: FoodProductContract): string {
+  if (product.stockQuantity <= 0) {
+    return `Produto sem estoque: ${product.name}`;
+  }
+
+  return `Estoque insuficiente para ${product.name}. Disponivel: ${product.stockQuantity}`;
 }
 
 function normalizeOptionalUrl(value: unknown, field: string, maxLength: number): string | null {
@@ -3180,6 +3236,9 @@ function mapProduct(row: FoodProductRow): FoodProductContract {
     slug: row.slug,
     sortOrder: row.sort_order,
     status: row.status,
+    stockControlEnabled: row.stock_control_enabled,
+    stockMinQuantity: row.stock_min_quantity,
+    stockQuantity: row.stock_quantity,
     storeId: row.store_id,
     updatedAt: row.updated_at
   };

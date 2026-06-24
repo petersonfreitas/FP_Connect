@@ -431,6 +431,26 @@ export function ProductForm({
         </label>
       </div>
 
+      <div className="form-grid">
+        <label className="checkbox-label">
+          <input
+            defaultChecked={product?.stockControlEnabled ?? false}
+            name="stockControlEnabled"
+            type="checkbox"
+          />
+          Controlar estoque deste produto
+        </label>
+        <label>
+          Estoque minimo
+          <input
+            defaultValue={product?.stockMinQuantity ?? 0}
+            min={0}
+            name="stockMinQuantity"
+            type="number"
+          />
+        </label>
+      </div>
+
       <label>
         Imagem URL
         <input defaultValue={product?.imageUrl ?? ""} maxLength={500} name="imageUrl" type="url" />

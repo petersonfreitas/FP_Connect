@@ -666,6 +666,21 @@ textarea {
   grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
+.checkbox-label {
+  align-items: center;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  display: flex;
+  flex-direction: row;
+  gap: 10px;
+  padding: 12px;
+}
+
+.checkbox-label input {
+  margin: 0;
+  width: auto;
+}
+
 .span-2 {
   grid-column: 1 / -1;
 }
@@ -848,7 +863,7 @@ textarea {
 }
 
 .food-products-row {
-  grid-template-columns: minmax(220px, 1.4fr) minmax(160px, 1fr) 120px 140px 90px;
+  grid-template-columns: minmax(220px, 1.4fr) minmax(160px, 1fr) 120px 140px 120px 90px;
 }
 
 .data-row:last-child {
@@ -872,6 +887,11 @@ textarea {
   color: var(--muted);
   display: block;
   margin-top: 4px;
+}
+
+.data-row .stock-alert {
+  color: #b45309;
+  font-weight: 900;
 }
 
 .data-row a {
@@ -1558,6 +1578,14 @@ textarea {
   margin: 6px 0 0;
 }
 
+.public-stock-note {
+  color: var(--muted);
+  display: inline-block;
+  font-size: 0.82rem;
+  font-weight: 800;
+  margin-top: 8px;
+}
+
 .public-product-grid {
   display: grid;
   gap: 14px;
@@ -1615,6 +1643,12 @@ textarea {
   font-weight: 950;
   height: 34px;
   width: 38px;
+}
+
+.quantity-control button:disabled {
+  color: var(--muted);
+  cursor: not-allowed;
+  opacity: 0.45;
 }
 
 .quantity-control span {

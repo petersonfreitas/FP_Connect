@@ -117,6 +117,7 @@ export default async function ProductsPage({ searchParams }: ProductsPageProps) 
                   <span>Categoria</span>
                   <span>Preco</span>
                   <span>Status</span>
+                  <span>Estoque</span>
                   <span />
                 </div>
                 {products.map((product) => (
@@ -128,6 +129,12 @@ export default async function ProductsPage({ searchParams }: ProductsPageProps) 
                     <span>{product.categoryId ? categoryNames.get(product.categoryId) ?? "Categoria removida" : "Sem categoria"}</span>
                     <span>{formatMoney(product.priceCents)}</span>
                     <span>{productStatusLabels[product.status]}</span>
+                    <span>
+                      {formatProductStock(product)}
+                      {isProductAtOrBelowMinStock(product) ? (
+                        <small className="stock-alert">Abaixo do minimo</small>
+                      ) : null}
+                    </span>
                     <Link href={`/cadastro/produtos?companyId=${selectedCompany.company.id}&edit=${product.id}`}>
                       Editar
                     </Link>
@@ -158,4 +165,22 @@ export default async function ProductsPage({ searchParams }: ProductsPageProps) 
 function normalizePage(value: string | undefined): number {
   const page = Number(value);
   return Number.isInteger(page) && page > 0 ? page : 1;
+}
+
+function formatProductStock(product: {
+  stockControlEnabled: boolean;
+  stockMinQuantity: number;
+  stockQuantity: number;
+}): string {
+  return product.stockControlEnabled
+    ? `${product.stockQuantity} atual / ${product.stockMinQuantity} minimo`
+    : "Nao controla";
+}
+
+function isProductAtOrBelowMinStock(product: {
+  stockControlEnabled: boolean;
+  stockMinQuantity: number;
+  stockQuantity: number;
+}): boolean {
+  return product.stockControlEnabled && product.stockQuantity <= product.stockMinQuantity;
 }

@@ -137,7 +137,9 @@ export async function saveFoodProductAction(formData: FormData): Promise<void> {
     priceCents: parseMoneyToCents(formData.get("price")),
     slug: optionalText(formData.get("slug")),
     sortOrder: optionalInteger(formData.get("sortOrder")),
-    status: normalizeProductStatus(formData.get("status"))
+    status: normalizeProductStatus(formData.get("status")),
+    stockControlEnabled: formData.get("stockControlEnabled") === "on",
+    stockMinQuantity: optionalInteger(formData.get("stockMinQuantity")) ?? 0
   };
   const result = productId
     ? await updateFoodProduct(companyId, productId, input)
