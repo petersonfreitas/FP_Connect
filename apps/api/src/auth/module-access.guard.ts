@@ -58,9 +58,9 @@ export class ModuleAccessGuard implements CanActivate {
     }
 
     const profile = await this.getActiveProfile(actorUserId);
-    await this.ensureCompanyHasModule(companyId, policy.applicationKey);
 
     if (profile.global_role === "super_admin") {
+      await this.ensureCompanyHasModule(companyId, policy.applicationKey);
       return true;
     }
 

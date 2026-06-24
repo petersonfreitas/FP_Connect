@@ -434,6 +434,7 @@ export class GatewayService {
 
     await this.safeCreateGatewayEvent(companyId, actorUserId, {
       eventCode,
+      idempotencyKey: buildGatewayEventIdempotencyKey(eventCode, paymentRequest.id, "created"),
       payload: buildGatewayPaymentEventPayload(paymentRequest),
       providerKey: provider.key,
       sourceEventId: paymentRequest.id
@@ -822,7 +823,11 @@ export class GatewayService {
     if (validation.status === "succeeded") {
       await this.robotsService.createEvent(companyId, actorUserId, {
         eventCode: "gateway.smtp.validated",
-        idempotencyKey: `gateway:smtp:${companyId}:${Date.now()}`,
+        idempotencyKey: buildGatewayEventIdempotencyKey(
+          "gateway.smtp.validated",
+          mappedConfig.id,
+          "succeeded"
+        ),
         occurredAt: new Date().toISOString(),
         originMetadata: {
           module: "gateway",
@@ -1090,15 +1095,14 @@ export class GatewayService {
 
     const mappedPaymentRequest = mapPaymentRequest(data as unknown as PaymentRequestRow, provider);
 
-    await this.safeCreateGatewayEvent(paymentRequestRow.company_id, actorUserId, {
-      eventCode: getGatewayPaymentEventCode(mappedPaymentRequest.status),
-      payload: buildGatewayPaymentEventPayload(mappedPaymentRequest, {
-        previousStatus: paymentRequestRow.status,
-        reconciliationSource
-      }),
-      providerKey: provider.key,
-      sourceEventId: mappedPaymentRequest.id
-    });
+    await this.safeCreateGatewayPaymentTransitionEvent(
+      paymentRequestRow.company_id,
+      actorUserId,
+      mappedPaymentRequest,
+      provider.key,
+      paymentRequestRow.status,
+      { reconciliationSource }
+    );
 
     if (mappedPaymentRequest.status === "paid") {
       await this.markFoodOrderPaidFromGateway(mappedPaymentRequest);
@@ -1243,19 +1247,23 @@ export class GatewayService {
 
       await this.safeCreateGatewayEvent(companyId, actorUserId, {
         eventCode: "gateway.payment.requested",
-        payload: buildGatewayPaymentEventPayload(mappedPaymentRequest),
+        idempotencyKey: buildGatewayEventIdempotencyKey(
+          "gateway.payment.requested",
+          mappedPaymentRequest.id,
+          "created"
+        ),
+        payload: buildGatewayPaymentEventPayload(paymentRequest),
         providerKey: provider.key,
         sourceEventId: mappedPaymentRequest.id
       });
 
-      if (mappedPaymentRequest.status === "paid") {
-        await this.safeCreateGatewayEvent(companyId, actorUserId, {
-          eventCode: "gateway.payment.paid",
-          payload: buildGatewayPaymentEventPayload(mappedPaymentRequest),
-          providerKey: provider.key,
-          sourceEventId: mappedPaymentRequest.id
-        });
-      }
+      await this.safeCreateGatewayPaymentTransitionEvent(
+        companyId,
+        actorUserId,
+        mappedPaymentRequest,
+        provider.key,
+        paymentRequest.status
+      );
 
       return mappedPaymentRequest;
     } catch (error) {
@@ -1294,16 +1302,46 @@ export class GatewayService {
 
     const mappedPaymentRequest = mapPaymentRequest(data as unknown as PaymentRequestRow, provider);
 
-    await this.safeCreateGatewayEvent(companyId, actorUserId, {
-      eventCode: "gateway.payment.failed",
-      payload: buildGatewayPaymentEventPayload(mappedPaymentRequest, {
-        error: mappedPaymentRequest.errorMessage
-      }),
-      providerKey: provider.key,
-      sourceEventId: mappedPaymentRequest.id
-    });
+    await this.safeCreateGatewayPaymentTransitionEvent(
+      companyId,
+      actorUserId,
+      mappedPaymentRequest,
+      provider.key,
+      paymentRequest.status,
+      { error: mappedPaymentRequest.errorMessage }
+    );
 
     return mappedPaymentRequest;
+  }
+
+  private async safeCreateGatewayPaymentTransitionEvent(
+    companyId: string,
+    actorUserId: string | null,
+    paymentRequest: GatewayPaymentRequestContract,
+    providerKey: string,
+    previousStatus: GatewayPaymentRequestStatus,
+    extra: Record<string, unknown> = {}
+  ): Promise<void> {
+    if (previousStatus === paymentRequest.status) {
+      return;
+    }
+
+    const eventCode = getGatewayPaymentEventCode(paymentRequest.status);
+
+    await this.safeCreateGatewayEvent(companyId, actorUserId, {
+      eventCode,
+      idempotencyKey: buildGatewayEventIdempotencyKey(
+        eventCode,
+        paymentRequest.id,
+        `${previousStatus}->${paymentRequest.status}`
+      ),
+      payload: buildGatewayPaymentEventPayload(paymentRequest, {
+        previousStatus,
+        ...extra
+      }),
+      providerKey,
+      sourceEventId: paymentRequest.id
+    });
   }
 
   private async safeCreateGatewayEvent(
@@ -1311,6 +1349,7 @@ export class GatewayService {
     actorUserId: string | null,
     input: {
       eventCode: string;
+      idempotencyKey?: string;
       payload: Record<string, unknown>;
       providerKey?: string;
       sourceEventId: string;
@@ -1319,7 +1358,9 @@ export class GatewayService {
     await this.robotsService
       .createEvent(companyId, actorUserId, {
         eventCode: input.eventCode,
-        idempotencyKey: `${input.eventCode}:${companyId}:${Date.now()}`,
+        idempotencyKey:
+          input.idempotencyKey ??
+          buildGatewayEventIdempotencyKey(input.eventCode, input.sourceEventId),
         occurredAt: new Date().toISOString(),
         originMetadata: {
           module: "gateway",
@@ -1702,6 +1743,14 @@ function buildGatewayPaymentEventPayload(
     status: paymentRequest.status,
     ...extra
   };
+}
+
+function buildGatewayEventIdempotencyKey(
+  eventCode: string,
+  sourceEventId: string,
+  scope = "event"
+): string {
+  return `${eventCode}:${sourceEventId}:${scope}`;
 }
 
 function getGatewayPaymentEventCode(status: GatewayPaymentRequestStatus): string {
