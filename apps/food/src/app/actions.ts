@@ -3,11 +3,13 @@
 import { redirect } from "next/navigation";
 import type {
   CreateFoodOrderInput,
+  CreatePublicFoodOrderInput,
   FoodCategoryStatus,
   FoodOrderStatus,
   FoodPaymentMethod,
   FoodPaymentStatus,
   FoodProductStatus,
+  FoodCustomerPreferredContactMethod,
   FoodStoreHourKind,
   FoodStoreStatus,
   UpdateFoodOrderPaymentInput,
@@ -28,9 +30,17 @@ import {
   updateFoodOrderPayment,
   updateFoodOrderStatus,
   updateFoodProduct,
+  updatePublicFoodCustomerProfile,
   upsertFoodStore
 } from "@/lib/internal-api";
-import { getCurrentUser } from "@/lib/auth";
+import { getCurrentPublicStoreUser } from "@/lib/auth";
+import {
+  createFallbackPublicStoreContext,
+  normalizePublicSlug as normalizeStorePublicSlug,
+  storeLoginUrl,
+  storeOrderUrl,
+  storeUrl
+} from "@/lib/public-store-urls";
 
 const validStatuses = new Set<FoodStoreStatus>([
   "closed",
@@ -60,6 +70,12 @@ const validPaymentStatuses = new Set<FoodPaymentStatus>([
   "pending"
 ]);
 const validStoreHourKinds = new Set<FoodStoreHourKind>(["delivery", "ordering"]);
+const validCustomerContactMethods = new Set<FoodCustomerPreferredContactMethod>([
+  "cellphone",
+  "email",
+  "landline",
+  "whatsapp"
+]);
 
 export async function saveFoodStoreAction(formData: FormData): Promise<void> {
   const companyId = String(formData.get("companyId") ?? "").trim();
@@ -286,11 +302,12 @@ export async function updateFoodOrderPaymentAction(formData: FormData): Promise<
 
 export async function createPublicFoodOrderAction(formData: FormData): Promise<void> {
   const publicSlug = normalizePublicSlug(formData.get("publicSlug"));
-  const currentUser = await getCurrentUser();
-  const basePath = `/l/${encodeURIComponent(publicSlug)}`;
+  const storeContext = createFallbackPublicStoreContext(publicSlug);
+  const currentUser = await getCurrentPublicStoreUser(publicSlug);
+  const basePath = storeUrl(storeContext);
 
   if (!currentUser) {
-    redirect(`/login?next=${encodeURIComponent(basePath)}`);
+    redirect(storeLoginUrl(storeContext, basePath));
   }
 
   const customerSessionResult = await ensurePublicFoodCustomerStoreAccess(publicSlug, {
@@ -306,6 +323,14 @@ export async function createPublicFoodOrderAction(formData: FormData): Promise<v
     );
   }
 
+  if (!customerSessionResult.data?.isCompleteForCheckout) {
+    redirect(
+      `${storeUrl(storeContext, "/conta")}?error=${encodeURIComponent(
+        truncateQueryValue("Complete seu cadastro antes de finalizar o pedido.")
+      )}`
+    );
+  }
+
   const productIds = formData.getAll("productId").map((value) => String(value));
   const items = productIds
     .map((productId) => ({
@@ -313,10 +338,12 @@ export async function createPublicFoodOrderAction(formData: FormData): Promise<v
       quantity: optionalInteger(formData.get(`quantity:${productId}`)) ?? 0
     }))
     .filter((item) => item.quantity > 0);
-  const input: CreateFoodOrderInput = {
-    customerName: optionalText(formData.get("customerName")),
+  const input: CreatePublicFoodOrderInput = {
+    authUserId: currentUser.id,
+    customerName: customerSessionResult.data.customer.fullName,
+    email: currentUser.email,
     customerNote: optionalText(formData.get("customerNote")),
-    customerPhone: optionalText(formData.get("customerPhone")),
+    customerPhone: customerSessionResult.data.primaryPhone?.phoneE164 ?? null,
     items
   };
   const result = await createPublicFoodOrder(publicSlug, input);
@@ -330,20 +357,50 @@ export async function createPublicFoodOrderAction(formData: FormData): Promise<v
   }
 
   redirect(
-    `${basePath}/pedido/${encodeURIComponent(result.data.orderNumber)}?created=1`
+    `${storeOrderUrl(storeContext, result.data.orderNumber)}?created=1`
   );
 }
 
 export async function trackPublicFoodOrderAction(formData: FormData): Promise<void> {
   const publicSlug = normalizePublicSlug(formData.get("publicSlug"));
+  const storeContext = createFallbackPublicStoreContext(publicSlug);
   const orderNumber = String(formData.get("orderNumber") ?? "").trim().toUpperCase();
-  const basePath = `/l/${encodeURIComponent(publicSlug)}`;
+  const basePath = storeUrl(storeContext);
 
   if (!orderNumber) {
     redirect(`${basePath}?error=${encodeURIComponent(truncateQueryValue("Informe o numero do pedido."))}`);
   }
 
-  redirect(`${basePath}/pedido/${encodeURIComponent(orderNumber)}`);
+  redirect(storeOrderUrl(storeContext, orderNumber));
+}
+
+export async function savePublicCustomerProfileAction(formData: FormData): Promise<void> {
+  const publicSlug = normalizePublicSlug(formData.get("publicSlug"));
+  const storeContext = createFallbackPublicStoreContext(publicSlug);
+  const accountPath = storeUrl(storeContext, "/conta");
+  const currentUser = await getCurrentPublicStoreUser(publicSlug);
+
+  if (!currentUser) {
+    redirect(storeLoginUrl(storeContext, accountPath));
+  }
+
+  const result = await updatePublicFoodCustomerProfile(publicSlug, {
+    acceptedPrivacy: formData.get("acceptedPrivacy") === "on",
+    acceptedTerms: formData.get("acceptedTerms") === "on",
+    authUserId: currentUser.id,
+    email: currentUser.email,
+    fullName: String(formData.get("fullName") ?? ""),
+    phone: String(formData.get("phone") ?? ""),
+    preferredContactMethod: normalizeCustomerContactMethod(
+      formData.get("preferredContactMethod")
+    )
+  });
+
+  if (result.error) {
+    redirect(`${accountPath}?error=${encodeURIComponent(truncateQueryValue(result.error))}`);
+  }
+
+  redirect(`${accountPath}?saved=1`);
 }
 
 function requireCompanyId(formData: FormData): string {
@@ -357,13 +414,11 @@ function requireCompanyId(formData: FormData): string {
 }
 
 function normalizePublicSlug(value: FormDataEntryValue | null): string {
-  const slug = String(value ?? "").trim().toLowerCase();
-
-  if (!/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(slug)) {
+  try {
+    return normalizeStorePublicSlug(String(value ?? ""));
+  } catch {
     redirect("/l/loja-nao-informada?error=Loja%20publica%20invalida.");
   }
-
-  return slug;
 }
 
 function redirectWithResult(
@@ -469,6 +524,18 @@ function normalizePaymentStatus(value: FormDataEntryValue | null): FoodPaymentSt
   }
 
   return status as FoodPaymentStatus;
+}
+
+function normalizeCustomerContactMethod(
+  value: FormDataEntryValue | null
+): FoodCustomerPreferredContactMethod {
+  const method = String(value ?? "");
+
+  if (!validCustomerContactMethods.has(method as FoodCustomerPreferredContactMethod)) {
+    return "whatsapp";
+  }
+
+  return method as FoodCustomerPreferredContactMethod;
 }
 
 function normalizeStoreHourKind(value: string): FoodStoreHourKind {

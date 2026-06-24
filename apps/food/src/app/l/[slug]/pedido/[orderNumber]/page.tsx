@@ -3,12 +3,16 @@ import type { FoodPaymentStatus } from "@fp/types";
 import { Notice } from "@/components/page-feedback";
 import { PublicCustomerMenu } from "@/components/public-customer-menu";
 import { PublicOrderPaymentRetry } from "@/components/public-order-payment-retry";
-import { getCurrentUser } from "@/lib/auth";
+import { getCurrentPublicStoreUser } from "@/lib/auth";
 import {
   ensurePublicFoodCustomerStoreAccess,
   getPublicFoodCheckout,
   getPublicFoodOrder
 } from "@/lib/internal-api";
+import {
+  createFallbackPublicStoreContext,
+  storeUrl
+} from "@/lib/public-store-urls";
 
 type PublicOrderPageProps = {
   params: Promise<{
@@ -54,10 +58,11 @@ export default async function PublicOrderPage({
   searchParams
 }: PublicOrderPageProps) {
   const [{ orderNumber, slug }, query] = await Promise.all([params, searchParams]);
+  const storeContext = createFallbackPublicStoreContext(slug);
   const [orderResult, checkoutResult, currentUser] = await Promise.all([
-    getPublicFoodOrder(slug, orderNumber),
-    getPublicFoodCheckout(slug),
-    getCurrentUser()
+    getPublicFoodOrder(storeContext.publicSlug, orderNumber),
+    getPublicFoodCheckout(storeContext.publicSlug),
+    getCurrentPublicStoreUser(storeContext.publicSlug)
   ]);
 
   if (orderResult.error || !orderResult.data) {
@@ -69,7 +74,7 @@ export default async function PublicOrderPage({
             <h1>Pedido nao encontrado</h1>
             <p>{orderResult.error ?? "Nao foi possivel carregar este pedido."}</p>
           </div>
-          <Link className="secondary-action" href={`/l/${encodeURIComponent(slug)}`}>
+          <Link className="secondary-action" href={storeUrl(storeContext)}>
             Voltar para loja
           </Link>
         </section>
@@ -79,7 +84,7 @@ export default async function PublicOrderPage({
 
   const order = orderResult.data;
   const customerSessionResult = currentUser
-    ? await ensurePublicFoodCustomerStoreAccess(slug, {
+    ? await ensurePublicFoodCustomerStoreAccess(storeContext.publicSlug, {
         authUserId: currentUser.id,
         email: currentUser.email
       })
@@ -89,8 +94,9 @@ export default async function PublicOrderPage({
     <main className="public-store">
       <PublicCustomerMenu
         active="order"
+        isAuthenticated={Boolean(currentUser)}
         orderNumber={order.orderNumber}
-        slug={slug}
+        storeContext={storeContext}
       />
 
       {query?.created ? (
@@ -127,7 +133,7 @@ export default async function PublicOrderPage({
             {paymentStatusLabels[order.paymentStatus]}
           </p>
         </div>
-        <Link className="secondary-action" href={`/l/${encodeURIComponent(slug)}`}>
+        <Link className="secondary-action" href={storeUrl(storeContext)}>
           Voltar ao cardapio
         </Link>
       </section>
@@ -181,8 +187,11 @@ export default async function PublicOrderPage({
       <PublicOrderPaymentRetry
         checkout={checkoutResult.data}
         isAuthenticated={Boolean(currentUser)}
+        isCustomerCompleteForCheckout={
+          customerSessionResult?.data?.isCompleteForCheckout ?? false
+        }
         order={order}
-        slug={slug}
+        storeContext={storeContext}
       />
     </main>
   );

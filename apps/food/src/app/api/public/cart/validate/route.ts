@@ -1,17 +1,17 @@
 import { NextResponse } from "next/server";
-import type { CreatePublicFoodCheckoutInput } from "@fp/types";
+import type { ValidatePublicFoodCartInput } from "@fp/types";
 import { getCurrentPublicStoreUser } from "@/lib/auth";
 import {
-  createPublicFoodCheckout,
-  ensurePublicFoodCustomerStoreAccess
+  ensurePublicFoodCustomerStoreAccess,
+  validatePublicFoodCart
 } from "@/lib/internal-api";
 
-type PublicCheckoutRequest = Omit<CreatePublicFoodCheckoutInput, "authUserId" | "email"> & {
+type PublicCartValidationRequest = ValidatePublicFoodCartInput & {
   publicSlug?: string | null;
 };
 
 export async function POST(request: Request) {
-  const body = (await request.json().catch(() => null)) as PublicCheckoutRequest | null;
+  const body = (await request.json().catch(() => null)) as PublicCartValidationRequest | null;
   const publicSlug = typeof body?.publicSlug === "string" ? body.publicSlug.trim() : "";
 
   if (!publicSlug) {
@@ -30,7 +30,7 @@ export async function POST(request: Request) {
   if (!currentUser) {
     return NextResponse.json(
       {
-        error: "Entre para finalizar o pedido."
+        error: "Entre para validar o carrinho."
       },
       {
         status: 401
@@ -57,7 +57,7 @@ export async function POST(request: Request) {
   if (!customerSessionResult.data?.isCompleteForCheckout) {
     return NextResponse.json(
       {
-        error: "Complete seu cadastro antes de finalizar o pedido."
+        error: "Complete seu cadastro antes de validar o carrinho."
       },
       {
         status: 400
@@ -65,20 +65,14 @@ export async function POST(request: Request) {
     );
   }
 
-  const result = await createPublicFoodCheckout(publicSlug, {
-    authUserId: currentUser.id,
-    customerName: customerSessionResult.data.customer.fullName,
-    customerNote: body?.customerNote,
-    customerPhone: customerSessionResult.data.primaryPhone?.phoneE164 ?? null,
-    email: currentUser.email,
-    items: body?.items ?? [],
-    payment: body?.payment
+  const result = await validatePublicFoodCart(publicSlug, {
+    items: body?.items ?? []
   });
 
   if (result.error || !result.data) {
     return NextResponse.json(
       {
-        error: result.error ?? "Nao foi possivel processar o pagamento."
+        error: result.error ?? "Nao foi possivel validar o carrinho."
       },
       {
         status: 400

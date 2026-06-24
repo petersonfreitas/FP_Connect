@@ -1,7 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 
-const ACCESS_TOKEN_COOKIE = "fp_connect_access_token";
-const REFRESH_TOKEN_COOKIE = "fp_connect_refresh_token";
+const ACCESS_TOKEN_COOKIE = "fp_food_internal_access_token";
+const REFRESH_TOKEN_COOKIE = "fp_food_internal_refresh_token";
 const DEFAULT_ACCESS_TOKEN_MAX_AGE = 60 * 60;
 const REFRESH_TOKEN_MAX_AGE = 60 * 60 * 24 * 30;
 

@@ -169,10 +169,21 @@ export type FoodPublicCustomerStoreAccessContract = {
   storeId: string;
 };
 
+export type FoodPublicCustomerPhoneContract = {
+  customerId: string;
+  id: string;
+  isPreferred: boolean;
+  isPrimary: boolean;
+  phoneE164: string;
+  storeId: string | null;
+  type: "cellphone" | "landline" | "other" | "whatsapp";
+};
+
 export type FoodPublicCustomerSessionContract = {
   account: FoodPublicCustomerAccountContract;
   customer: FoodPublicCustomerContract;
   isCompleteForCheckout: boolean;
+  primaryPhone: FoodPublicCustomerPhoneContract | null;
   storeAccess: FoodPublicCustomerStoreAccessContract;
 };
 
@@ -201,6 +212,9 @@ export type FoodOrderContract = {
   id: string;
   companyId: string;
   storeId: string | null;
+  customerAccountId: string | null;
+  customerId: string | null;
+  customerStoreAccessId: string | null;
   orderNumber: string;
   status: FoodOrderStatus;
   customerName: string | null;
@@ -248,7 +262,14 @@ export type CreateFoodOrderInput = {
   items: CreateFoodOrderItemInput[];
 };
 
-export type CreatePublicFoodCheckoutInput = CreateFoodOrderInput & {
+export type EnsureFoodPublicCustomerInput = {
+  authUserId: string;
+  email?: string | null;
+};
+
+export type CreatePublicFoodOrderInput = CreateFoodOrderInput & EnsureFoodPublicCustomerInput;
+
+export type CreatePublicFoodCheckoutInput = CreatePublicFoodOrderInput & {
   payment?: {
     cardToken?: string | null;
     customerEmail?: string | null;
@@ -258,9 +279,40 @@ export type CreatePublicFoodCheckoutInput = CreateFoodOrderInput & {
   } | null;
 };
 
-export type EnsureFoodPublicCustomerInput = {
-  authUserId: string;
-  email?: string | null;
+export type ValidatePublicFoodCartInput = {
+  items: CreateFoodOrderItemInput[];
+};
+
+export type FoodPublicCartValidationItemStatus =
+  | "available"
+  | "missing"
+  | "unavailable";
+
+export type FoodPublicCartValidationItemContract = {
+  issue: string | null;
+  productId: string;
+  productName: string | null;
+  quantity: number;
+  status: FoodPublicCartValidationItemStatus;
+  totalPriceCents: number;
+  unitPriceCents: number;
+};
+
+export type FoodPublicCartValidationContract = {
+  checkedAt: string;
+  isValidForCheckout: boolean;
+  issues: string[];
+  items: FoodPublicCartValidationItemContract[];
+  subtotalCents: number;
+  totalCents: number;
+};
+
+export type UpdateFoodPublicCustomerProfileInput = EnsureFoodPublicCustomerInput & {
+  acceptedPrivacy: boolean;
+  acceptedTerms: boolean;
+  fullName: string;
+  phone: string;
+  preferredContactMethod: FoodCustomerPreferredContactMethod;
 };
 
 export type CreatePublicFoodCheckoutContract = {
@@ -271,6 +323,8 @@ export type CreatePublicFoodCheckoutContract = {
 };
 
 export type RetryPublicFoodPaymentInput = {
+  authUserId: string;
+  email?: string | null;
   payment?: CreatePublicFoodCheckoutInput["payment"];
 };
 

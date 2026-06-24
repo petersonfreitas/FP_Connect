@@ -7,16 +7,26 @@ import type {
   CreatePublicFoodCheckoutInput,
   FoodMenuContract,
   FoodProductContract,
-  FoodPublicCheckoutContract
+  FoodPublicCartValidationContract,
+  FoodPublicCheckoutContract,
+  ValidatePublicFoodCartInput
 } from "@fp/types";
 import { PendingSubmitButton } from "@/components/pending-submit-button";
 import { PublicCustomerMenu } from "@/components/public-customer-menu";
+import {
+  storeLoginUrl,
+  storeOrderUrl,
+  storeUrl,
+  type PublicStoreUrlContext
+} from "@/lib/public-store-urls";
 
 type PublicStorefrontProps = {
   checkout: FoodPublicCheckoutContract | null;
   createOrderAction: (formData: FormData) => void | Promise<void>;
   isAuthenticated: boolean;
+  isCustomerCompleteForCheckout: boolean;
   menu: FoodMenuContract;
+  storeContext: PublicStoreUrlContext;
   trackOrderAction: (formData: FormData) => void | Promise<void>;
 };
 
@@ -70,7 +80,9 @@ export function PublicStorefront({
   checkout,
   createOrderAction,
   isAuthenticated,
+  isCustomerCompleteForCheckout,
   menu,
+  storeContext,
   trackOrderAction
 }: PublicStorefrontProps) {
   const orderFormRef = useRef<HTMLFormElement>(null);
@@ -78,9 +90,16 @@ export function PublicStorefront({
   const [quantities, setQuantities] = useState<Record<string, number>>({});
   const [cardError, setCardError] = useState<string | null>(null);
   const [cardStatus, setCardStatus] = useState<string | null>(null);
+  const [cartValidation, setCartValidation] =
+    useState<FoodPublicCartValidationContract | null>(null);
+  const [cartValidationError, setCartValidationError] = useState<string | null>(null);
+  const [cartValidationPending, setCartValidationPending] = useState(false);
   const [mercadoPagoReady, setMercadoPagoReady] = useState(false);
   const [payingWithCard, setPayingWithCard] = useState(false);
-  const selectedItems = products.filter((product) => (quantities[product.id] ?? 0) > 0);
+  const selectedItems = useMemo(
+    () => products.filter((product) => (quantities[product.id] ?? 0) > 0),
+    [products, quantities]
+  );
   const selectedItemsCount = selectedItems.reduce(
     (sum, product) => sum + (quantities[product.id] ?? 0),
     0
@@ -89,8 +108,19 @@ export function PublicStorefront({
     (sum, product) => sum + product.priceCents * (quantities[product.id] ?? 0),
     0
   );
+  const selectedCartItems = useMemo(
+    () =>
+      selectedItems.map((product) => ({
+        productId: product.id,
+        quantity: quantities[product.id] ?? 0
+      })),
+    [quantities, selectedItems]
+  );
+  const validatedTotalCents = cartValidation?.totalCents ?? totalCents;
+  const isCartValidForCheckout = cartValidation?.isValidForCheckout ?? false;
   const canOrderNow = menu.availability.isOrderingOpen;
-  const loginHref = `/login?next=${encodeURIComponent(`/l/${menu.store.publicSlug}`)}`;
+  const loginHref = storeLoginUrl(storeContext);
+  const accountHref = storeUrl(storeContext, "/conta");
   const publicKey = checkout?.mercadoPago.enabled ? checkout.mercadoPago.publicKey : null;
 
   const submitCardPayment = useCallback(
@@ -98,6 +128,15 @@ export function PublicStorefront({
       if (!isAuthenticated) {
         window.location.href = loginHref;
         return;
+      }
+
+      if (!isCustomerCompleteForCheckout) {
+        window.location.href = accountHref;
+        return;
+      }
+
+      if (!isCartValidForCheckout) {
+        throw new Error(cartValidationError ?? "Valide o carrinho antes de pagar.");
       }
 
       const payload = buildCardCheckoutPayload({
@@ -132,16 +171,30 @@ export function PublicStorefront({
         throw new Error(body?.error ?? "Nao foi possivel processar o pagamento.");
       }
 
-      window.location.href = `/l/${encodeURIComponent(menu.store.publicSlug)}/pedido/${encodeURIComponent(
+      window.location.href = `${storeOrderUrl(
+        storeContext,
         body.data.order.orderNumber
       )}?created=1&payment=${encodeURIComponent(body.data.paymentStatus)}`;
     },
-    [isAuthenticated, loginHref, menu.store.publicSlug, products, quantities]
+    [
+      accountHref,
+      cartValidationError,
+      isAuthenticated,
+      isCartValidForCheckout,
+      isCustomerCompleteForCheckout,
+      loginHref,
+      menu.store.publicSlug,
+      products,
+      quantities,
+      storeContext
+    ]
   );
 
   useEffect(() => {
     if (
       !isAuthenticated ||
+      !isCustomerCompleteForCheckout ||
+      !isCartValidForCheckout ||
       !canOrderNow ||
       !publicKey ||
       !mercadoPagoReady ||
@@ -187,7 +240,7 @@ export function PublicStorefront({
           }
         },
         initialization: {
-          amount: totalCents / 100
+          amount: validatedTotalCents / 100
         }
       })
       .then((controller) => {
@@ -210,11 +263,78 @@ export function PublicStorefront({
   }, [
     canOrderNow,
     isAuthenticated,
+    isCartValidForCheckout,
+    isCustomerCompleteForCheckout,
     mercadoPagoReady,
     publicKey,
     selectedItems.length,
     submitCardPayment,
-    totalCents
+    totalCents,
+    validatedTotalCents
+  ]);
+
+  useEffect(() => {
+    if (!isAuthenticated || !isCustomerCompleteForCheckout || selectedCartItems.length === 0) {
+      setCartValidation(null);
+      setCartValidationError(null);
+      setCartValidationPending(false);
+      return undefined;
+    }
+
+    const controller = new AbortController();
+    const payload: ValidatePublicFoodCartInput & { publicSlug: string } = {
+      items: selectedCartItems,
+      publicSlug: menu.store.publicSlug
+    };
+
+    setCartValidationPending(true);
+    setCartValidationError(null);
+
+    fetch("/api/public/cart/validate", {
+      body: JSON.stringify(payload),
+      headers: {
+        "Content-Type": "application/json"
+      },
+      method: "POST",
+      signal: controller.signal
+    })
+      .then(async (response) => {
+        const body = (await response.json().catch(() => null)) as
+          | {
+              data?: FoodPublicCartValidationContract;
+              error?: string;
+            }
+          | null;
+
+        if (!response.ok || !body?.data) {
+          throw new Error(body?.error ?? "Nao foi possivel validar o carrinho.");
+        }
+
+        setCartValidation(body.data);
+        setCartValidationError(body.data.issues[0] ?? null);
+      })
+      .catch((error: unknown) => {
+        if (controller.signal.aborted) {
+          return;
+        }
+
+        setCartValidation(null);
+        setCartValidationError(getErrorMessage(error));
+      })
+      .finally(() => {
+        if (!controller.signal.aborted) {
+          setCartValidationPending(false);
+        }
+      });
+
+    return () => {
+      controller.abort();
+    };
+  }, [
+    isAuthenticated,
+    isCustomerCompleteForCheckout,
+    menu.store.publicSlug,
+    selectedCartItems
   ]);
 
   function changeQuantity(productId: string, delta: number) {
@@ -240,7 +360,8 @@ export function PublicStorefront({
       <PublicCustomerMenu
         active="menu"
         contactPhone={menu.store.contactPhone}
-        slug={menu.store.publicSlug}
+        isAuthenticated={isAuthenticated}
+        storeContext={storeContext}
       />
 
       <section className="public-hero">
@@ -369,7 +490,7 @@ export function PublicStorefront({
             <div>
               <div className="eyebrow">Checkout</div>
               <h2>Seu pedido</h2>
-              <p>Confira os itens e informe seus dados para enviar para a loja.</p>
+              <p>Confira os itens e finalize com os dados salvos na sua conta.</p>
             </div>
             <span>{selectedItemsCount} item(ns)</span>
           </div>
@@ -403,9 +524,17 @@ export function PublicStorefront({
           )}
 
           <div className="public-cart-total">
-            <span>Total</span>
-            <strong>{formatMoney(totalCents)}</strong>
+            <span>{cartValidation ? "Total validado" : "Total estimado"}</span>
+            <strong>{formatMoney(validatedTotalCents)}</strong>
           </div>
+
+          {cartValidationPending ? (
+            <p className="public-delivery-note">Validando carrinho com a loja...</p>
+          ) : null}
+
+          {cartValidationError ? (
+            <p className="public-payment-error">{cartValidationError}</p>
+          ) : null}
 
           {!canOrderNow ? (
             <p className="public-delivery-note">
@@ -413,14 +542,6 @@ export function PublicStorefront({
             </p>
           ) : null}
 
-          <label>
-            Nome
-            <input maxLength={120} name="customerName" placeholder="Seu nome" required />
-          </label>
-          <label>
-            WhatsApp
-            <input maxLength={40} name="customerPhone" placeholder="(00) 00000-0000" required />
-          </label>
           <label>
             Observacao
             <textarea maxLength={600} name="customerNote" rows={3} />
@@ -432,13 +553,22 @@ export function PublicStorefront({
             </p>
           ) : null}
 
-          {isAuthenticated ? (
+          {isAuthenticated && isCustomerCompleteForCheckout ? (
             <PendingSubmitButton
-              disabled={selectedItems.length === 0 || !canOrderNow}
+              disabled={
+                selectedItems.length === 0 ||
+                !canOrderNow ||
+                cartValidationPending ||
+                !isCartValidForCheckout
+              }
               pendingLabel="Enviando pedido..."
             >
               Enviar pedido
             </PendingSubmitButton>
+          ) : isAuthenticated ? (
+            <a className="primary-action" href={accountHref}>
+              Completar cadastro
+            </a>
           ) : (
             <a className="primary-action" href={loginHref}>
               Entrar para finalizar
@@ -464,6 +594,13 @@ export function PublicStorefront({
                 Entrar
               </a>
             </div>
+          ) : !isCustomerCompleteForCheckout ? (
+            <div className="empty-state public-empty-cart">
+              Complete seu cadastro para habilitar pagamento online.
+              <a className="secondary-action compact-action" href={accountHref}>
+                Minha conta
+              </a>
+            </div>
           ) : !canOrderNow ? (
             <div className="empty-state public-empty-cart">
               Pagamento online indisponivel fora do horario de pedidos.
@@ -472,11 +609,19 @@ export function PublicStorefront({
             <div className="empty-state public-empty-cart">
               Adicione itens ao pedido para habilitar o pagamento com cartao.
             </div>
+          ) : cartValidationPending ? (
+            <div className="empty-state public-empty-cart">
+              Validando carrinho com a loja antes do pagamento.
+            </div>
+          ) : !isCartValidForCheckout ? (
+            <div className="empty-state public-empty-cart">
+              {cartValidationError ?? "Valide o carrinho antes de pagar."}
+            </div>
           ) : (
             <>
               <div className="public-payment-summary">
                 <span>Total selecionado</span>
-                <strong>{formatMoney(totalCents)}</strong>
+                <strong>{formatMoney(validatedTotalCents)}</strong>
               </div>
               <div
                 aria-busy={payingWithCard}
@@ -552,14 +697,12 @@ function buildCardCheckoutPayload({
   products: FoodProductContract[];
   publicSlug: string;
   quantities: Record<string, number>;
-}): CreatePublicFoodCheckoutInput & { publicSlug: string } {
+}): Omit<CreatePublicFoodCheckoutInput, "authUserId" | "email"> & { publicSlug: string } {
   if (!formElement) {
     throw new Error("Formulario do pedido nao esta disponivel.");
   }
 
   const orderFormData = new FormData(formElement);
-  const customerName = normalizeFormText(orderFormData.get("customerName"));
-  const customerPhone = normalizeFormText(orderFormData.get("customerPhone"));
   const customerNote = normalizeFormText(orderFormData.get("customerNote"));
   const items = products
     .map((product) => ({
@@ -567,10 +710,6 @@ function buildCardCheckoutPayload({
       quantity: quantities[product.id] ?? 0
     }))
     .filter((item) => item.quantity > 0);
-
-  if (!customerName || !customerPhone) {
-    throw new Error("Informe nome e WhatsApp antes de pagar com cartao.");
-  }
 
   if (items.length === 0) {
     throw new Error("Adicione itens ao pedido antes de pagar com cartao.");
@@ -587,9 +726,7 @@ function buildCardCheckoutPayload({
   }
 
   return {
-    customerName,
     customerNote,
-    customerPhone,
     items,
     payment: {
       cardToken,

@@ -11,6 +11,7 @@ import { SupabaseService } from "../../supabase/supabase.service";
 import type {
   CreatePublicFoodCheckoutContract,
   CreatePublicFoodCheckoutInput,
+  CreatePublicFoodOrderInput,
   CreateFoodOrderInput,
   EnsureFoodPublicCustomerInput,
   FoodCategoryContract,
@@ -29,9 +30,12 @@ import type {
   FoodPaymentStatus,
   FoodProductContract,
   FoodProductStatus,
+  FoodPublicCartValidationContract,
+  FoodPublicCartValidationItemContract,
   FoodPublicCheckoutContract,
   FoodPublicCustomerAccountContract,
   FoodPublicCustomerContract,
+  FoodPublicCustomerPhoneContract,
   FoodPublicCustomerSessionContract,
   FoodPublicCustomerStoreAccessContract,
   FoodStoreContract,
@@ -42,10 +46,12 @@ import type {
   RetryPublicFoodPaymentInput,
   UpdateFoodOrderPaymentInput,
   UpdateFoodOrderStatusInput,
+  UpdateFoodPublicCustomerProfileInput,
   UpsertFoodCategoryInput,
   UpsertFoodProductInput,
   UpsertFoodStoreHoursInput,
-  UpsertFoodStoreInput
+  UpsertFoodStoreInput,
+  ValidatePublicFoodCartInput
 } from "./food.contracts";
 
 type FoodStoreRow = {
@@ -112,6 +118,9 @@ type FoodOrderRow = {
   customer_name: string | null;
   customer_phone: string | null;
   customer_note: string | null;
+  customer_account_id: string | null;
+  customer_id: string | null;
+  customer_store_access_id: string | null;
   paid_at: string | null;
   paid_by: string | null;
   payment_method: FoodPaymentMethod | null;
@@ -175,6 +184,16 @@ type FoodCustomerStoreAccessRow = {
   store_id: string;
 };
 
+type FoodCustomerPhoneRow = {
+  customer_id: string;
+  id: string;
+  is_preferred: boolean;
+  is_primary: boolean;
+  phone_e164: string;
+  store_id: string | null;
+  type: "cellphone" | "landline" | "other" | "whatsapp";
+};
+
 type FoodDashboardOrderRow = {
   id: string;
   status: FoodOrderStatus;
@@ -212,6 +231,7 @@ type OrderListOptions = PaginationOptions & {
 
 type CreateOrderOptions = {
   eventSource: "internal-order-v0" | "public-store-v0";
+  customerSession?: FoodPublicCustomerSessionContract | null;
 };
 
 const storeSelect = [
@@ -278,6 +298,9 @@ const orderSelect = [
   "customer_name",
   "customer_phone",
   "customer_note",
+  "customer_account_id",
+  "customer_id",
+  "customer_store_access_id",
   "paid_at",
   "paid_by",
   "payment_method",
@@ -341,6 +364,16 @@ const customerStoreAccessSelect = [
   "last_access_at"
 ].join(",");
 
+const customerPhoneSelect = [
+  "id",
+  "customer_id",
+  "store_id",
+  "phone_e164",
+  "type",
+  "is_primary",
+  "is_preferred"
+].join(",");
+
 const validStatuses = new Set<FoodStoreStatus>([
   "closed",
   "implementation",
@@ -369,6 +402,12 @@ const validPaymentStatuses = new Set<FoodPaymentStatus>([
   "pending"
 ]);
 const validStoreHourKinds = new Set<FoodStoreHourKind>(["delivery", "ordering"]);
+const validCustomerContactMethods = new Set<FoodCustomerPreferredContactMethod>([
+  "cellphone",
+  "email",
+  "landline",
+  "whatsapp"
+]);
 const saoPauloTimeZone = "America/Sao_Paulo";
 
 @Injectable()
@@ -725,12 +764,55 @@ export class FoodService {
     return this.getPublicCheckoutForCompany(store.company_id);
   }
 
+  async validatePublicCart(
+    publicSlug: string,
+    input: ValidatePublicFoodCartInput
+  ): Promise<FoodPublicCartValidationContract> {
+    const store = await this.getStoreByPublicSlug(publicSlug);
+    await this.ensurePublicStoreReadable(store);
+    const [hours, normalizedItems] = await Promise.all([
+      this.listStoreHoursByStore(store.company_id, store.id),
+      this.normalizeCartValidationItems(store.company_id, input)
+    ]);
+    const availability = calculateStoreAvailability(hours);
+    const issues = normalizedItems.flatMap((item) => (item.issue ? [item.issue] : []));
+
+    if (!availability.isOrderingOpen) {
+      issues.push(availability.message);
+    }
+
+    if (normalizedItems.length === 0) {
+      issues.push("Adicione ao menos um item ao carrinho.");
+    }
+
+    const subtotalCents = normalizedItems.reduce(
+      (sum, item) => sum + item.totalPriceCents,
+      0
+    );
+
+    return {
+      checkedAt: new Date().toISOString(),
+      isValidForCheckout: issues.length === 0,
+      issues,
+      items: normalizedItems,
+      subtotalCents,
+      totalCents: subtotalCents
+    };
+  }
+
   async ensurePublicCustomerStoreAccess(
     publicSlug: string,
     input: EnsureFoodPublicCustomerInput
   ): Promise<FoodPublicCustomerSessionContract> {
     const store = await this.getStoreByPublicSlug(publicSlug);
     await this.ensurePublicStoreReadable(store);
+    return this.buildPublicCustomerSession(store, input);
+  }
+
+  private async buildPublicCustomerSession(
+    store: FoodStoreRow,
+    input: EnsureFoodPublicCustomerInput
+  ): Promise<FoodPublicCustomerSessionContract> {
     const normalized = normalizePublicCustomerInput(input);
     const account = await this.findOrCreateCustomerAccount(normalized.authUserId);
     const customer = await this.findOrCreateCustomer(store.company_id, account.id);
@@ -740,26 +822,109 @@ export class FoodService {
       customer.id,
       normalized.authUserId
     );
+    const primaryPhone = await this.findPrimaryCustomerPhone(
+      store.company_id,
+      store.id,
+      customer.id
+    );
 
     return {
       account,
       customer,
-      isCompleteForCheckout: isCustomerCompleteForCheckout(account, customer),
+      isCompleteForCheckout: isCustomerCompleteForCheckout(account, customer, primaryPhone),
+      primaryPhone,
       storeAccess
+    };
+  }
+
+  private async ensurePublicCheckoutCustomerSession(
+    store: FoodStoreRow,
+    input: EnsureFoodPublicCustomerInput
+  ): Promise<FoodPublicCustomerSessionContract> {
+    const session = await this.buildPublicCustomerSession(store, input);
+
+    if (!session.isCompleteForCheckout) {
+      throw new ForbiddenException("Complete seu cadastro antes de finalizar o pedido.");
+    }
+
+    return session;
+  }
+
+  async updatePublicCustomerProfile(
+    publicSlug: string,
+    input: UpdateFoodPublicCustomerProfileInput
+  ): Promise<FoodPublicCustomerSessionContract> {
+    const store = await this.getStoreByPublicSlug(publicSlug);
+    await this.ensurePublicStoreReadable(store);
+    const normalized = normalizePublicCustomerProfileInput(input);
+    const session = await this.ensurePublicCustomerStoreAccess(publicSlug, input);
+    const now = new Date().toISOString();
+
+    const { data: accountData, error: accountError } = await this.supabase.food
+      .from("customer_accounts")
+      .update({
+        privacy_accepted_at: session.account.privacyAcceptedAt ?? now,
+        terms_accepted_at: session.account.termsAcceptedAt ?? now
+      })
+      .eq("id", session.account.id)
+      .select(customerAccountSelect)
+      .single();
+
+    if (accountError) {
+      throwSupabaseError(accountError);
+    }
+
+    const { data: customerData, error: customerError } = await this.supabase.food
+      .from("customers")
+      .update({
+        full_name: normalized.fullName,
+        preferred_contact_method: normalized.preferredContactMethod
+      })
+      .eq("id", session.customer.id)
+      .select(customerSelect)
+      .single();
+
+    if (customerError) {
+      throwSupabaseError(customerError);
+    }
+
+    const primaryPhone = await this.upsertPrimaryCustomerPhone(
+      store.company_id,
+      store.id,
+      session.customer.id,
+      normalized.phone,
+      normalized.preferredContactMethod === "whatsapp" ? "whatsapp" : "cellphone"
+    );
+    const account = mapCustomerAccount(accountData as unknown as FoodCustomerAccountRow);
+    const customer = mapCustomer(customerData as unknown as FoodCustomerRow);
+
+    return {
+      account,
+      customer,
+      isCompleteForCheckout: isCustomerCompleteForCheckout(account, customer, primaryPhone),
+      primaryPhone,
+      storeAccess: session.storeAccess
     };
   }
 
   async createPublicOrder(
     publicSlug: string,
-    input: CreateFoodOrderInput
+    input: CreatePublicFoodOrderInput
   ): Promise<FoodOrderContract> {
     const store = await this.getStoreByPublicSlug(publicSlug);
     await this.ensurePublicStoreAvailable(store);
     await this.ensureOrderingOpen(store);
+    const customerSession = await this.ensurePublicCheckoutCustomerSession(store, input);
 
-    return this.createOrder(store.company_id, null, input, {
-      eventSource: "public-store-v0"
-    });
+    return this.createOrder(
+      store.company_id,
+      null,
+      buildPublicOrderInput(input, customerSession),
+      {
+        customerSession,
+        eventSource: "public-store-v0"
+      }
+    );
   }
 
   async createPublicCheckout(
@@ -769,10 +934,17 @@ export class FoodService {
     const store = await this.getStoreByPublicSlug(publicSlug);
     await this.ensurePublicStoreAvailable(store);
     await this.ensureOrderingOpen(store);
+    const customerSession = await this.ensurePublicCheckoutCustomerSession(store, input);
     const payment = normalizePublicCheckoutPayment(input.payment);
-    const order = await this.createOrder(store.company_id, null, input, {
-      eventSource: "public-store-v0"
-    });
+    const order = await this.createOrder(
+      store.company_id,
+      null,
+      buildPublicOrderInput(input, customerSession),
+      {
+        customerSession,
+        eventSource: "public-store-v0"
+      }
+    );
 
     if (!payment) {
       return {
@@ -832,8 +1004,13 @@ export class FoodService {
     const store = await this.getStoreByPublicSlug(publicSlug);
     await this.ensurePublicStoreReadable(store);
     await this.ensureOrderingOpen(store);
+    const customerSession = await this.ensurePublicCheckoutCustomerSession(store, input);
     const order = await this.getPublicOrderFromStore(store, orderNumber);
     const payment = normalizePublicCheckoutPayment(input.payment);
+
+    if (!order.customerId || order.customerId !== customerSession.customer.id) {
+      throw new ForbiddenException("Pedido nao pertence ao consumidor autenticado.");
+    }
 
     if (order.paymentStatus === "paid") {
       throw new BadRequestException("Pedido ja esta pago");
@@ -1000,9 +1177,12 @@ export class FoodService {
       .insert({
         company_id: companyId,
         created_by: actorUserId,
+        customer_account_id: options.customerSession?.account.id ?? null,
+        customer_id: options.customerSession?.customer.id ?? null,
         customer_name: normalized.customerName,
         customer_note: normalized.customerNote,
         customer_phone: normalized.customerPhone,
+        customer_store_access_id: options.customerSession?.storeAccess.id ?? null,
         order_number: orderNumber,
         status: "created",
         store_id: store.id,
@@ -1381,6 +1561,76 @@ export class FoodService {
     return access;
   }
 
+  private async findPrimaryCustomerPhone(
+    companyId: string,
+    storeId: string,
+    customerId: string
+  ): Promise<FoodPublicCustomerPhoneContract | null> {
+    const { data, error } = await this.supabase.food
+      .from("customer_phones")
+      .select(customerPhoneSelect)
+      .eq("company_id", companyId)
+      .eq("customer_id", customerId)
+      .eq("store_id", storeId)
+      .eq("is_primary", true)
+      .is("deleted_at", null)
+      .maybeSingle();
+
+    if (error) {
+      throwSupabaseError(error);
+    }
+
+    return data ? mapCustomerPhone(data as unknown as FoodCustomerPhoneRow) : null;
+  }
+
+  private async upsertPrimaryCustomerPhone(
+    companyId: string,
+    storeId: string,
+    customerId: string,
+    phoneE164: string,
+    phoneType: FoodCustomerPhoneRow["type"]
+  ): Promise<FoodPublicCustomerPhoneContract> {
+    const current = await this.findPrimaryCustomerPhone(companyId, storeId, customerId);
+    const row = {
+      is_preferred: true,
+      is_primary: true,
+      phone_e164: phoneE164,
+      type: phoneType
+    };
+
+    if (current) {
+      const { data, error } = await this.supabase.food
+        .from("customer_phones")
+        .update(row)
+        .eq("id", current.id)
+        .select(customerPhoneSelect)
+        .single();
+
+      if (error) {
+        throwSupabaseError(error);
+      }
+
+      return mapCustomerPhone(data as unknown as FoodCustomerPhoneRow);
+    }
+
+    const { data, error } = await this.supabase.food
+      .from("customer_phones")
+      .insert({
+        ...row,
+        company_id: companyId,
+        customer_id: customerId,
+        store_id: storeId
+      })
+      .select(customerPhoneSelect)
+      .single();
+
+    if (error) {
+      throwSupabaseError(error);
+    }
+
+    return mapCustomerPhone(data as unknown as FoodCustomerPhoneRow);
+  }
+
   private async findStore(companyId: string): Promise<FoodStoreRow | null> {
     const { data, error } = await this.supabase.food
       .from("stores")
@@ -1662,6 +1912,71 @@ export class FoodService {
         };
       })
     };
+  }
+
+  private async normalizeCartValidationItems(
+    companyId: string,
+    input: ValidatePublicFoodCartInput
+  ): Promise<FoodPublicCartValidationItemContract[]> {
+    if (!input || !Array.isArray(input.items)) {
+      throw new BadRequestException("items deve ser uma lista");
+    }
+
+    if (input.items.length > 50) {
+      throw new BadRequestException("Carrinho excede 50 itens");
+    }
+
+    const normalizedItems = input.items
+      .map((item) => ({
+        productId: normalizeRequiredText(item.productId, "productId", 80),
+        quantity: normalizeQuantity(item.quantity)
+      }))
+      .filter((item) => item.quantity > 0);
+    const productIds = [...new Set(normalizedItems.map((item) => item.productId))];
+
+    if (productIds.length === 0) {
+      return [];
+    }
+
+    const productsById = await this.listProductsByIds(companyId, productIds);
+
+    return normalizedItems.map((item) => {
+      const product = productsById.get(item.productId);
+
+      if (!product) {
+        return {
+          issue: "Produto do carrinho nao encontrado.",
+          productId: item.productId,
+          productName: null,
+          quantity: item.quantity,
+          status: "missing",
+          totalPriceCents: 0,
+          unitPriceCents: 0
+        };
+      }
+
+      if (product.status !== "available") {
+        return {
+          issue: `Produto indisponivel: ${product.name}`,
+          productId: product.id,
+          productName: product.name,
+          quantity: item.quantity,
+          status: "unavailable",
+          totalPriceCents: 0,
+          unitPriceCents: product.priceCents
+        };
+      }
+
+      return {
+        issue: null,
+        productId: product.id,
+        productName: product.name,
+        quantity: item.quantity,
+        status: "available",
+        totalPriceCents: product.priceCents * item.quantity,
+        unitPriceCents: product.priceCents
+      };
+    });
   }
 
   private async listProductsByIds(
@@ -2014,6 +2329,31 @@ function normalizePublicCustomerInput(input: EnsureFoodPublicCustomerInput): {
   };
 }
 
+function normalizePublicCustomerProfileInput(input: UpdateFoodPublicCustomerProfileInput): {
+  acceptedPrivacy: true;
+  acceptedTerms: true;
+  authUserId: string;
+  email: string | null;
+  fullName: string;
+  phone: string;
+  preferredContactMethod: FoodCustomerPreferredContactMethod;
+} {
+  const normalized = normalizePublicCustomerInput(input);
+
+  if (input.acceptedPrivacy !== true || input.acceptedTerms !== true) {
+    throw new BadRequestException("Aceite os termos e a politica de privacidade");
+  }
+
+  return {
+    ...normalized,
+    acceptedPrivacy: true,
+    acceptedTerms: true,
+    fullName: normalizeRequiredText(input.fullName, "fullName", 120),
+    phone: normalizePhoneE164(input.phone),
+    preferredContactMethod: normalizeCustomerContactMethod(input.preferredContactMethod)
+  };
+}
+
 function normalizeUuid(value: unknown, field: string): string {
   const normalized = normalizeRequiredText(value, field, 80).toLowerCase();
 
@@ -2022,6 +2362,41 @@ function normalizeUuid(value: unknown, field: string): string {
   }
 
   return normalized;
+}
+
+function normalizeCustomerContactMethod(value: unknown): FoodCustomerPreferredContactMethod {
+  if (
+    typeof value !== "string" ||
+    !validCustomerContactMethods.has(value as FoodCustomerPreferredContactMethod)
+  ) {
+    throw new BadRequestException("preferredContactMethod invalido");
+  }
+
+  return value as FoodCustomerPreferredContactMethod;
+}
+
+function normalizePhoneE164(value: unknown): string {
+  const raw = normalizeRequiredText(value, "phone", 40);
+
+  if (raw.startsWith("+")) {
+    if (!/^\+[1-9]\d{7,14}$/.test(raw)) {
+      throw new BadRequestException("phone deve estar em formato valido");
+    }
+
+    return raw;
+  }
+
+  const digits = raw.replace(/\D/g, "");
+
+  if ((digits.length === 12 || digits.length === 13) && digits.startsWith("55")) {
+    return `+${digits}`;
+  }
+
+  if (digits.length === 10 || digits.length === 11) {
+    return `+55${digits}`;
+  }
+
+  throw new BadRequestException("phone deve estar em formato valido");
 }
 
 function normalizeStoreHourKind(value: unknown): FoodStoreHourKind {
@@ -2112,6 +2487,18 @@ function normalizePublicCheckoutPayment(
     installments,
     paymentMethodId,
     paymentMethodType: value.paymentMethodType
+  };
+}
+
+function buildPublicOrderInput(
+  input: CreateFoodOrderInput,
+  session: FoodPublicCustomerSessionContract
+): CreateFoodOrderInput {
+  return {
+    customerName: session.customer.fullName,
+    customerNote: input.customerNote,
+    customerPhone: session.primaryPhone?.phoneE164 ?? null,
+    items: input.items
   };
 }
 
@@ -2512,9 +2899,12 @@ function mapOrder(row: FoodOrderRow, items: FoodOrderItemContract[]): FoodOrderC
   return {
     companyId: row.company_id,
     createdAt: row.created_at,
+    customerAccountId: row.customer_account_id,
+    customerId: row.customer_id,
     customerName: row.customer_name,
     customerNote: row.customer_note,
     customerPhone: row.customer_phone,
+    customerStoreAccessId: row.customer_store_access_id,
     id: row.id,
     items,
     orderNumber: row.order_number,
@@ -2595,14 +2985,28 @@ function mapCustomerStoreAccess(
   };
 }
 
+function mapCustomerPhone(row: FoodCustomerPhoneRow): FoodPublicCustomerPhoneContract {
+  return {
+    customerId: row.customer_id,
+    id: row.id,
+    isPreferred: row.is_preferred,
+    isPrimary: row.is_primary,
+    phoneE164: row.phone_e164,
+    storeId: row.store_id,
+    type: row.type
+  };
+}
+
 function isCustomerCompleteForCheckout(
   account: FoodPublicCustomerAccountContract,
-  customer: FoodPublicCustomerContract
+  customer: FoodPublicCustomerContract,
+  primaryPhone: FoodPublicCustomerPhoneContract | null
 ): boolean {
   return Boolean(
     account.status === "active" &&
       customer.status === "active" &&
       customer.fullName &&
+      primaryPhone?.phoneE164 &&
       account.termsAcceptedAt &&
       account.privacyAcceptedAt
   );

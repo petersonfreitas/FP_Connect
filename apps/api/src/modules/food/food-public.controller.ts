@@ -1,10 +1,12 @@
-import { Body, Controller, Get, Param, Post, UseGuards } from "@nestjs/common";
+import { Body, Controller, Get, Param, Patch, Post, UseGuards } from "@nestjs/common";
 import { InternalApiGuard } from "../../auth/internal-api.guard";
 import type {
-  CreateFoodOrderInput,
   CreatePublicFoodCheckoutInput,
+  CreatePublicFoodOrderInput,
   EnsureFoodPublicCustomerInput,
-  RetryPublicFoodPaymentInput
+  RetryPublicFoodPaymentInput,
+  UpdateFoodPublicCustomerProfileInput,
+  ValidatePublicFoodCartInput
 } from "./food.contracts";
 import { FoodService } from "./food.service";
 
@@ -23,12 +25,28 @@ export class FoodPublicController {
     return this.foodService.getPublicCheckout(publicSlug);
   }
 
+  @Post("stores/:publicSlug/cart/validate")
+  validatePublicCart(
+    @Body() input: ValidatePublicFoodCartInput,
+    @Param("publicSlug") publicSlug: string
+  ) {
+    return this.foodService.validatePublicCart(publicSlug, input);
+  }
+
   @Post("stores/:publicSlug/customers/me")
   ensurePublicCustomerStoreAccess(
     @Body() input: EnsureFoodPublicCustomerInput,
     @Param("publicSlug") publicSlug: string
   ) {
     return this.foodService.ensurePublicCustomerStoreAccess(publicSlug, input);
+  }
+
+  @Patch("stores/:publicSlug/customers/me/profile")
+  updatePublicCustomerProfile(
+    @Body() input: UpdateFoodPublicCustomerProfileInput,
+    @Param("publicSlug") publicSlug: string
+  ) {
+    return this.foodService.updatePublicCustomerProfile(publicSlug, input);
   }
 
   @Get("stores/:publicSlug/orders/:orderNumber")
@@ -41,7 +59,7 @@ export class FoodPublicController {
 
   @Post("stores/:publicSlug/orders")
   createPublicOrder(
-    @Body() input: CreateFoodOrderInput,
+    @Body() input: CreatePublicFoodOrderInput,
     @Param("publicSlug") publicSlug: string
   ) {
     return this.foodService.createPublicOrder(publicSlug, input);

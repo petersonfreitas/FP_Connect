@@ -1,30 +1,17 @@
 import { NextResponse } from "next/server";
 import type { RetryPublicFoodPaymentInput } from "@fp/types";
-import { getCurrentUser } from "@/lib/auth";
+import { getCurrentPublicStoreUser } from "@/lib/auth";
 import {
   ensurePublicFoodCustomerStoreAccess,
   retryPublicFoodPayment
 } from "@/lib/internal-api";
 
-type PublicPaymentRetryRequest = RetryPublicFoodPaymentInput & {
+type PublicPaymentRetryRequest = Omit<RetryPublicFoodPaymentInput, "authUserId" | "email"> & {
   orderNumber?: string | null;
   publicSlug?: string | null;
 };
 
 export async function POST(request: Request) {
-  const currentUser = await getCurrentUser();
-
-  if (!currentUser) {
-    return NextResponse.json(
-      {
-        error: "Entre para tentar pagar novamente."
-      },
-      {
-        status: 401
-      }
-    );
-  }
-
   const body = (await request.json().catch(() => null)) as PublicPaymentRetryRequest | null;
   const publicSlug = typeof body?.publicSlug === "string" ? body.publicSlug.trim() : "";
   const orderNumber = typeof body?.orderNumber === "string" ? body.orderNumber.trim() : "";
@@ -36,6 +23,19 @@ export async function POST(request: Request) {
       },
       {
         status: 400
+      }
+    );
+  }
+
+  const currentUser = await getCurrentPublicStoreUser(publicSlug);
+
+  if (!currentUser) {
+    return NextResponse.json(
+      {
+        error: "Entre para tentar pagar novamente."
+      },
+      {
+        status: 401
       }
     );
   }
@@ -56,7 +56,20 @@ export async function POST(request: Request) {
     );
   }
 
+  if (!customerSessionResult.data?.isCompleteForCheckout) {
+    return NextResponse.json(
+      {
+        error: "Complete seu cadastro antes de tentar pagar novamente."
+      },
+      {
+        status: 400
+      }
+    );
+  }
+
   const result = await retryPublicFoodPayment(publicSlug, orderNumber, {
+    authUserId: currentUser.id,
+    email: currentUser.email,
     payment: body?.payment
   });
 

@@ -4,12 +4,13 @@ import {
 } from "@/app/actions";
 import { PublicStorefront } from "@/components/public-storefront";
 import { Notice } from "@/components/page-feedback";
-import { getCurrentUser } from "@/lib/auth";
+import { getCurrentPublicStoreUser } from "@/lib/auth";
 import {
   ensurePublicFoodCustomerStoreAccess,
   getPublicFoodCheckout,
   getPublicFoodMenu
 } from "@/lib/internal-api";
+import { createFallbackPublicStoreContext } from "@/lib/public-store-urls";
 
 type PublicStorePageProps = {
   params: Promise<{
@@ -17,6 +18,7 @@ type PublicStorePageProps = {
   }>;
   searchParams?: Promise<{
     error?: string;
+    signedOut?: string;
   }>;
 };
 
@@ -27,10 +29,11 @@ export default async function PublicStorePage({
   searchParams
 }: PublicStorePageProps) {
   const [{ slug }, query] = await Promise.all([params, searchParams]);
+  const storeContext = createFallbackPublicStoreContext(slug);
   const [menuResult, checkoutResult, currentUser] = await Promise.all([
-    getPublicFoodMenu(slug),
-    getPublicFoodCheckout(slug),
-    getCurrentUser()
+    getPublicFoodMenu(storeContext.publicSlug),
+    getPublicFoodCheckout(storeContext.publicSlug),
+    getCurrentPublicStoreUser(storeContext.publicSlug)
   ]);
 
   if (menuResult.error || !menuResult.data) {
@@ -48,7 +51,7 @@ export default async function PublicStorePage({
   }
 
   const customerSessionResult = currentUser
-    ? await ensurePublicFoodCustomerStoreAccess(slug, {
+    ? await ensurePublicFoodCustomerStoreAccess(storeContext.publicSlug, {
         authUserId: currentUser.id,
         email: currentUser.email
       })
@@ -57,6 +60,7 @@ export default async function PublicStorePage({
   return (
     <>
       {query?.error ? <Notice tone="danger" message={query.error} /> : null}
+      {query?.signedOut ? <Notice tone="success" message="Voce saiu desta loja." /> : null}
       {customerSessionResult?.error ? (
         <Notice
           tone="danger"
@@ -67,7 +71,11 @@ export default async function PublicStorePage({
         checkout={checkoutResult.data}
         createOrderAction={createPublicFoodOrderAction}
         isAuthenticated={Boolean(currentUser)}
+        isCustomerCompleteForCheckout={
+          customerSessionResult?.data?.isCompleteForCheckout ?? false
+        }
         menu={menuResult.data}
+        storeContext={storeContext}
         trackOrderAction={trackPublicFoodOrderAction}
       />
     </>

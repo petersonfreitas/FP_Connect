@@ -4,6 +4,7 @@ import type {
   AdminCurrentUserAccessContract,
   CreatePublicFoodCheckoutContract,
   CreatePublicFoodCheckoutInput,
+  CreatePublicFoodOrderInput,
   CreateFoodOrderInput,
   EnsureFoodPublicCustomerInput,
   FoodCategoryContract,
@@ -22,6 +23,9 @@ import type {
   RetryPublicFoodPaymentInput,
   UpdateFoodOrderPaymentInput,
   UpdateFoodOrderStatusInput,
+  UpdateFoodPublicCustomerProfileInput,
+  ValidatePublicFoodCartInput,
+  FoodPublicCartValidationContract,
   UpsertFoodCategoryInput,
   UpsertFoodProductInput,
   UpsertFoodStoreHoursInput,
@@ -264,6 +268,19 @@ export async function getPublicFoodCheckout(
   );
 }
 
+export async function validatePublicFoodCart(
+  publicSlug: string,
+  input: ValidatePublicFoodCartInput
+): Promise<InternalApiResult<FoodPublicCartValidationContract>> {
+  return fetchPublicInternal<FoodPublicCartValidationContract>(
+    `food/public/stores/${encodeURIComponent(publicSlug)}/cart/validate`,
+    {
+      body: JSON.stringify(input),
+      method: "POST"
+    }
+  );
+}
+
 export async function ensurePublicFoodCustomerStoreAccess(
   publicSlug: string,
   input: EnsureFoodPublicCustomerInput
@@ -273,6 +290,19 @@ export async function ensurePublicFoodCustomerStoreAccess(
     {
       body: JSON.stringify(input),
       method: "POST"
+    }
+  );
+}
+
+export async function updatePublicFoodCustomerProfile(
+  publicSlug: string,
+  input: UpdateFoodPublicCustomerProfileInput
+): Promise<InternalApiResult<FoodPublicCustomerSessionContract>> {
+  return fetchPublicInternal<FoodPublicCustomerSessionContract>(
+    `food/public/stores/${encodeURIComponent(publicSlug)}/customers/me/profile`,
+    {
+      body: JSON.stringify(input),
+      method: "PATCH"
     }
   );
 }
@@ -317,7 +347,7 @@ export async function getFoodOrderDetail(
 
 export async function createPublicFoodOrder(
   publicSlug: string,
-  input: CreateFoodOrderInput
+  input: CreatePublicFoodOrderInput
 ): Promise<InternalApiResult<FoodOrderContract>> {
   return fetchPublicInternal<FoodOrderContract>(
     `food/public/stores/${encodeURIComponent(publicSlug)}/orders`,

@@ -100,6 +100,9 @@ Este arquivo registra decisoes arquiteturais e operacionais para evitar retrabal
 | DEC-092 | FP Tracking entra somente depois que os fluxos base de pedido, pagamento, eventos, permissoes e operacao estiverem suficientemente estabilizados; ate la, a entrega simples do Food segue como fallback operacional do MVP. | Aprovada |
 | DEC-093 | Modulos com areas internas devem usar navegacao superior em cards (`module-subnav`) como padrao visual, seguindo FP Robots/Gateway: um card por area, descricao curta e destaque no item ativo. | Aprovada |
 | DEC-094 | A vitrine publica do FP Food deve nascer preparada para dominio proprio por loja como rota principal futura (`lojaA.com.br`), mantendo `/l/[slug]` como fallback tecnico; rotas e links publicos devem evoluir para usar resolucao de loja por `host + path`, sem acoplar componentes permanentemente ao prefixo `/l`. | Aprovada |
+| DEC-095 | DEC-091 e DEC-092 prevalecem sobre DEC-004 e DEC-075 para a fase atual: Console, Food, Gateway e Robots devem ser estabilizados para operacao antes de iniciar FP Tracking completo. | Aprovada |
+| DEC-096 | A vitrine publica do FP Food permite navegacao anonima, mas criacao de pedido, checkout e retentativa de pagamento exigem usuario autenticado, cadastro de consumidor completo e vinculo server-side do pedido ao consumidor/loja. | Aprovada |
+| DEC-097 | O ecossistema mantem Supabase Auth unico nesta fase, com senha global por identidade, mas as sessoes e jornadas devem ser isoladas entre Console/Food operacional e vitrine publica; na vitrine, a sessao do consumidor deve ser contextual por loja. CPF entra como dado previsto do cadastro Food, sem obrigar unicidade ou deduplicacao nesta fase. | Aprovada |
 
 ---
 

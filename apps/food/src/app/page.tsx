@@ -6,6 +6,7 @@ import { FoodShell } from "@/components/food-shell";
 import { EmptyFoodAccess, Notice } from "@/components/page-feedback";
 import { getFoodPageContext } from "@/lib/food-context";
 import { getFoodAccess, getFoodDashboard, getFoodStore } from "@/lib/internal-api";
+import { createFallbackPublicStoreContext, storeUrl } from "@/lib/public-store-urls";
 
 type DashboardPageProps = {
   searchParams?: Promise<{
@@ -214,7 +215,8 @@ function StoreAccessPanel({
 }) {
   const storeConfigHref = `/cadastro/loja${companyId ? `?companyId=${companyId}` : ""}`;
   const menuConfigHref = `/movimentacao/cardapio${companyId ? `?companyId=${companyId}` : ""}`;
-  const publicStoreHref = store ? `/l/${encodeURIComponent(store.publicSlug)}` : null;
+  const storeContext = store ? createFallbackPublicStoreContext(store.publicSlug) : null;
+  const publicStoreHref = storeContext ? storeUrl(storeContext) : null;
 
   return (
     <section className="content-panel quick-access-panel">
@@ -245,7 +247,7 @@ function StoreAccessPanel({
         </article>
         <article className="quick-access-card">
           <span>Link publico</span>
-          <strong>{store ? `/l/${store.publicSlug}` : "Configure o slug"}</strong>
+          <strong>{publicStoreHref ?? "Configure o slug"}</strong>
           <p>Visao do cliente para realizar pedidos e acompanhar compras anteriores.</p>
           {publicStoreHref ? (
             <a

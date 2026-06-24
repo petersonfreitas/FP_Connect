@@ -8,12 +8,19 @@ import type {
   FoodPublicCheckoutContract,
   RetryPublicFoodPaymentInput
 } from "@fp/types";
+import {
+  storeLoginUrl,
+  storeOrderUrl,
+  storeUrl,
+  type PublicStoreUrlContext
+} from "@/lib/public-store-urls";
 
 type PublicOrderPaymentRetryProps = {
   checkout: FoodPublicCheckoutContract | null;
   isAuthenticated: boolean;
+  isCustomerCompleteForCheckout: boolean;
   order: FoodOrderContract;
-  slug: string;
+  storeContext: PublicStoreUrlContext;
 };
 
 type CardPaymentBrickController = {
@@ -65,20 +72,20 @@ declare global {
 export function PublicOrderPaymentRetry({
   checkout,
   isAuthenticated,
+  isCustomerCompleteForCheckout,
   order,
-  slug
+  storeContext
 }: PublicOrderPaymentRetryProps) {
   const [cardError, setCardError] = useState<string | null>(null);
   const [cardStatus, setCardStatus] = useState<string | null>(null);
   const [mercadoPagoReady, setMercadoPagoReady] = useState(false);
   const [payingWithCard, setPayingWithCard] = useState(false);
   const publicKey = checkout?.mercadoPago.enabled ? checkout.mercadoPago.publicKey : null;
-  const loginHref = `/login?next=${encodeURIComponent(
-    `/l/${slug}/pedido/${order.orderNumber}`
-  )}`;
+  const loginHref = storeLoginUrl(storeContext, storeOrderUrl(storeContext, order.orderNumber));
+  const accountHref = storeUrl(storeContext, "/conta");
   const hasPendingPayment =
     Boolean(publicKey) && order.paymentStatus === "pending" && order.status !== "cancelled";
-  const canRetry = isAuthenticated && hasPendingPayment;
+  const canRetry = isAuthenticated && isCustomerCompleteForCheckout && hasPendingPayment;
 
   const submitCardPayment = useCallback(
     async (formData: CardPaymentFormData, additionalData: CardPaymentAdditionalData) => {
@@ -87,11 +94,16 @@ export function PublicOrderPaymentRetry({
         return;
       }
 
+      if (!isCustomerCompleteForCheckout) {
+        window.location.href = accountHref;
+        return;
+      }
+
       const payload = buildRetryPayload({
         additionalData,
         formData,
         orderNumber: order.orderNumber,
-        publicSlug: slug
+        publicSlug: storeContext.publicSlug
       });
 
       setCardError(null);
@@ -117,11 +129,19 @@ export function PublicOrderPaymentRetry({
         throw new Error(body?.error ?? "Nao foi possivel reprocessar o pagamento.");
       }
 
-      window.location.href = `/l/${encodeURIComponent(slug)}/pedido/${encodeURIComponent(
+      window.location.href = `${storeOrderUrl(
+        storeContext,
         order.orderNumber
       )}?retry=1&payment=${encodeURIComponent(body.data.paymentStatus)}`;
     },
-    [isAuthenticated, loginHref, order.orderNumber, slug]
+    [
+      accountHref,
+      isAuthenticated,
+      isCustomerCompleteForCheckout,
+      loginHref,
+      order.orderNumber,
+      storeContext
+    ]
   );
 
   useEffect(() => {
@@ -206,6 +226,21 @@ export function PublicOrderPaymentRetry({
     );
   }
 
+  if (!isCustomerCompleteForCheckout) {
+    return (
+      <section className="public-online-payment">
+        <div>
+          <div className="eyebrow">Pagamento pendente</div>
+          <h2>Complete seu cadastro</h2>
+          <p>A nova tentativa de pagamento exige os dados minimos do consumidor.</p>
+        </div>
+        <a className="primary-action" href={accountHref}>
+          Minha conta
+        </a>
+      </section>
+    );
+  }
+
   return (
     <section className="public-online-payment">
       <Script
@@ -248,7 +283,7 @@ function buildRetryPayload({
   formData: CardPaymentFormData;
   orderNumber: string;
   publicSlug: string;
-}): RetryPublicFoodPaymentInput & {
+}): Omit<RetryPublicFoodPaymentInput, "authUserId" | "email"> & {
   orderNumber: string;
   publicSlug: string;
 } {

@@ -5,6 +5,7 @@ import { FoodShell } from "@/components/food-shell";
 import { EmptyFoodAccess, Notice } from "@/components/page-feedback";
 import { displayCompanyName, getFoodPageContext } from "@/lib/food-context";
 import { getFoodAccess, getFoodStore } from "@/lib/internal-api";
+import { createFallbackPublicStoreContext, storeUrl } from "@/lib/public-store-urls";
 
 type StorePageProps = {
   searchParams?: Promise<{
@@ -27,6 +28,10 @@ export default async function StorePage({ searchParams }: StorePageProps) {
     selectedCompany && !foodAccessResult.error
       ? await getFoodStore(selectedCompany.company.id)
       : { data: null, error: null };
+  const storeContext = storeResult.data
+    ? createFallbackPublicStoreContext(storeResult.data.publicSlug)
+    : null;
+  const publicStoreHref = storeContext ? storeUrl(storeContext) : null;
   const missingStore =
     storeResult.error?.includes("404") || storeResult.error?.includes("ainda nao configurada");
 
@@ -68,7 +73,7 @@ export default async function StorePage({ searchParams }: StorePageProps) {
                 <div className="store-link-actions">
                   <a
                     className="primary-action compact-action"
-                    href={`/l/${encodeURIComponent(storeResult.data.publicSlug)}`}
+                    href={publicStoreHref ?? "#"}
                     rel="noreferrer"
                     target="_blank"
                   >
@@ -87,7 +92,7 @@ export default async function StorePage({ searchParams }: StorePageProps) {
           {storeResult.data ? (
             <div className="store-public-link">
               <span>Link publico</span>
-              <strong>/l/{storeResult.data.publicSlug}</strong>
+              <strong>{publicStoreHref}</strong>
               <small>
                 Compartilhe este caminho com clientes ou use para validar a experiencia publica.
               </small>

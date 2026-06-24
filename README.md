@@ -53,15 +53,16 @@ Ja existe base funcional para:
 - remocao de rotas de cadastro usadas apenas como redirecionamento;
 - API Nest interna consumida pelo Next server-side.
 
-Ainda precisam ser amadurecidos antes de entrar pesado nos modulos operacionais:
+O foco atual deixou de ser criacao de shells e passou a ser amadurecimento produtivo dos fluxos ja implementados:
 
 - smoke tests manuais dos fluxos principais, pendentes enquanto o acesso ao Supabase estiver instavel;
-- shell dos modulos Food e Tracking;
-- persistencia funcional do FP Robots.
+- estabilizacao de UX, validacoes, observabilidade e processos reais em Console, Food, Gateway e Robots;
+- smoke tests e conciliacao online do Mercado Pago, especialmente webhook e cartao de debito;
+- preparacao gradual para Tracking completo somente depois que pedido, pagamento, eventos e operacao base estiverem maduros.
 
-O shell V0 do FP Robots ja possui rota `/robots`, entrada no menu, tela inicial, secoes planejadas e estado vazio sem persistencia nova.
+O FP Robots ja possui base funcional com catalogo de eventos, event log, regras simples, execucoes e reprocessamento basico. O FP Gateway ja concentra provedores, Mercado Pago, pagamentos, webhook V0, SMTP laboratorio/fallback e eventos `gateway.*`. O FP Food ja opera em frontend separado com loja, cardapio, pedidos, cozinha, entrega simples, vitrine publica, login/cadastro de consumidor e checkout Mercado Pago via Gateway.
 
-Nota de arquitetura futura: o FP Robots deve orquestrar eventos, regras, acoes, execucoes, falhas e reprocessamentos. O futuro FP Gateway devera encapsular provedores externos como WhatsApp, Instagram, Facebook, Ads, Mercado Pago, PagSeguro e canais equivalentes, sem transferir para ele a decisao de negocio das automacoes.
+Nota de arquitetura: o FP Robots orquestra eventos, regras, acoes, execucoes, falhas e reprocessamentos. O FP Gateway encapsula provedores externos como Mercado Pago, SMTP e futuros canais como WhatsApp, Instagram, Facebook, Ads, PagSeguro e equivalentes, sem transferir para ele a decisao de negocio dos modulos consumidores.
 
 ## Comandos
 
@@ -190,6 +191,8 @@ incluindo `/api`.
 
 O login do Admin Console usa Supabase Auth pelo server-side do Next. A sessao fica em cookies HttpOnly e o navegador nao recebe a service role nem o token interno. Quando o access token expira, o proxy do Next renova a sessao com o refresh token HttpOnly antes de liberar a rota protegida.
 
+O ecossistema usa Supabase Auth unico nesta fase, mas as sessoes sao isoladas por jornada. O Console/Web, o Food operacional e a vitrine publica do Food usam cookies distintos. Na vitrine publica, a sessao do consumidor e contextual por loja, evitando que o login de uma loja seja reaproveitado automaticamente em outra. A senha da identidade Supabase permanece global por enquanto; isolamento maior de credenciais fica para avaliacao futura.
+
 Para recuperacao de senha e aceite de convite, cadastre a URL abaixo em Supabase Dashboard > Authentication > URL Configuration > Redirect URLs:
 
 ```text
@@ -208,6 +211,7 @@ Endpoints internos atuais do Admin Console:
 
 - `GET /api/admin-console/overview`
 - `GET /api/admin-console/users/me/access`
+- `GET /api/admin-console/users/me/companies`
 - `GET /api/admin-console/applications`
 - `GET /api/admin-console/basic-plans`
 - `GET /api/admin-console/catalog`
@@ -242,13 +246,64 @@ Endpoints internos de acesso aos modulos operacionais:
 
 - `GET /api/billing/access`
 - `GET /api/food/access`
+- `GET /api/gateway/access`
 - `GET /api/marketing/access`
 - `GET /api/robots/access`
 - `GET /api/sales/access`
 - `GET /api/tickets/access`
 - `GET /api/tracking/access`
 
-Essas rotas usam Supabase server-side com `SUPABASE_SERVICE_ROLE_KEY` e exigem o header `X-FP-Internal-Token` com o valor de `FP_INTERNAL_API_TOKEN`.
+Endpoints internos atuais do FP Food operacional:
+
+- `GET /api/food/store`
+- `POST /api/food/store`
+- `GET /api/food/store/hours`
+- `POST /api/food/store/hours`
+- `GET /api/food/categories?page=1&pageSize=20`
+- `POST /api/food/categories`
+- `PATCH /api/food/categories/:categoryId`
+- `GET /api/food/products?page=1&pageSize=20`
+- `POST /api/food/products`
+- `PATCH /api/food/products/:productId`
+- `GET /api/food/menu`
+- `GET /api/food/dashboard`
+- `GET /api/food/orders?page=1&pageSize=20`
+- `POST /api/food/orders`
+- `GET /api/food/orders/:orderId`
+- `PATCH /api/food/orders/:orderId/payment`
+- `PATCH /api/food/orders/:orderId/status`
+
+Endpoints internos publicos do FP Food, consumidos server-side pelo `apps/food`:
+
+- `GET /api/food/public/stores/:publicSlug/menu`
+- `GET /api/food/public/stores/:publicSlug/checkout`
+- `POST /api/food/public/stores/:publicSlug/cart/validate`
+- `POST /api/food/public/stores/:publicSlug/customers/me`
+- `PATCH /api/food/public/stores/:publicSlug/customers/me/profile`
+- `GET /api/food/public/stores/:publicSlug/orders/:orderNumber`
+- `POST /api/food/public/stores/:publicSlug/orders`
+- `POST /api/food/public/stores/:publicSlug/checkout`
+- `POST /api/food/public/stores/:publicSlug/orders/:orderNumber/checkout`
+
+Endpoints internos atuais do FP Gateway:
+
+- `GET /api/gateway/providers`
+- `GET /api/gateway/providers/configs`
+- `POST /api/gateway/providers/mercado-pago/oauth/start`
+- `POST /api/gateway/providers/mercado-pago/oauth/callback`
+- `POST /api/gateway/providers/mercado-pago/manual-config`
+- `GET /api/gateway/payments/requests?page=1&pageSize=20`
+- `POST /api/gateway/payments/requests`
+- `POST /api/gateway/payments/requests/:paymentRequestId/sync`
+- `POST /api/gateway/providers/smtp/config`
+- `POST /api/gateway/providers/smtp/test`
+- `POST /api/gateway/providers/smtp/test-email`
+
+Webhook publico do Gateway:
+
+- `POST /api/gateway/webhooks/mercado-pago`
+
+Com excecao do webhook publico do Gateway, essas rotas usam Supabase server-side com `SUPABASE_SERVICE_ROLE_KEY` e exigem o header `X-FP-Internal-Token` com o valor de `FP_INTERNAL_API_TOKEN`.
 
 As rotas do Admin Console tambem exigem `X-FP-Actor-User-Id` apontando para um usuario ativo no `core.profiles`. `super_admin` possui bypass global. Rotas com contexto de empresa podem usar policies granulares por permissao, como `admin.companies.read`, `admin.companies.manage`, `admin.users.manage` e `admin.modules.manage`. Rotas globais continuam restritas a super-admin.
 
