@@ -103,6 +103,7 @@ Este arquivo registra decisoes arquiteturais e operacionais para evitar retrabal
 | DEC-095 | DEC-091 e DEC-092 prevalecem sobre DEC-004 e DEC-075 para a fase atual: Console, Food, Gateway e Robots devem ser estabilizados para operacao antes de iniciar FP Tracking completo. | Aprovada |
 | DEC-096 | A vitrine publica do FP Food permite navegacao anonima, mas criacao de pedido, checkout e retentativa de pagamento exigem usuario autenticado, cadastro de consumidor completo e vinculo server-side do pedido ao consumidor/loja. | Aprovada |
 | DEC-097 | O ecossistema mantem Supabase Auth unico nesta fase, com senha global por identidade, mas as sessoes e jornadas devem ser isoladas entre Console/Food operacional e vitrine publica; na vitrine, a sessao do consumidor deve ser contextual por loja. CPF entra como dado previsto do cadastro Food, sem obrigar unicidade ou deduplicacao nesta fase. | Aprovada |
+| DEC-098 | O consumidor do FP Food pode manter multiplos enderecos por loja/empresa, escolhendo um como padrao; no checkout de entrega, o usuario deve poder escolher o endereco de destino e o pedido deve guardar uma fotografia historica do endereco usado. A revalidacao atual do carrinho cobre itens/precos/disponibilidade basica, mas a validacao de estoque fica pendente ate a implementacao do estoque direto/reserva. | Aprovada |
 
 ---
 
