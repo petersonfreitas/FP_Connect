@@ -8,7 +8,7 @@ import { createHmac, randomBytes, timingSafeEqual } from "node:crypto";
 import net from "node:net";
 import readline from "node:readline";
 import tls from "node:tls";
-import { MercadoPagoConfig, Order } from "mercadopago";
+import { Customer, CustomerCard, MercadoPagoConfig, Order } from "mercadopago";
 import { RobotsService } from "../robots/robots.service";
 import { AppConfigService } from "../../config/app-config.service";
 import { SupabaseService } from "../../supabase/supabase.service";
@@ -87,6 +87,7 @@ type PaymentRequestRow = {
   provider_id: string;
   provider_reference: string | null;
   request_payload: Record<string, unknown>;
+  response_payload: Record<string, unknown>;
   source_application_key: string;
   source_reference_id: string;
   source_reference_type: string;
@@ -138,6 +139,12 @@ type MercadoPagoOAuthTokenResponse = {
 
 type MercadoPagoOrderResponse = {
   id?: string;
+  fp_gateway?: {
+    saved_card?: MercadoPagoSavedCard;
+  };
+  payer?: {
+    customer_id?: string;
+  };
   status?: string;
   status_detail?: string;
   transactions?: {
@@ -163,6 +170,17 @@ type MercadoPagoOrderResponse = {
   };
 };
 
+type MercadoPagoSavedCard = {
+  customer_id?: string;
+  id?: string;
+  last_four_digits?: string;
+  payment_method?: {
+    id?: string;
+    name?: string;
+    payment_type_id?: string;
+  };
+};
+
 type MercadoPagoPixOrderOptions = {
   useManualSandbox: boolean;
 };
@@ -174,6 +192,9 @@ type NormalizedPaymentRequestInput = Required<
   installments: number | null;
   paymentMethodId: string | null;
   paymentMethodType: GatewayPaymentMethodType;
+  providerCardId: string | null;
+  providerCustomerId: string | null;
+  saveCardForFuture: boolean;
 };
 
 const defaultPage = 1;
@@ -235,6 +256,7 @@ const paymentRequestSelect = [
   "provider_reference",
   "error_message",
   "request_payload",
+  "response_payload",
   "created_at",
   "updated_at"
 ].join(",");
@@ -398,6 +420,9 @@ export class GatewayService {
           installments: normalized.installments,
           paymentMethodId: normalized.paymentMethodId,
           paymentMethodType: normalized.paymentMethodType,
+          providerCardId: normalized.providerCardId,
+          providerCustomerId: normalized.providerCustomerId,
+          saveCardForFuture: normalized.saveCardForFuture,
           sourceApplicationKey: normalized.sourceApplicationKey,
           sourceReferenceId: normalized.sourceReferenceId,
           sourceReferenceType: normalized.sourceReferenceType
@@ -1067,6 +1092,10 @@ export class GatewayService {
     }
 
     const order = await getMercadoPagoOrder(accessToken, paymentRequestRow.provider_reference);
+    const responsePayload = preserveMercadoPagoGatewayMetadata(
+      paymentRequestRow.response_payload,
+      order
+    );
     const nextStatus = mapMercadoPagoOrderStatus(order);
     const pixPaymentMethod = getMercadoPagoPixPaymentMethod(order);
     const paymentUrl = pixPaymentMethod?.ticket_url ?? paymentRequestRow.payment_url;
@@ -1080,7 +1109,7 @@ export class GatewayService {
       .update({
         error_message: errorMessage,
         payment_url: paymentUrl,
-        response_payload: order,
+        response_payload: responsePayload,
         status: nextStatus,
         updated_by: actorUserId
       })
@@ -1460,9 +1489,20 @@ function mapPaymentRequest(
 ): GatewayPaymentRequestContract {
   const paymentMethodType = parsePaymentMethodType(row.request_payload?.paymentMethodType);
   const paymentMethodId = parseOptionalString(row.request_payload?.paymentMethodId);
+  const savedCard = parseSavedCardMetadata(row.response_payload);
+  const providerCustomerId =
+    savedCard?.customerId ??
+    parseOptionalString(row.request_payload?.providerCustomerId) ??
+    getMercadoPagoPayerCustomerId(row.response_payload);
+  const providerCardId =
+    savedCard?.cardId ??
+    parseOptionalString(row.request_payload?.providerCardId) ??
+    getMercadoPagoPaymentMethodCardId(row.response_payload);
 
   return {
     amountCents: row.amount_cents,
+    cardBrand: savedCard?.cardBrand ?? paymentMethodId,
+    cardLast4: savedCard?.cardLast4 ?? null,
     companyId: row.company_id,
     createdAt: row.created_at,
     currency: row.currency,
@@ -1478,6 +1518,8 @@ function mapPaymentRequest(
     paymentUrl: row.payment_url,
     providerKey: provider.key,
     providerName: provider.name,
+    providerCardId,
+    providerCustomerId,
     providerReference: row.provider_reference,
     sourceApplicationKey: row.source_application_key,
     sourceReferenceId: row.source_reference_id,
@@ -1646,7 +1688,10 @@ function normalizePaymentRequestInput(
   const installments = input.installments == null ? null : Number(input.installments);
   const paymentMethodId = input.paymentMethodId?.trim().toLowerCase() || null;
   const paymentMethodType = input.paymentMethodType ?? "pix";
+  const providerCardId = input.providerCardId?.trim() || null;
+  const providerCustomerId = input.providerCustomerId?.trim() || null;
   const providerKey = input.providerKey?.trim().toLowerCase() || "mercado_pago";
+  const saveCardForFuture = input.saveCardForFuture === true;
   const sourceApplicationKey = input.sourceApplicationKey.trim().toLowerCase();
   const sourceReferenceId = input.sourceReferenceId.trim();
   const sourceReferenceType = input.sourceReferenceType.trim().toLowerCase();
@@ -1671,12 +1716,21 @@ function normalizePaymentRequestInput(
     throw new BadRequestException("Metodo de pagamento invalido");
   }
 
-  if (paymentMethodType === "pix" && (cardToken || paymentMethodId || installments)) {
+  if (
+    paymentMethodType === "pix" &&
+    (cardToken || paymentMethodId || installments || providerCardId || providerCustomerId || saveCardForFuture)
+  ) {
     throw new BadRequestException("Dados de cartao nao devem ser enviados para PIX");
   }
 
   if (paymentMethodType !== "pix") {
-    if (!cardToken || cardToken.length > 255) {
+    const usesSavedCard = Boolean(providerCardId && providerCustomerId);
+
+    if (!usesSavedCard && (!cardToken || cardToken.length > 255)) {
+      throw new BadRequestException("Token do cartao invalido");
+    }
+
+    if (cardToken && cardToken.length > 255) {
       throw new BadRequestException("Token do cartao invalido");
     }
 
@@ -1686,6 +1740,22 @@ function normalizePaymentRequestInput(
 
     if (installments === null || installments < 1 || installments > 24) {
       throw new BadRequestException("Numero de parcelas invalido");
+    }
+
+    if ((providerCardId && !providerCustomerId) || (!providerCardId && providerCustomerId)) {
+      throw new BadRequestException("Referencia de cartao salvo incompleta");
+    }
+
+    if (providerCardId && providerCardId.length > 120) {
+      throw new BadRequestException("Referencia de cartao salva invalida");
+    }
+
+    if (providerCustomerId && providerCustomerId.length > 120) {
+      throw new BadRequestException("Referencia de cliente salva invalida");
+    }
+
+    if (saveCardForFuture && (!cardToken || !customerEmail)) {
+      throw new BadRequestException("Salvar cartao exige token e e-mail do cliente");
     }
   }
 
@@ -1717,7 +1787,10 @@ function normalizePaymentRequestInput(
     installments,
     paymentMethodId,
     paymentMethodType,
+    providerCardId,
+    providerCustomerId,
     providerKey,
+    saveCardForFuture,
     sourceApplicationKey,
     sourceReferenceId,
     sourceReferenceType
@@ -1775,6 +1848,76 @@ function parsePaymentMethodType(value: unknown): GatewayPaymentMethodType {
 
 function parseOptionalString(value: unknown): string | null {
   return typeof value === "string" && value.trim() ? value.trim() : null;
+}
+
+function parseSavedCardMetadata(payload: Record<string, unknown>): {
+  cardBrand: string | null;
+  cardId: string | null;
+  cardLast4: string | null;
+  customerId: string | null;
+} | null {
+  const metadata = payload.fp_gateway;
+
+  if (!isRecord(metadata)) {
+    return null;
+  }
+
+  const savedCard = metadata.saved_card;
+
+  if (!isRecord(savedCard)) {
+    return null;
+  }
+
+  const paymentMethod = isRecord(savedCard.payment_method)
+    ? savedCard.payment_method
+    : null;
+
+  return {
+    cardBrand: parseOptionalString(paymentMethod?.id) ?? parseOptionalString(paymentMethod?.name),
+    cardId: parseOptionalString(savedCard.id),
+    cardLast4: parseOptionalString(savedCard.last_four_digits),
+    customerId: parseOptionalString(savedCard.customer_id)
+  };
+}
+
+function getMercadoPagoPaymentMethodCardId(payload: Record<string, unknown>): string | null {
+  const transactions = payload.transactions;
+
+  if (!isRecord(transactions) || !Array.isArray(transactions.payments)) {
+    return null;
+  }
+
+  const payment = transactions.payments[0];
+
+  if (!isRecord(payment) || !isRecord(payment.payment_method)) {
+    return null;
+  }
+
+  return parseOptionalString(payment.payment_method.card_id);
+}
+
+function getMercadoPagoPayerCustomerId(payload: Record<string, unknown>): string | null {
+  return isRecord(payload.payer) ? parseOptionalString(payload.payer.customer_id) : null;
+}
+
+function preserveMercadoPagoGatewayMetadata(
+  previousPayload: Record<string, unknown>,
+  nextPayload: MercadoPagoOrderResponse
+): MercadoPagoOrderResponse {
+  const metadata = previousPayload.fp_gateway;
+
+  if (!isRecord(metadata)) {
+    return nextPayload;
+  }
+
+  return {
+    ...nextPayload,
+    fp_gateway: metadata as MercadoPagoOrderResponse["fp_gateway"]
+  };
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return Boolean(value) && typeof value === "object" && !Array.isArray(value);
 }
 
 function buildMercadoPagoOrderFailureMessage(order: MercadoPagoOrderResponse): string {
@@ -2359,6 +2502,12 @@ async function createMercadoPagoOrder(
   });
   const order = new Order(client);
   const amount = formatMercadoPagoAmount(paymentRequest.amountCents);
+  const savedCard =
+    input.paymentMethodType !== "pix" && input.saveCardForFuture
+      ? await saveMercadoPagoCustomerCard(client, paymentRequest, input)
+      : null;
+  const providerCustomerId =
+    savedCard?.customer_id ?? input.providerCustomerId ?? undefined;
 
   if (!paymentRequest.customerEmail) {
     throw new BadRequestException(
@@ -2378,9 +2527,23 @@ async function createMercadoPagoOrder(
           id: "pix",
           type: "bank_transfer"
         }
-      : buildMercadoPagoCardPaymentMethod(input);
+      : buildMercadoPagoCardPaymentMethod(input, savedCard);
+  const payment = {
+    amount,
+    payment_method: paymentMethod,
+    ...(input.paymentMethodType !== "pix" && (savedCard || input.providerCardId)
+      ? {
+          stored_credential: {
+            first_payment: Boolean(savedCard),
+            payment_initiator: "cardholder",
+            reason: "unscheduled",
+            store_payment_method: Boolean(savedCard)
+          }
+        }
+      : {})
+  };
 
-  return (await order.create({
+  const mercadoPagoOrder = (await order.create({
     body: {
       description: paymentRequest.description,
       external_reference: paymentRequest.id,
@@ -2388,17 +2551,13 @@ async function createMercadoPagoOrder(
         email: paymentRequest.customerEmail,
         first_name: options.useManualSandbox
           ? "APRO"
-          : paymentRequest.customerName ?? undefined
+          : paymentRequest.customerName ?? undefined,
+        customer_id: providerCustomerId
       },
       processing_mode: "automatic",
       total_amount: amount,
       transactions: {
-        payments: [
-          {
-            amount,
-            payment_method: paymentMethod
-          }
-        ]
+        payments: [payment]
       },
       type: "online"
     },
@@ -2406,21 +2565,48 @@ async function createMercadoPagoOrder(
       idempotencyKey: `gateway-payment:${paymentRequest.companyId}:${paymentRequest.id}`
     }
   })) as MercadoPagoOrderResponse;
+
+  return savedCard
+    ? {
+        ...mercadoPagoOrder,
+        fp_gateway: {
+          saved_card: savedCard
+        }
+      }
+    : mercadoPagoOrder;
 }
 
-function buildMercadoPagoCardPaymentMethod(input: NormalizedPaymentRequestInput): {
+function buildMercadoPagoCardPaymentMethod(
+  input: NormalizedPaymentRequestInput,
+  savedCard: MercadoPagoSavedCard | null = null
+): {
+  card_id?: string;
   id: string;
   installments: number;
-  token: string;
+  token?: string;
   type: "credit_card" | "debit_card";
 } {
   if (
     input.paymentMethodType === "pix" ||
     !input.paymentMethodId ||
-    !input.cardToken ||
     !input.installments
   ) {
     throw new BadRequestException("Dados de cartao incompletos");
+  }
+
+  const cardId = savedCard?.id ?? input.providerCardId;
+
+  if (cardId) {
+    return {
+      card_id: cardId,
+      id: input.paymentMethodId,
+      installments: input.installments,
+      type: input.paymentMethodType
+    };
+  }
+
+  if (!input.cardToken) {
+    throw new BadRequestException("Token do cartao invalido");
   }
 
   return {
@@ -2429,6 +2615,76 @@ function buildMercadoPagoCardPaymentMethod(input: NormalizedPaymentRequestInput)
     token: input.cardToken,
     type: input.paymentMethodType
   };
+}
+
+async function saveMercadoPagoCustomerCard(
+  client: MercadoPagoConfig,
+  paymentRequest: GatewayPaymentRequestContract,
+  input: NormalizedPaymentRequestInput
+): Promise<MercadoPagoSavedCard> {
+  if (!paymentRequest.customerEmail || !input.cardToken) {
+    throw new BadRequestException("Salvar cartao exige e-mail e token do pagador");
+  }
+
+  const customerId = await findOrCreateMercadoPagoCustomer(client, paymentRequest);
+  const customerCard = new CustomerCard(client);
+  const savedCard = (await customerCard.create({
+    body: {
+      token: input.cardToken
+    },
+    customerId,
+    requestOptions: {
+      idempotencyKey: `gateway-card:${paymentRequest.companyId}:${paymentRequest.id}`
+    }
+  })) as MercadoPagoSavedCard;
+
+  if (!savedCard.id) {
+    throw new BadRequestException("Mercado Pago nao retornou identificador do cartao salvo");
+  }
+
+  return {
+    ...savedCard,
+    customer_id: savedCard.customer_id ?? customerId
+  };
+}
+
+async function findOrCreateMercadoPagoCustomer(
+  client: MercadoPagoConfig,
+  paymentRequest: GatewayPaymentRequestContract
+): Promise<string> {
+  if (!paymentRequest.customerEmail) {
+    throw new BadRequestException("Informe um e-mail de pagador para salvar cartao");
+  }
+
+  const customer = new Customer(client);
+  const searchResult = await customer.search({
+    options: {
+      email: paymentRequest.customerEmail,
+      limit: 1
+    }
+  });
+  const existingCustomerId = searchResult.results?.find((item) => item.id)?.id;
+
+  if (existingCustomerId) {
+    return existingCustomerId;
+  }
+
+  const created = await customer.create({
+    body: {
+      description: `FP Gateway customer ${paymentRequest.companyId}`,
+      email: paymentRequest.customerEmail,
+      first_name: paymentRequest.customerName ?? undefined
+    },
+    requestOptions: {
+      idempotencyKey: `gateway-customer:${paymentRequest.companyId}:${paymentRequest.customerEmail}`
+    }
+  });
+
+  if (!created.id) {
+    throw new BadRequestException("Mercado Pago nao retornou identificador do cliente");
+  }
+
+  return created.id;
 }
 
 async function getMercadoPagoOrder(

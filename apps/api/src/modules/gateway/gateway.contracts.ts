@@ -117,6 +117,8 @@ export type GatewayPaymentMethodType = "credit_card" | "debit_card" | "pix";
 
 export type GatewayPaymentRequestContract = {
   amountCents: number;
+  cardBrand: string | null;
+  cardLast4: string | null;
   companyId: string;
   createdAt: string;
   currency: string;
@@ -132,6 +134,8 @@ export type GatewayPaymentRequestContract = {
   paymentUrl: string | null;
   providerKey: string;
   providerName: string;
+  providerCardId: string | null;
+  providerCustomerId: string | null;
   providerReference: string | null;
   sourceApplicationKey: string;
   sourceReferenceId: string;
@@ -152,7 +156,10 @@ export type CreateGatewayPaymentRequestInput = {
   installments?: number | null;
   paymentMethodId?: string | null;
   paymentMethodType?: GatewayPaymentMethodType | null;
+  providerCardId?: string | null;
+  providerCustomerId?: string | null;
   providerKey?: string | null;
+  saveCardForFuture?: boolean | null;
   sourceApplicationKey: string;
   sourceReferenceId: string;
   sourceReferenceType: string;

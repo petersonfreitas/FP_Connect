@@ -7,6 +7,7 @@ import {
 } from "@nestjs/common";
 import { randomUUID } from "node:crypto";
 import { GatewayService } from "../gateway/gateway.service";
+import type { GatewayPaymentRequestContract } from "../gateway/gateway.contracts";
 import { RobotsService } from "../robots/robots.service";
 import { SupabaseService } from "../../supabase/supabase.service";
 import type {
@@ -1418,17 +1419,18 @@ export class FoodService {
       paymentMethodId: payment.paymentMethodId,
       paymentMethodType: payment.paymentMethodType,
       providerKey: "mercado_pago",
+      saveCardForFuture: payment.saveForFuture,
       sourceApplicationKey: "food",
       sourceReferenceId: order.id,
       sourceReferenceType: "food_order"
     });
 
     if (payment.saveForFuture && payment.paymentMethodType !== "pix") {
-      await this.savePendingPublicCustomerPaymentMethod(
+      await this.savePublicCustomerPaymentMethodFromGateway(
         store,
         customerSession,
         payment,
-        paymentRequest.id
+        paymentRequest
       );
     }
 
@@ -1496,17 +1498,18 @@ export class FoodService {
       paymentMethodId: payment.paymentMethodId,
       paymentMethodType: payment.paymentMethodType,
       providerKey: "mercado_pago",
+      saveCardForFuture: payment.saveForFuture,
       sourceApplicationKey: "food",
       sourceReferenceId: order.id,
       sourceReferenceType: "food_order"
     });
 
     if (payment.saveForFuture && payment.paymentMethodType !== "pix") {
-      await this.savePendingPublicCustomerPaymentMethod(
+      await this.savePublicCustomerPaymentMethodFromGateway(
         store,
         customerSession,
         payment,
-        paymentRequest.id
+        paymentRequest
       );
     }
 
@@ -2280,22 +2283,76 @@ export class FoodService {
     return mapCustomerPaymentMethod(data as unknown as FoodCustomerPaymentMethodRow);
   }
 
-  private async savePendingPublicCustomerPaymentMethod(
+  private async savePublicCustomerPaymentMethodFromGateway(
     store: FoodStoreRow,
     session: FoodPublicCustomerSessionContract,
     payment: PublicCheckoutPaymentInput,
-    paymentRequestId: string
+    paymentRequest: GatewayPaymentRequestContract
   ): Promise<void> {
     if (payment.paymentMethodType === "pix" || !payment.paymentMethodId) {
       return;
     }
 
     const hasDefault = session.paymentMethods.some((paymentMethod) => paymentMethod.isDefault);
+    const activeCardData =
+      paymentRequest.providerCardId && paymentRequest.providerCustomerId
+        ? {
+            card_brand: paymentRequest.cardBrand ?? payment.paymentMethodId,
+            card_last4: paymentRequest.cardLast4,
+            provider_card_id: paymentRequest.providerCardId,
+            provider_customer_id: paymentRequest.providerCustomerId,
+            status: "active"
+          }
+        : {
+            card_brand: payment.paymentMethodId,
+            card_last4: null,
+            provider_card_id: null,
+            provider_customer_id: null,
+            status: "pending_tokenization"
+          };
+
+    if (paymentRequest.providerCardId) {
+      const { data: existing, error: existingError } = await this.supabase.food
+        .from("customer_payment_methods")
+        .select("id,is_default")
+        .eq("company_id", store.company_id)
+        .eq("customer_id", session.customer.id)
+        .eq("store_id", store.id)
+        .eq("provider_key", "mercado_pago")
+        .eq("provider_card_id", paymentRequest.providerCardId)
+        .is("deleted_at", null)
+        .maybeSingle();
+
+      if (existingError) {
+        throwSupabaseError(existingError);
+      }
+
+      const existingRow = existing as { id: string; is_default?: boolean } | null;
+
+      if (existingRow) {
+        const { error } = await this.supabase.food
+          .from("customer_payment_methods")
+          .update({
+            ...activeCardData,
+            is_default: existingRow.is_default || !hasDefault,
+            payment_method_id: payment.paymentMethodId,
+            payment_method_type: payment.paymentMethodType,
+            provider_payment_request_id: paymentRequest.id
+          })
+          .eq("id", existingRow.id);
+
+        if (error) {
+          throwSupabaseError(error);
+        }
+
+        return;
+      }
+    }
 
     const { error } = await this.supabase.food
       .from("customer_payment_methods")
       .insert({
-        card_brand: payment.paymentMethodId,
+        ...activeCardData,
         company_id: store.company_id,
         customer_account_id: session.account.id,
         customer_id: session.customer.id,
@@ -2304,8 +2361,7 @@ export class FoodService {
         payment_method_id: payment.paymentMethodId,
         payment_method_type: payment.paymentMethodType,
         provider_key: "mercado_pago",
-        provider_payment_request_id: paymentRequestId,
-        status: "pending_tokenization",
+        provider_payment_request_id: paymentRequest.id,
         store_id: store.id
       });
 
