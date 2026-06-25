@@ -1150,6 +1150,84 @@ export class FoodService {
     return this.buildPublicCustomerSession(store, input);
   }
 
+  async updatePublicCustomerAddress(
+    publicSlug: string,
+    addressId: string,
+    input: UpsertFoodPublicCustomerAddressInput
+  ): Promise<FoodPublicCustomerSessionContract> {
+    const store = await this.getStoreByPublicSlug(publicSlug);
+    await this.ensurePublicStoreReadable(store);
+    const session = await this.buildPublicCustomerSession(store, input);
+    const address = await this.getCustomerAddress(
+      store.company_id,
+      store.id,
+      session.customer.id,
+      addressId
+    );
+    const normalized = normalizePublicCustomerAddressInput(input);
+
+    if (normalized.isPrimary) {
+      await this.clearPrimaryCustomerAddresses(store.company_id, store.id, session.customer.id);
+    }
+
+    const { error } = await this.supabase.food
+      .from("customer_addresses")
+      .update({
+        city: normalized.city,
+        complement: normalized.complement,
+        district: normalized.district,
+        is_primary: normalized.isPrimary || address.isPrimary,
+        label: normalized.label,
+        number: normalized.number,
+        postal_code: normalized.postalCode,
+        reference: normalized.reference,
+        state: normalized.state,
+        street: normalized.street
+      })
+      .eq("id", address.id);
+
+    if (error) {
+      throwSupabaseError(error);
+    }
+
+    return this.buildPublicCustomerSession(store, input);
+  }
+
+  async deletePublicCustomerAddress(
+    publicSlug: string,
+    addressId: string,
+    input: SetFoodPublicCustomerPrimaryAddressInput
+  ): Promise<FoodPublicCustomerSessionContract> {
+    const store = await this.getStoreByPublicSlug(publicSlug);
+    await this.ensurePublicStoreReadable(store);
+    const session = await this.buildPublicCustomerSession(store, input);
+    const address = await this.getCustomerAddress(
+      store.company_id,
+      store.id,
+      session.customer.id,
+      addressId
+    );
+
+    const { error } = await this.supabase.food
+      .from("customer_addresses")
+      .update({
+        deleted_at: new Date().toISOString(),
+        is_active: false,
+        is_primary: false
+      })
+      .eq("id", address.id);
+
+    if (error) {
+      throwSupabaseError(error);
+    }
+
+    if (address.isPrimary) {
+      await this.ensureCustomerHasPrimaryAddress(store.company_id, store.id, session.customer.id);
+    }
+
+    return this.buildPublicCustomerSession(store, input);
+  }
+
   async createPublicOrder(
     publicSlug: string,
     input: CreatePublicFoodOrderInput
@@ -1982,6 +2060,45 @@ export class FoodService {
 
     if (error) {
       throwSupabaseError(error);
+    }
+  }
+
+  private async ensureCustomerHasPrimaryAddress(
+    companyId: string,
+    storeId: string,
+    customerId: string
+  ): Promise<void> {
+    const { data, error } = await this.supabase.food
+      .from("customer_addresses")
+      .select("id")
+      .eq("company_id", companyId)
+      .eq("customer_id", customerId)
+      .eq("store_id", storeId)
+      .eq("is_active", true)
+      .is("deleted_at", null)
+      .order("created_at", { ascending: true })
+      .limit(1)
+      .maybeSingle();
+
+    if (error) {
+      throwSupabaseError(error);
+    }
+
+    const nextAddressId = (data as { id?: string } | null)?.id;
+
+    if (!nextAddressId) {
+      return;
+    }
+
+    const { error: updateError } = await this.supabase.food
+      .from("customer_addresses")
+      .update({
+        is_primary: true
+      })
+      .eq("id", nextAddressId);
+
+    if (updateError) {
+      throwSupabaseError(updateError);
     }
   }
 

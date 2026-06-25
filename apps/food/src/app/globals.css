@@ -1366,13 +1366,29 @@ textarea {
 }
 
 .public-address-item {
-  align-items: center;
+  align-items: stretch;
   border: 1px solid var(--line);
   border-radius: 8px;
-  display: flex;
+  display: grid;
   gap: 12px;
-  justify-content: space-between;
   padding: 14px;
+}
+
+.public-address-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.public-address-edit {
+  border-top: 1px solid var(--line);
+  padding-top: 10px;
+}
+
+.public-address-edit summary {
+  color: var(--accent);
+  cursor: pointer;
+  font-weight: 900;
 }
 
 .public-address-item p,

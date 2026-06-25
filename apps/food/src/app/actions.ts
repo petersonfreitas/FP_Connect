@@ -26,6 +26,7 @@ import {
   createFoodProduct,
   createFoodStockEntry,
   createPublicFoodOrder,
+  deletePublicFoodCustomerAddress,
   ensurePublicFoodCustomerStoreAccess,
   savePublicFoodCustomerAddress,
   setPrimaryPublicFoodCustomerAddress,
@@ -34,6 +35,7 @@ import {
   updateFoodOrderPayment,
   updateFoodOrderStatus,
   updateFoodProduct,
+  updatePublicFoodCustomerAddress,
   updatePublicFoodCustomerProfile,
   upsertFoodStore
 } from "@/lib/internal-api";
@@ -441,26 +443,71 @@ export async function savePublicCustomerAddressAction(formData: FormData): Promi
     redirect(storeLoginUrl(storeContext, accountPath));
   }
 
-  const result = await savePublicFoodCustomerAddress(publicSlug, {
-    authUserId: currentUser.id,
-    city: String(formData.get("city") ?? ""),
-    complement: optionalText(formData.get("complement")),
-    district: optionalText(formData.get("district")),
-    email: currentUser.email,
-    isPrimary: formData.get("isPrimary") === "on",
-    label: optionalText(formData.get("label")),
-    number: String(formData.get("number") ?? ""),
-    postalCode: optionalText(formData.get("postalCode")),
-    reference: optionalText(formData.get("reference")),
-    state: String(formData.get("state") ?? ""),
-    street: String(formData.get("street") ?? "")
-  });
+  const result = await savePublicFoodCustomerAddress(
+    publicSlug,
+    buildPublicCustomerAddressInput(formData, currentUser)
+  );
 
   if (result.error) {
     redirect(`${accountPath}?error=${encodeURIComponent(truncateQueryValue(result.error))}`);
   }
 
   redirect(`${accountPath}?addressSaved=1`);
+}
+
+export async function updatePublicCustomerAddressAction(formData: FormData): Promise<void> {
+  const publicSlug = normalizePublicSlug(formData.get("publicSlug"));
+  const addressId = String(formData.get("addressId") ?? "").trim();
+  const storeContext = createFallbackPublicStoreContext(publicSlug);
+  const accountPath = storeUrl(storeContext, "/conta");
+  const currentUser = await getCurrentPublicStoreUser(publicSlug);
+
+  if (!currentUser) {
+    redirect(storeLoginUrl(storeContext, accountPath));
+  }
+
+  if (!addressId) {
+    redirect(`${accountPath}?error=${encodeURIComponent("Endereco nao informado.")}`);
+  }
+
+  const result = await updatePublicFoodCustomerAddress(
+    publicSlug,
+    addressId,
+    buildPublicCustomerAddressInput(formData, currentUser)
+  );
+
+  if (result.error) {
+    redirect(`${accountPath}?error=${encodeURIComponent(truncateQueryValue(result.error))}`);
+  }
+
+  redirect(`${accountPath}?addressUpdated=1`);
+}
+
+export async function deletePublicCustomerAddressAction(formData: FormData): Promise<void> {
+  const publicSlug = normalizePublicSlug(formData.get("publicSlug"));
+  const addressId = String(formData.get("addressId") ?? "").trim();
+  const storeContext = createFallbackPublicStoreContext(publicSlug);
+  const accountPath = storeUrl(storeContext, "/conta");
+  const currentUser = await getCurrentPublicStoreUser(publicSlug);
+
+  if (!currentUser) {
+    redirect(storeLoginUrl(storeContext, accountPath));
+  }
+
+  if (!addressId) {
+    redirect(`${accountPath}?error=${encodeURIComponent("Endereco nao informado.")}`);
+  }
+
+  const result = await deletePublicFoodCustomerAddress(publicSlug, addressId, {
+    authUserId: currentUser.id,
+    email: currentUser.email
+  });
+
+  if (result.error) {
+    redirect(`${accountPath}?error=${encodeURIComponent(truncateQueryValue(result.error))}`);
+  }
+
+  redirect(`${accountPath}?addressDeleted=1`);
 }
 
 export async function setPublicCustomerPrimaryAddressAction(
@@ -508,6 +555,26 @@ function normalizePublicSlug(value: FormDataEntryValue | null): string {
   } catch {
     redirect("/l/loja-nao-informada?error=Loja%20publica%20invalida.");
   }
+}
+
+function buildPublicCustomerAddressInput(
+  formData: FormData,
+  currentUser: { email: string | null; id: string }
+) {
+  return {
+    authUserId: currentUser.id,
+    city: String(formData.get("city") ?? ""),
+    complement: optionalText(formData.get("complement")),
+    district: optionalText(formData.get("district")),
+    email: currentUser.email,
+    isPrimary: formData.get("isPrimary") === "on",
+    label: optionalText(formData.get("label")),
+    number: String(formData.get("number") ?? ""),
+    postalCode: optionalText(formData.get("postalCode")),
+    reference: optionalText(formData.get("reference")),
+    state: String(formData.get("state") ?? ""),
+    street: String(formData.get("street") ?? "")
+  };
 }
 
 function redirectWithResult(

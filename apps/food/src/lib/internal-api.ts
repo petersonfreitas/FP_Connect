@@ -351,6 +351,38 @@ export async function savePublicFoodCustomerAddress(
   );
 }
 
+export async function updatePublicFoodCustomerAddress(
+  publicSlug: string,
+  addressId: string,
+  input: UpsertFoodPublicCustomerAddressInput
+): Promise<InternalApiResult<FoodPublicCustomerSessionContract>> {
+  return fetchPublicInternal<FoodPublicCustomerSessionContract>(
+    `food/public/stores/${encodeURIComponent(publicSlug)}/customers/me/addresses/${encodeURIComponent(
+      addressId
+    )}`,
+    {
+      body: JSON.stringify(input),
+      method: "PATCH"
+    }
+  );
+}
+
+export async function deletePublicFoodCustomerAddress(
+  publicSlug: string,
+  addressId: string,
+  input: SetFoodPublicCustomerPrimaryAddressInput
+): Promise<InternalApiResult<FoodPublicCustomerSessionContract>> {
+  return fetchPublicInternal<FoodPublicCustomerSessionContract>(
+    `food/public/stores/${encodeURIComponent(publicSlug)}/customers/me/addresses/${encodeURIComponent(
+      addressId
+    )}`,
+    {
+      body: JSON.stringify(input),
+      method: "DELETE"
+    }
+  );
+}
+
 export async function setPrimaryPublicFoodCustomerAddress(
   publicSlug: string,
   addressId: string,

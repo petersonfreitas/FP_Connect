@@ -1,8 +1,10 @@
 import { redirect } from "next/navigation";
 import {
+  deletePublicCustomerAddressAction,
   savePublicCustomerAddressAction,
   savePublicCustomerProfileAction,
-  setPublicCustomerPrimaryAddressAction
+  setPublicCustomerPrimaryAddressAction,
+  updatePublicCustomerAddressAction
 } from "@/app/actions";
 import { Notice } from "@/components/page-feedback";
 import { PublicCustomerAddressesForm } from "@/components/public-customer-addresses-form";
@@ -24,8 +26,10 @@ type PublicCustomerAccountPageProps = {
     slug: string;
   }>;
   searchParams?: Promise<{
+    addressDeleted?: string;
     addressPrimary?: string;
     addressSaved?: string;
+    addressUpdated?: string;
     error?: string;
     saved?: string;
   }>;
@@ -66,6 +70,8 @@ export default async function PublicCustomerAccountPage({
 
       {query?.saved ? <Notice tone="success" message="Cadastro atualizado." /> : null}
       {query?.addressSaved ? <Notice tone="success" message="Endereco cadastrado." /> : null}
+      {query?.addressUpdated ? <Notice tone="success" message="Endereco atualizado." /> : null}
+      {query?.addressDeleted ? <Notice tone="success" message="Endereco removido." /> : null}
       {query?.addressPrimary ? (
         <Notice tone="success" message="Endereco padrao atualizado." />
       ) : null}
@@ -112,9 +118,11 @@ export default async function PublicCustomerAccountPage({
 
       <PublicCustomerAddressesForm
         addresses={session?.addresses ?? []}
+        deleteAction={deletePublicCustomerAddressAction}
         publicSlug={storeContext.publicSlug}
         saveAction={savePublicCustomerAddressAction}
         setPrimaryAction={setPublicCustomerPrimaryAddressAction}
+        updateAction={updatePublicCustomerAddressAction}
       />
     </main>
   );

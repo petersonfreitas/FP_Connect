@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Param, Patch, Post, UseGuards } from "@nestjs/common";
+import { Body, Controller, Delete, Get, Param, Patch, Post, UseGuards } from "@nestjs/common";
 import { InternalApiGuard } from "../../auth/internal-api.guard";
 import type {
   CreatePublicFoodCheckoutInput,
@@ -66,6 +66,24 @@ export class FoodPublicController {
     @Param("publicSlug") publicSlug: string
   ) {
     return this.foodService.setPublicCustomerPrimaryAddress(publicSlug, addressId, input);
+  }
+
+  @Patch("stores/:publicSlug/customers/me/addresses/:addressId")
+  updatePublicCustomerAddress(
+    @Body() input: UpsertFoodPublicCustomerAddressInput,
+    @Param("addressId") addressId: string,
+    @Param("publicSlug") publicSlug: string
+  ) {
+    return this.foodService.updatePublicCustomerAddress(publicSlug, addressId, input);
+  }
+
+  @Delete("stores/:publicSlug/customers/me/addresses/:addressId")
+  deletePublicCustomerAddress(
+    @Body() input: SetFoodPublicCustomerPrimaryAddressInput,
+    @Param("addressId") addressId: string,
+    @Param("publicSlug") publicSlug: string
+  ) {
+    return this.foodService.deletePublicCustomerAddress(publicSlug, addressId, input);
   }
 
   @Get("stores/:publicSlug/orders/:orderNumber")
