@@ -1,5 +1,5 @@
 import Link from "next/link";
-import type { FoodOrderStatus, FoodPaymentStatus } from "@fp/types";
+import type { FoodOrderContract, FoodOrderStatus, FoodPaymentStatus } from "@fp/types";
 import { CompanySwitcher } from "@/components/company-switcher";
 import { formatMoney } from "@/components/food-forms";
 import { FoodShell } from "@/components/food-shell";
@@ -231,84 +231,93 @@ export default async function OrdersPage({ searchParams }: OrdersPageProps) {
 
             {orders.length > 0 ? (
               <div className="order-list">
-                {orders.map((order) => (
-                  <article className="order-card" key={order.id}>
-                    <div className="order-card-heading">
-                      <div>
-                        <strong>{order.orderNumber}</strong>
-                        <small>
-                          {order.customerName ?? "Cliente nao informado"} -{" "}
-                          {new Date(order.createdAt).toLocaleString("pt-BR")}
-                        </small>
-                        <small>{paymentStatusLabels[order.paymentStatus]}</small>
-                      </div>
-                      <span>{orderStatusLabels[order.status]}</span>
-                    </div>
+                {orders.map((order) => {
+                  const statusOptions = getOrderStatusOptions(order);
+                  const quickActions = getQuickStatusOptions(order);
+                  const paymentCleared = isOrderPaymentCleared(order);
 
-                    <div className="order-items">
-                      {order.items.map((item) => (
-                        <div className="order-item-row" key={item.id}>
-                          <span>
-                            {item.quantity}x {item.productName}
-                          </span>
-                          <strong>{formatMoney(item.totalPriceCents)}</strong>
+                  return (
+                    <article className="order-card" key={order.id}>
+                      <div className="order-card-heading">
+                        <div>
+                          <strong>{order.orderNumber}</strong>
+                          <small>
+                            {order.customerName ?? "Cliente nao informado"} -{" "}
+                            {new Date(order.createdAt).toLocaleString("pt-BR")}
+                          </small>
+                          <small>{paymentStatusLabels[order.paymentStatus]}</small>
+                          {!paymentCleared ? (
+                            <small>Fluxo operacional bloqueado ate confirmacao do pagamento.</small>
+                          ) : null}
                         </div>
-                      ))}
-                    </div>
+                        <span>{orderStatusLabels[order.status]}</span>
+                      </div>
 
-                    <form action={updateFoodOrderStatusAction} className="order-status-form">
-                      <input name="companyId" type="hidden" value={selectedCompany.company.id} />
-                      <input name="orderId" type="hidden" value={order.id} />
-                      <input name="statusFilter" type="hidden" value={statusFilter ?? ""} />
-                      <strong>Total: {formatMoney(order.totalCents)}</strong>
-                      <select defaultValue={order.status} name="status">
-                        {orderStatusOptions.map(([value, label]) => (
-                          <option key={value} value={value}>
-                            {label}
-                          </option>
-                        ))}
-                      </select>
-                      <PendingSubmitButton
-                        className="secondary-action compact-action"
-                        pendingLabel="Salvando..."
-                      >
-                        Atualizar
-                      </PendingSubmitButton>
-                    </form>
-
-                    {quickStatusOptions[order.status].length > 0 ? (
-                      <div className="quick-status-actions">
-                        {quickStatusOptions[order.status].map(([status, label]) => (
-                          <form action={updateFoodOrderStatusAction} key={status}>
-                            <input name="companyId" type="hidden" value={selectedCompany.company.id} />
-                            <input name="orderId" type="hidden" value={order.id} />
-                            <input name="status" type="hidden" value={status} />
-                            <input name="statusFilter" type="hidden" value={statusFilter ?? ""} />
-                            <PendingSubmitButton
-                              className={
-                                status === "cancelled"
-                                  ? "secondary-action compact-action danger-action"
-                                  : "secondary-action compact-action"
-                              }
-                              pendingLabel="Salvando..."
-                            >
-                              {label}
-                            </PendingSubmitButton>
-                          </form>
+                      <div className="order-items">
+                        {order.items.map((item) => (
+                          <div className="order-item-row" key={item.id}>
+                            <span>
+                              {item.quantity}x {item.productName}
+                            </span>
+                            <strong>{formatMoney(item.totalPriceCents)}</strong>
+                          </div>
                         ))}
                       </div>
-                    ) : null}
 
-                    <div className="order-card-footer">
-                      <Link
-                        className="secondary-action compact-action"
-                        href={`/movimentacao/pedidos/${order.id}?companyId=${selectedCompany.company.id}`}
-                      >
-                        Ver detalhes
-                      </Link>
-                    </div>
-                  </article>
-                ))}
+                      <form action={updateFoodOrderStatusAction} className="order-status-form">
+                        <input name="companyId" type="hidden" value={selectedCompany.company.id} />
+                        <input name="orderId" type="hidden" value={order.id} />
+                        <input name="statusFilter" type="hidden" value={statusFilter ?? ""} />
+                        <strong>Total: {formatMoney(order.totalCents)}</strong>
+                        <select defaultValue={order.status} name="status">
+                          {statusOptions.map(([value, label]) => (
+                            <option key={value} value={value}>
+                              {label}
+                            </option>
+                          ))}
+                        </select>
+                        <PendingSubmitButton
+                          className="secondary-action compact-action"
+                          pendingLabel="Salvando..."
+                        >
+                          Atualizar
+                        </PendingSubmitButton>
+                      </form>
+
+                      {quickActions.length > 0 ? (
+                        <div className="quick-status-actions">
+                          {quickActions.map(([status, label]) => (
+                            <form action={updateFoodOrderStatusAction} key={status}>
+                              <input name="companyId" type="hidden" value={selectedCompany.company.id} />
+                              <input name="orderId" type="hidden" value={order.id} />
+                              <input name="status" type="hidden" value={status} />
+                              <input name="statusFilter" type="hidden" value={statusFilter ?? ""} />
+                              <PendingSubmitButton
+                                className={
+                                  status === "cancelled"
+                                    ? "secondary-action compact-action danger-action"
+                                    : "secondary-action compact-action"
+                                }
+                                pendingLabel="Salvando..."
+                              >
+                                {label}
+                              </PendingSubmitButton>
+                            </form>
+                          ))}
+                        </div>
+                      ) : null}
+
+                      <div className="order-card-footer">
+                        <Link
+                          className="secondary-action compact-action"
+                          href={`/movimentacao/pedidos/${order.id}?companyId=${selectedCompany.company.id}`}
+                        >
+                          Ver detalhes
+                        </Link>
+                      </div>
+                    </article>
+                  );
+                })}
               </div>
             ) : (
               <div className="empty-state">Nenhum pedido encontrado para este filtro.</div>
@@ -334,6 +343,30 @@ export default async function OrdersPage({ searchParams }: OrdersPageProps) {
 function normalizePage(value: string | undefined): number {
   const page = Number(value);
   return Number.isInteger(page) && page > 0 ? page : 1;
+}
+
+function isOrderPaymentCleared(order: FoodOrderContract): boolean {
+  return order.paymentStatus === "paid";
+}
+
+function getOrderStatusOptions(
+  order: FoodOrderContract
+): ReadonlyArray<readonly [FoodOrderStatus, string]> {
+  if (isOrderPaymentCleared(order)) {
+    return orderStatusOptions;
+  }
+
+  return orderStatusOptions.filter(
+    ([status]) => status === order.status || status === "created" || status === "cancelled"
+  );
+}
+
+function getQuickStatusOptions(order: FoodOrderContract): Array<[FoodOrderStatus, string]> {
+  if (isOrderPaymentCleared(order)) {
+    return quickStatusOptions[order.status];
+  }
+
+  return order.status === "cancelled" ? [] : [["cancelled", "Cancelar"]];
 }
 
 function normalizeOrderStatusFilter(value: string | undefined): FoodOrderStatus | undefined {

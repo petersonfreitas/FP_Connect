@@ -1781,6 +1781,12 @@ export class FoodService {
       return mapOrder(current, items.get(current.id) ?? []);
     }
 
+    if (current.payment_status !== "paid" && isOperationalOrderStatus(status)) {
+      throw new BadRequestException(
+        "Pedido com pagamento pendente nao pode avancar para cozinha ou entrega."
+      );
+    }
+
     const { data, error } = await this.supabase.food
       .from("orders")
       .update({
@@ -3576,6 +3582,16 @@ function normalizeOrderStatus(value: unknown): FoodOrderStatus {
   }
 
   return value as FoodOrderStatus;
+}
+
+function isOperationalOrderStatus(status: FoodOrderStatus): boolean {
+  return (
+    status === "accepted" ||
+    status === "preparing" ||
+    status === "ready" ||
+    status === "out_for_delivery" ||
+    status === "delivered"
+  );
 }
 
 function normalizePaymentInput(input: UpdateFoodOrderPaymentInput): {

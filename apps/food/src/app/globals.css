@@ -1758,6 +1758,10 @@ textarea {
   border-color: rgba(0, 119, 92, 0.35);
 }
 
+.public-checkout-step.blocked {
+  background: #f8fafc;
+}
+
 .public-checkout-step-header {
   align-items: center;
   background: transparent;
@@ -1771,6 +1775,10 @@ textarea {
   padding: 16px;
   text-align: left;
   width: 100%;
+}
+
+.public-checkout-step-header:disabled {
+  cursor: not-allowed;
 }
 
 .public-checkout-step-header span {
@@ -1788,6 +1796,14 @@ textarea {
 
 .public-checkout-step-header strong {
   font-size: 1.05rem;
+}
+
+.checkout-step-hint {
+  color: var(--muted) !important;
+  font-size: 0.82rem !important;
+  font-weight: 700 !important;
+  letter-spacing: 0 !important;
+  text-transform: none !important;
 }
 
 .public-checkout-step-body {
@@ -1840,6 +1856,74 @@ textarea {
 .public-checkout-summary {
   position: sticky;
   top: 92px;
+}
+
+.public-checkout-step-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  justify-content: flex-end;
+}
+
+.public-fulfillment-choice-grid {
+  display: grid;
+  gap: 12px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.public-fulfillment-choice {
+  background: #ffffff;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  color: inherit;
+  cursor: pointer;
+  display: grid;
+  gap: 6px;
+  padding: 14px;
+  text-align: left;
+}
+
+.public-fulfillment-choice:hover,
+.public-fulfillment-choice.selected {
+  border-color: rgba(0, 119, 92, 0.45);
+}
+
+.public-fulfillment-choice.selected {
+  background: #ecfdf3;
+}
+
+.public-fulfillment-choice:disabled {
+  background: #f8fafc;
+  color: var(--muted);
+  cursor: not-allowed;
+}
+
+.public-fulfillment-choice span {
+  font-weight: 900;
+}
+
+.public-fulfillment-choice small {
+  color: var(--muted);
+}
+
+.public-address-panel {
+  display: grid;
+  gap: 12px;
+}
+
+.public-address-selected {
+  background: #f8fafc;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  display: grid;
+  gap: 4px;
+  padding: 12px;
+}
+
+.public-address-selected span {
+  color: var(--muted);
+  font-size: 0.8rem;
+  font-weight: 800;
 }
 
 .public-cart-management,
@@ -2243,6 +2327,7 @@ textarea {
 
   .public-cart-page,
   .public-checkout-layout,
+  .public-fulfillment-choice-grid,
   .public-order-layout,
   .public-product-grid,
   .public-store-overview,

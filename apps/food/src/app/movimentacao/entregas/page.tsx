@@ -41,8 +41,8 @@ export default async function DeliveryPage({ searchParams }: DeliveryPageProps) 
           })
         ])
       : [{ data: null, error: null }, { data: null, error: null }];
-  const readyOrders = readyResult.data?.items ?? [];
-  const outForDeliveryOrders = outForDeliveryResult.data?.items ?? [];
+  const readyOrders = (readyResult.data?.items ?? []).filter(isPaidOrder);
+  const outForDeliveryOrders = (outForDeliveryResult.data?.items ?? []).filter(isPaidOrder);
 
   return (
     <FoodShell activePath="/movimentacao/entregas">
@@ -110,6 +110,10 @@ export default async function DeliveryPage({ searchParams }: DeliveryPageProps) 
       )}
     </FoodShell>
   );
+}
+
+function isPaidOrder(order: FoodOrderContract): boolean {
+  return order.paymentStatus === "paid";
 }
 
 function DeliveryColumn({

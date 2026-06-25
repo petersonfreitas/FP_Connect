@@ -41,8 +41,8 @@ export default async function KitchenPage({ searchParams }: KitchenPageProps) {
           })
         ])
       : [{ data: null, error: null }, { data: null, error: null }];
-  const acceptedOrders = acceptedResult.data?.items ?? [];
-  const preparingOrders = preparingResult.data?.items ?? [];
+  const acceptedOrders = (acceptedResult.data?.items ?? []).filter(isPaidOrder);
+  const preparingOrders = (preparingResult.data?.items ?? []).filter(isPaidOrder);
 
   return (
     <FoodShell activePath="/movimentacao/cozinha">
@@ -109,6 +109,10 @@ export default async function KitchenPage({ searchParams }: KitchenPageProps) {
       )}
     </FoodShell>
   );
+}
+
+function isPaidOrder(order: FoodOrderContract): boolean {
+  return order.paymentStatus === "paid";
 }
 
 function KitchenColumn({

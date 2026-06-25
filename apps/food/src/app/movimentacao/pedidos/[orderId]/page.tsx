@@ -1,5 +1,10 @@
 import Link from "next/link";
-import type { FoodOrderStatus, FoodPaymentMethod, FoodPaymentStatus } from "@fp/types";
+import type {
+  FoodOrderContract,
+  FoodOrderStatus,
+  FoodPaymentMethod,
+  FoodPaymentStatus
+} from "@fp/types";
 import { updateFoodOrderPaymentAction, updateFoodOrderStatusAction } from "@/app/actions";
 import { CompanySwitcher } from "@/components/company-switcher";
 import { formatMoney } from "@/components/food-forms";
@@ -89,6 +94,8 @@ export default async function OrderDetailPage({
   const ordersHref = selectedCompany
     ? `/movimentacao/pedidos?companyId=${selectedCompany.company.id}`
     : "/movimentacao/pedidos";
+  const paymentCleared = order ? isOrderPaymentCleared(order) : false;
+  const statusOptions = order ? getOrderStatusOptions(order) : orderStatusOptions;
 
   return (
     <FoodShell activePath="/movimentacao/pedidos">
@@ -182,8 +189,11 @@ export default async function OrderDetailPage({
               <input name="orderId" type="hidden" value={order.id} />
               <input name="returnTo" type="hidden" value={detailPath} />
               <strong>Alterar status</strong>
+              {!paymentCleared ? (
+                <span>Fluxo operacional bloqueado ate confirmacao do pagamento.</span>
+              ) : null}
               <select defaultValue={order.status} name="status">
-                {orderStatusOptions.map(([value, label]) => (
+                {statusOptions.map(([value, label]) => (
                   <option key={value} value={value}>
                     {label}
                   </option>
@@ -304,5 +314,21 @@ export default async function OrderDetailPage({
         </>
       )}
     </FoodShell>
+  );
+}
+
+function isOrderPaymentCleared(order: FoodOrderContract): boolean {
+  return order.paymentStatus === "paid";
+}
+
+function getOrderStatusOptions(
+  order: FoodOrderContract
+): ReadonlyArray<readonly [FoodOrderStatus, string]> {
+  if (isOrderPaymentCleared(order)) {
+    return orderStatusOptions;
+  }
+
+  return orderStatusOptions.filter(
+    ([status]) => status === order.status || status === "created" || status === "cancelled"
   );
 }

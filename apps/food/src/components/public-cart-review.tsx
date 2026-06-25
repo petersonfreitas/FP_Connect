@@ -107,8 +107,8 @@ export function PublicCartReview({
   const [mercadoPagoReady, setMercadoPagoReady] = useState(false);
   const [customerNote, setCustomerNote] = useState("");
   const [saveCardForFuture, setSaveCardForFuture] = useState(false);
-  const [fulfillmentMethod, setFulfillmentMethod] = useState<FoodOrderFulfillmentMethod>(
-    addresses.length > 0 && menu.availability.isDeliveryOpen ? "delivery" : "pickup"
+  const [fulfillmentMethod, setFulfillmentMethod] = useState<FoodOrderFulfillmentMethod | null>(
+    null
   );
   const [paymentMode, setPaymentMode] = useState<"card" | "pix">("pix");
   const [activeStep, setActiveStep] = useState<CheckoutStepId>("cart");
@@ -136,6 +136,45 @@ export function PublicCartReview({
   const cartReady = Boolean(validation?.isValidForCheckout);
   const fulfillmentReady = isFulfillmentReady(fulfillmentMethod, selectedAddressId);
   const paymentReady = canPay && Boolean(publicKey);
+  const cartBlocked = cartItems.length === 0;
+  const fulfillmentBlocked = !accountReady || !cartReady;
+  const shippingBlocked = fulfillmentBlocked || !fulfillmentMethod;
+  const paymentBlocked = !accountReady || !cartReady || !fulfillmentReady || !publicKey;
+  const stepStatuses = {
+    account: getStepStatus({ isComplete: accountReady }),
+    cart: getStepStatus({
+      isBlocked: cartBlocked,
+      isComplete: cartReady,
+      isCurrent: isValidating
+    }),
+    fulfillment: getStepStatus({
+      isBlocked: fulfillmentBlocked,
+      isComplete: Boolean(fulfillmentMethod)
+    }),
+    payment: getStepStatus({
+      isBlocked: paymentBlocked,
+      isComplete: paymentReady
+    }),
+    shipping: getStepStatus({
+      isBlocked: shippingBlocked,
+      isComplete: fulfillmentReady
+    })
+  } satisfies Record<CheckoutStepId, CheckoutStepStatus>;
+  const nextCheckoutStep = getNextCheckoutStep({
+    accountReady,
+    cartReady,
+    fulfillmentReady
+  });
+  const checkoutStepHintContext = {
+    accountReady,
+    cartItemsCount,
+    cartReady,
+    fulfillmentMethod,
+    fulfillmentReady,
+    isValidating,
+    publicKey
+  };
+  const cartStepActionLabel = getCartStepActionLabel({ accountReady, cartReady });
   const issues = useMemo(
     () => validation?.issues ?? (validationError ? [validationError] : []),
     [validation?.issues, validationError]
@@ -150,6 +189,14 @@ export function PublicCartReview({
         })) ?? [],
     [validation?.items]
   );
+
+  function selectFulfillmentMethod(method: FoodOrderFulfillmentMethod) {
+    setFulfillmentMethod(method);
+
+    if (method === "delivery" && !selectedAddressId && primaryAddress) {
+      setSelectedAddressId(primaryAddress.id);
+    }
+  }
 
   const completeCheckout = useCallback(
     (data: CreatePublicFoodCheckoutContract) => {
@@ -170,6 +217,10 @@ export function PublicCartReview({
 
   const submitCardPayment = useCallback(
     async (formData: CardPaymentFormData, additionalData: CardPaymentAdditionalData) => {
+      if (!fulfillmentMethod) {
+        throw new Error("Escolha entrega ou retirada antes de pagar.");
+      }
+
       const paymentMethodType = normalizePaymentMethodType(additionalData.paymentTypeId);
       const payload = buildCheckoutPayload({
         items: checkoutItems,
@@ -358,6 +409,11 @@ export function PublicCartReview({
   ]);
 
   async function submitPixPayment() {
+    if (!fulfillmentMethod) {
+      setPixError("Escolha entrega ou retirada antes de pagar.");
+      return;
+    }
+
     const payload = buildCheckoutPayload({
       items: checkoutItems,
       customerNote,
@@ -433,8 +489,9 @@ export function PublicCartReview({
           <CheckoutAccordionStep
             active={activeStep === "cart"}
             eyebrow="Resumo"
+            hint={getCheckoutStepHint("cart", checkoutStepHintContext)}
             onOpen={() => setActiveStep("cart")}
-            status={getStepStatus(cartReady, isValidating)}
+            status={stepStatuses.cart}
             title="Carrinho e valores"
           >
             <div className="public-section-heading">
@@ -492,13 +549,22 @@ export function PublicCartReview({
                 ))}
               </div>
             ) : null}
+
+            <CheckoutStepActions
+              disabled={accountReady && !cartReady}
+              label={cartStepActionLabel}
+              onNext={() => setActiveStep(accountReady ? "fulfillment" : "account")}
+              secondaryHref={cartHref}
+              secondaryLabel="Editar carrinho"
+            />
           </CheckoutAccordionStep>
 
           <CheckoutAccordionStep
             active={activeStep === "account"}
             eyebrow="Conta"
+            hint={getCheckoutStepHint("account", checkoutStepHintContext)}
             onOpen={() => setActiveStep("account")}
-            status={getStepStatus(accountReady, false)}
+            status={stepStatuses.account}
             title="Conta do cliente"
           >
             {!isAuthenticated ? (
@@ -519,39 +585,51 @@ export function PublicCartReview({
               <div className="public-checkout-ready">
                 <strong>Cadastro pronto para compra.</strong>
                 <span>Nome, telefone e aceites serao usados no pedido.</span>
+                <CheckoutStepActions
+                  label={cartReady ? "Continuar para recebimento" : "Voltar ao carrinho"}
+                  onNext={() => setActiveStep(cartReady ? "fulfillment" : "cart")}
+                />
               </div>
             )}
           </CheckoutAccordionStep>
 
           <CheckoutAccordionStep
             active={activeStep === "fulfillment"}
+            disabled={fulfillmentBlocked}
             eyebrow="Recebimento"
+            hint={getCheckoutStepHint("fulfillment", checkoutStepHintContext)}
             onOpen={() => setActiveStep("fulfillment")}
-            status={getStepStatus(Boolean(fulfillmentMethod), false)}
+            status={stepStatuses.fulfillment}
             title="Entrega ou retirada"
           >
             <div className="public-fulfillment-panel">
-              <label className="public-radio-option">
-                <input
-                  checked={fulfillmentMethod === "delivery"}
+              <div className="public-fulfillment-choice-grid">
+                <button
+                  className={
+                    fulfillmentMethod === "delivery"
+                      ? "public-fulfillment-choice selected"
+                      : "public-fulfillment-choice"
+                  }
                   disabled={!menu.availability.isDeliveryOpen}
-                  name="fulfillmentMethod"
-                  onChange={() => setFulfillmentMethod("delivery")}
-                  type="radio"
-                  value="delivery"
-                />
-                Entrega no endereco
-              </label>
-              <label className="public-radio-option">
-                <input
-                  checked={fulfillmentMethod === "pickup"}
-                  name="fulfillmentMethod"
-                  onChange={() => setFulfillmentMethod("pickup")}
-                  type="radio"
-                  value="pickup"
-                />
-                Retirada em balcao
-              </label>
+                  onClick={() => selectFulfillmentMethod("delivery")}
+                  type="button"
+                >
+                  <span>Receber em casa</span>
+                  <small>Usar endereco cadastrado ou escolher outro.</small>
+                </button>
+                <button
+                  className={
+                    fulfillmentMethod === "pickup"
+                      ? "public-fulfillment-choice selected"
+                      : "public-fulfillment-choice"
+                  }
+                  onClick={() => selectFulfillmentMethod("pickup")}
+                  type="button"
+                >
+                  <span>Retirar no balcao</span>
+                  <small>Buscar o pedido diretamente na loja.</small>
+                </button>
+              </div>
 
               {!menu.availability.isDeliveryOpen ? (
                 <p className="public-delivery-note">
@@ -559,33 +637,58 @@ export function PublicCartReview({
                 </p>
               ) : null}
             </div>
+
+            <CheckoutStepActions
+              disabled={!fulfillmentMethod}
+              label="Continuar"
+              onNext={() => setActiveStep("shipping")}
+            />
           </CheckoutAccordionStep>
 
           <CheckoutAccordionStep
             active={activeStep === "shipping"}
+            disabled={shippingBlocked}
             eyebrow={fulfillmentMethod === "pickup" ? "Retirada" : "Endereco"}
+            hint={getCheckoutStepHint("shipping", checkoutStepHintContext)}
             onOpen={() => setActiveStep("shipping")}
-            status={getStepStatus(fulfillmentReady, false)}
-            title={fulfillmentMethod === "pickup" ? "Dados de retirada" : "Endereco e observacao"}
+            status={stepStatuses.shipping}
+            title={getShippingStepTitle(fulfillmentMethod)}
           >
             <div className="public-fulfillment-panel">
               {fulfillmentMethod === "delivery" ? (
                 addresses.length > 0 ? (
-                  <label>
-                    Endereco de entrega
-                    <select
-                      name="deliveryAddressId"
-                      onChange={(event) => setSelectedAddressId(event.target.value)}
-                      required
-                      value={selectedAddressId}
-                    >
-                      {addresses.map((address) => (
-                        <option key={address.id} value={address.id}>
-                          {formatAddressOption(address)}
-                        </option>
-                      ))}
-                    </select>
-                  </label>
+                  <div className="public-address-panel">
+                    {selectedAddressId ? (
+                      <div className="public-address-selected">
+                        <span>Endereco selecionado</span>
+                        <strong>
+                          {formatAddressOption(
+                            addresses.find((address) => address.id === selectedAddressId) ??
+                              primaryAddress ??
+                              addresses[0]
+                          )}
+                        </strong>
+                      </div>
+                    ) : null}
+                    <label>
+                      Manter endereco padrao ou escolher outro
+                      <select
+                        name="deliveryAddressId"
+                        onChange={(event) => setSelectedAddressId(event.target.value)}
+                        required
+                        value={selectedAddressId}
+                      >
+                        {addresses.map((address) => (
+                          <option key={address.id} value={address.id}>
+                            {formatAddressOption(address)}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                    <a className="secondary-action compact-action" href={accountHref}>
+                      Gerenciar enderecos
+                    </a>
+                  </div>
                 ) : (
                   <a className="secondary-action" href={accountHref}>
                     Cadastrar endereco
@@ -607,13 +710,21 @@ export function PublicCartReview({
                 />
               </label>
             </div>
+
+            <CheckoutStepActions
+              disabled={!fulfillmentReady}
+              label={fulfillmentReady ? "Continuar para pagamento" : "Informe o endereco"}
+              onNext={() => setActiveStep("payment")}
+            />
           </CheckoutAccordionStep>
 
           <CheckoutAccordionStep
             active={activeStep === "payment"}
+            disabled={paymentBlocked}
             eyebrow="Pagamento"
+            hint={getCheckoutStepHint("payment", checkoutStepHintContext)}
             onOpen={() => setActiveStep("payment")}
-            status={getStepStatus(paymentReady, false)}
+            status={stepStatuses.payment}
             title="Pagamento e confirmacao"
           >
             {!validation?.isValidForCheckout ? (
@@ -728,6 +839,7 @@ export function PublicCartReview({
             <span>{accountReady ? "Conta pronta" : "Conta pendente"}</span>
             <span>{cartReady ? "Carrinho validado" : "Carrinho pendente"}</span>
             <span>{fulfillmentReady ? "Recebimento pronto" : "Recebimento pendente"}</span>
+            <span>{publicKey ? "Pagamento online ativo" : "Pagamento online pendente"}</span>
           </div>
 
           <div className="public-cart-actions">
@@ -736,11 +848,11 @@ export function PublicCartReview({
             </a>
             <button
               className="primary-action"
-              disabled={!cartReady}
-              onClick={() => setActiveStep("payment")}
+              disabled={cartItems.length === 0}
+              onClick={() => setActiveStep(nextCheckoutStep)}
               type="button"
             >
-              Ir para pagamento
+              {nextCheckoutStep === "payment" ? "Ir para pagamento" : "Continuar checkout"}
             </button>
           </div>
         </aside>
@@ -752,29 +864,43 @@ export function PublicCartReview({
 function CheckoutAccordionStep({
   active,
   children,
+  disabled = false,
   eyebrow,
+  hint,
   onOpen,
   status,
   title
 }: {
   active: boolean;
   children: ReactNode;
+  disabled?: boolean;
   eyebrow: string;
+  hint?: string;
   onOpen: () => void;
   status: CheckoutStepStatus;
   title: string;
 }) {
   return (
-    <article className={active ? "public-checkout-step active" : "public-checkout-step"}>
+    <article
+      className={[
+        "public-checkout-step",
+        active ? "active" : "",
+        disabled ? "blocked" : ""
+      ]
+        .filter(Boolean)
+        .join(" ")}
+    >
       <button
         aria-expanded={active}
         className="public-checkout-step-header"
+        disabled={disabled}
         onClick={onOpen}
         type="button"
       >
         <span>
           <small>{eyebrow}</small>
           <strong>{title}</strong>
+          {hint ? <small className="checkout-step-hint">{hint}</small> : null}
         </span>
         <em className={`checkout-step-status ${status}`}>{formatStepStatus(status)}</em>
       </button>
@@ -783,12 +909,146 @@ function CheckoutAccordionStep({
   );
 }
 
-function getStepStatus(isComplete: boolean, isCurrent: boolean): CheckoutStepStatus {
+function CheckoutStepActions({
+  disabled = false,
+  label,
+  onNext,
+  secondaryHref,
+  secondaryLabel
+}: {
+  disabled?: boolean;
+  label: string;
+  onNext: () => void;
+  secondaryHref?: string;
+  secondaryLabel?: string;
+}) {
+  return (
+    <div className="public-checkout-step-actions">
+      {secondaryHref && secondaryLabel ? (
+        <a className="secondary-action" href={secondaryHref}>
+          {secondaryLabel}
+        </a>
+      ) : null}
+      <button className="primary-action" disabled={disabled} onClick={onNext} type="button">
+        {label}
+      </button>
+    </div>
+  );
+}
+
+function getStepStatus({
+  isBlocked = false,
+  isComplete,
+  isCurrent = false
+}: {
+  isBlocked?: boolean;
+  isComplete: boolean;
+  isCurrent?: boolean;
+}): CheckoutStepStatus {
+  if (isBlocked) {
+    return "blocked";
+  }
+
   if (isComplete) {
     return "complete";
   }
 
   return isCurrent ? "current" : "pending";
+}
+
+function getNextCheckoutStep({
+  accountReady,
+  cartReady,
+  fulfillmentReady
+}: {
+  accountReady: boolean;
+  cartReady: boolean;
+  fulfillmentReady: boolean;
+}): CheckoutStepId {
+  if (!accountReady) {
+    return "account";
+  }
+
+  if (!cartReady) {
+    return "cart";
+  }
+
+  if (!fulfillmentReady) {
+    return "shipping";
+  }
+
+  return "payment";
+}
+
+function getCartStepActionLabel({
+  accountReady,
+  cartReady
+}: {
+  accountReady: boolean;
+  cartReady: boolean;
+}): string {
+  if (!accountReady) {
+    return "Continuar para conta";
+  }
+
+  return cartReady ? "Continuar para recebimento" : "Aguardando validacao";
+}
+
+function getCheckoutStepHint(
+  step: CheckoutStepId,
+  context: {
+    accountReady: boolean;
+    cartItemsCount: number;
+    cartReady: boolean;
+    fulfillmentMethod: FoodOrderFulfillmentMethod | null;
+    fulfillmentReady: boolean;
+    isValidating: boolean;
+    publicKey: string | null;
+  }
+): string {
+  if (step === "account") {
+    return context.accountReady ? "Cadastro verificado" : "Obrigatorio para comprar";
+  }
+
+  if (step === "cart") {
+    if (context.cartItemsCount === 0) {
+      return "Carrinho vazio";
+    }
+
+    if (!context.accountReady) {
+      return "Conta necessaria para validar";
+    }
+
+    if (context.isValidating) {
+      return "Validando com a loja";
+    }
+
+    return context.cartReady ? "Precos e itens conferidos" : "Aguardando validacao";
+  }
+
+  if (step === "fulfillment") {
+    return context.cartReady ? "Escolha como receber" : "Valide o carrinho primeiro";
+  }
+
+  if (step === "shipping") {
+    if (!context.cartReady) {
+      return "Complete as etapas anteriores";
+    }
+
+    if (!context.fulfillmentMethod) {
+      return "Escolha entrega ou retirada";
+    }
+
+    return context.fulfillmentMethod === "pickup"
+      ? "Retirada no balcao"
+      : "Escolha o endereco";
+  }
+
+  if (!context.publicKey) {
+    return "Gateway pendente";
+  }
+
+  return context.fulfillmentReady ? "Liberado para pagar" : "Complete recebimento";
 }
 
 function formatStepStatus(status: CheckoutStepStatus): string {
@@ -860,10 +1120,22 @@ function normalizeFormText(value: FormDataEntryValue | string | null | undefined
 }
 
 function isFulfillmentReady(
-  fulfillmentMethod: FoodOrderFulfillmentMethod,
+  fulfillmentMethod: FoodOrderFulfillmentMethod | null,
   selectedAddressId: string
 ): boolean {
   return fulfillmentMethod === "pickup" || selectedAddressId.trim().length > 0;
+}
+
+function getShippingStepTitle(fulfillmentMethod: FoodOrderFulfillmentMethod | null): string {
+  if (fulfillmentMethod === "pickup") {
+    return "Dados de retirada";
+  }
+
+  if (fulfillmentMethod === "delivery") {
+    return "Endereco e observacao";
+  }
+
+  return "Endereco ou retirada";
 }
 
 function formatAddressOption(address: FoodPublicCustomerAddressContract): string {
