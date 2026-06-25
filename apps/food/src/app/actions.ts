@@ -3,6 +3,7 @@
 import { redirect } from "next/navigation";
 import type {
   CreateFoodOrderInput,
+  CreateFoodStockEntryInput,
   CreatePublicFoodOrderInput,
   FoodCategoryStatus,
   FoodOrderStatus,
@@ -23,6 +24,7 @@ import {
   createFoodOrder,
   createFoodCategory,
   createFoodProduct,
+  createFoodStockEntry,
   createPublicFoodOrder,
   ensurePublicFoodCustomerStoreAccess,
   savePublicFoodCustomerAddress,
@@ -150,6 +152,26 @@ export async function saveFoodProductAction(formData: FormData): Promise<void> {
     companyId,
     result.error,
     productId ? "productUpdated" : "productCreated"
+  );
+}
+
+export async function createFoodStockEntryAction(formData: FormData): Promise<void> {
+  const companyId = requireCompanyId(formData);
+  const input: CreateFoodStockEntryInput = {
+    batchCode: optionalText(formData.get("batchCode")),
+    expiresAt: optionalText(formData.get("expiresAt")),
+    invoiceNumber: optionalText(formData.get("invoiceNumber")),
+    notes: optionalText(formData.get("notes")),
+    productId: String(formData.get("productId") ?? ""),
+    quantity: optionalInteger(formData.get("quantity")) ?? 0
+  };
+  const result = await createFoodStockEntry(companyId, input);
+
+  redirectWithResult(
+    "/movimentacao/estoque",
+    companyId,
+    result.error,
+    "stockEntryCreated"
   );
 }
 

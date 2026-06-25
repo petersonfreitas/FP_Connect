@@ -2,6 +2,7 @@ import "server-only";
 
 import type {
   AdminCurrentUserAccessContract,
+  CreateFoodStockEntryInput,
   CreatePublicFoodCheckoutContract,
   CreatePublicFoodCheckoutInput,
   CreatePublicFoodOrderInput,
@@ -16,6 +17,7 @@ import type {
   FoodPublicCustomerSessionContract,
   FoodOrderStatus,
   FoodProductContract,
+  FoodStockMovementContract,
   FoodStoreContract,
   FoodStoreHourContract,
   ModuleAccessContract,
@@ -231,6 +233,33 @@ export async function updateFoodProduct(
       "X-FP-Company-Id": companyId
     },
     method: "PATCH"
+  });
+}
+
+export async function listFoodStockMovements(
+  companyId: string,
+  pagination: PaginationParams = {}
+): Promise<InternalApiResult<PaginatedContract<FoodStockMovementContract>>> {
+  return fetchInternal<PaginatedContract<FoodStockMovementContract>>(
+    `food/stock/movements${formatPaginationSearch(pagination)}`,
+    {
+      headers: {
+        "X-FP-Company-Id": companyId
+      }
+    }
+  );
+}
+
+export async function createFoodStockEntry(
+  companyId: string,
+  input: CreateFoodStockEntryInput
+): Promise<InternalApiResult<FoodStockMovementContract>> {
+  return fetchInternal<FoodStockMovementContract>("food/stock/entries", {
+    body: JSON.stringify(input),
+    headers: {
+      "X-FP-Company-Id": companyId
+    },
+    method: "POST"
   });
 }
 

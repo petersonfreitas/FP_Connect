@@ -71,6 +71,11 @@ export async function POST(request: Request) {
     authUserId: currentUser.id,
     email: currentUser.email,
     payment: body?.payment
+      ? {
+          ...body.payment,
+          customerEmail: body.payment.customerEmail ?? currentUser.email
+        }
+      : body?.payment
   });
 
   if (result.error || !result.data) {

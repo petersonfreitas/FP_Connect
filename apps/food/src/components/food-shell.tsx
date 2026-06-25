@@ -48,7 +48,8 @@ const navigation = {
       items: [
         { href: "/movimentacao/pedidos", label: "Pedidos" },
         { href: "/movimentacao/cozinha", label: "Cozinha" },
-        { href: "/movimentacao/entregas", label: "Entregas" }
+        { href: "/movimentacao/entregas", label: "Entregas" },
+        { href: "/movimentacao/estoque", label: "Estoque" }
       ]
     }
   ]

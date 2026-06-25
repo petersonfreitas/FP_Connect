@@ -1,6 +1,7 @@
 export type FoodStoreStatus = "closed" | "implementation" | "open" | "suspended";
 export type FoodCategoryStatus = "active" | "inactive";
 export type FoodProductStatus = "available" | "hidden" | "unavailable";
+export type FoodStockMovementType = "entry";
 export type FoodPaymentMethod = "card" | "cash" | "other" | "pix";
 export type FoodPaymentStatus = "cancelled" | "paid" | "pending";
 export type FoodCustomerStatus = "active" | "blocked" | "inactive";
@@ -116,6 +117,33 @@ export type UpsertFoodProductInput = {
   stockControlEnabled?: boolean | null;
   stockMinQuantity?: number | null;
   sortOrder?: number | null;
+};
+
+export type FoodStockMovementContract = {
+  batchCode: string | null;
+  companyId: string;
+  createdAt: string;
+  createdBy: string | null;
+  expiresAt: string | null;
+  id: string;
+  invoiceNumber: string | null;
+  movementType: FoodStockMovementType;
+  newQuantity: number;
+  notes: string | null;
+  previousQuantity: number;
+  productId: string;
+  productName: string | null;
+  quantity: number;
+  storeId: string | null;
+};
+
+export type CreateFoodStockEntryInput = {
+  batchCode?: string | null;
+  expiresAt?: string | null;
+  invoiceNumber?: string | null;
+  notes?: string | null;
+  productId: string;
+  quantity: number;
 };
 
 export type FoodMenuCategoryContract = FoodCategoryContract & {

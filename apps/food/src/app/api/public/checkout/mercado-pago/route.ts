@@ -74,6 +74,11 @@ export async function POST(request: Request) {
     email: currentUser.email,
     items: body?.items ?? [],
     payment: body?.payment
+      ? {
+          ...body.payment,
+          customerEmail: body.payment.customerEmail ?? currentUser.email
+        }
+      : body?.payment
   });
 
   if (result.error || !result.data) {

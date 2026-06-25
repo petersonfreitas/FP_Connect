@@ -2,6 +2,7 @@ import {
   BadRequestException,
   ForbiddenException,
   Injectable,
+  InternalServerErrorException,
   NotFoundException
 } from "@nestjs/common";
 import { randomUUID } from "node:crypto";
@@ -9,6 +10,7 @@ import { GatewayService } from "../gateway/gateway.service";
 import { RobotsService } from "../robots/robots.service";
 import { SupabaseService } from "../../supabase/supabase.service";
 import type {
+  CreateFoodStockEntryInput,
   CreatePublicFoodCheckoutContract,
   CreatePublicFoodCheckoutInput,
   CreatePublicFoodOrderInput,
@@ -43,6 +45,8 @@ import type {
   FoodStoreHourContract,
   FoodStoreHourKind,
   FoodStoreStatus,
+  FoodStockMovementContract,
+  FoodStockMovementType,
   PaginatedContract,
   RetryPublicFoodPaymentInput,
   SetFoodPublicCustomerPrimaryAddressInput,
@@ -113,6 +117,23 @@ type FoodProductRow = {
   sort_order: number;
   created_at: string;
   updated_at: string;
+};
+
+type FoodStockMovementRow = {
+  batch_code: string | null;
+  company_id: string;
+  created_at: string;
+  created_by: string | null;
+  expires_at: string | null;
+  id: string;
+  invoice_number: string | null;
+  movement_type: FoodStockMovementType;
+  new_quantity: number;
+  notes: string | null;
+  previous_quantity: number;
+  product_id: string;
+  quantity: number;
+  store_id: string | null;
 };
 
 type FoodOrderRow = {
@@ -237,11 +258,11 @@ type MercadoPagoCompanyConfigRow = {
 };
 
 type PublicCheckoutPaymentInput = {
-  cardToken: string;
+  cardToken: string | null;
   customerEmail: string;
-  installments: number;
-  paymentMethodId: string;
-  paymentMethodType: "credit_card" | "debit_card";
+  installments: number | null;
+  paymentMethodId: string | null;
+  paymentMethodType: "credit_card" | "debit_card" | "pix";
 };
 
 type PaginationOptions = {
@@ -315,6 +336,23 @@ const productSelect = [
   "sort_order",
   "created_at",
   "updated_at"
+].join(",");
+
+const stockMovementSelect = [
+  "id",
+  "company_id",
+  "store_id",
+  "product_id",
+  "movement_type",
+  "quantity",
+  "previous_quantity",
+  "new_quantity",
+  "invoice_number",
+  "batch_code",
+  "expires_at",
+  "notes",
+  "created_by",
+  "created_at"
 ].join(",");
 
 const orderSelect = [
@@ -745,6 +783,71 @@ export class FoodService {
     return product;
   }
 
+  async listStockMovements(
+    companyId: string,
+    pagination: PaginationOptions
+  ): Promise<PaginatedContract<FoodStockMovementContract>> {
+    const from = (pagination.page - 1) * pagination.pageSize;
+    const to = from + pagination.pageSize - 1;
+    const { count, data, error } = await this.supabase.food
+      .from("stock_movements")
+      .select(stockMovementSelect, { count: "exact" })
+      .eq("company_id", companyId)
+      .is("deleted_at", null)
+      .order("created_at", { ascending: false })
+      .range(from, to);
+
+    if (error) {
+      throwSupabaseError(error);
+    }
+
+    const rows = (data ?? []) as unknown as FoodStockMovementRow[];
+    const productsById = await this.listProductsByIds(
+      companyId,
+      [...new Set(rows.map((row) => row.product_id))]
+    );
+
+    return toPaginated(
+      rows.map((row) => mapStockMovement(row, productsById.get(row.product_id) ?? null)),
+      pagination,
+      count ?? 0
+    );
+  }
+
+  async createStockEntry(
+    companyId: string,
+    actorUserId: string,
+    input: CreateFoodStockEntryInput
+  ): Promise<FoodStockMovementContract> {
+    const normalized = normalizeStockEntryInput(input);
+    const { data, error } = await this.supabase.food.rpc("register_stock_entry", {
+      batch_code: normalized.batchCode,
+      expires_at: normalized.expiresAt,
+      invoice_number: normalized.invoiceNumber,
+      movement_quantity: normalized.quantity,
+      notes: normalized.notes,
+      target_actor_user_id: actorUserId,
+      target_company_id: companyId,
+      target_product_id: normalized.productId
+    });
+
+    if (error) {
+      throwSupabaseError(error);
+    }
+
+    const row = Array.isArray(data)
+      ? ((data[0] ?? null) as unknown as FoodStockMovementRow | null)
+      : (data as unknown as FoodStockMovementRow | null);
+
+    if (!row) {
+      throw new InternalServerErrorException("Entrada de estoque nao foi registrada");
+    }
+
+    const productsById = await this.listProductsByIds(companyId, [row.product_id]);
+
+    return mapStockMovement(row, productsById.get(row.product_id) ?? null);
+  }
+
   async getMenu(companyId: string): Promise<FoodMenuContract> {
     const store = await this.getStore(companyId);
     return this.buildMenu(store);
@@ -1118,7 +1221,7 @@ export class FoodService {
       const paidOrder = await this.markOrderPaymentFromGateway(
         store.company_id,
         order.id,
-        "card",
+        getFoodPaymentMethodFromGateway(payment.paymentMethodType),
         "Pagamento aprovado pelo FP Gateway/Mercado Pago."
       );
 
@@ -1187,7 +1290,7 @@ export class FoodService {
       const paidOrder = await this.markOrderPaymentFromGateway(
         store.company_id,
         order.id,
-        "card",
+        getFoodPaymentMethodFromGateway(payment.paymentMethodType),
         "Pagamento aprovado pelo FP Gateway/Mercado Pago em retentativa."
       );
 
@@ -2230,6 +2333,10 @@ export class FoodService {
     companyId: string,
     productIds: string[]
   ): Promise<Map<string, FoodProductContract>> {
+    if (productIds.length === 0) {
+      return new Map();
+    }
+
     const { data, error } = await this.supabase.food
       .from("products")
       .select(productSelect)
@@ -2767,26 +2874,35 @@ function normalizePublicCheckoutPayment(
     return null;
   }
 
-  const cardToken = normalizeRequiredText(value.cardToken, "payment.cardToken", 300);
   const customerEmail = normalizeEmail(value.customerEmail, "payment.customerEmail");
-  const installments = normalizeInstallments(value.installments);
-  const paymentMethodId = normalizeRequiredText(
-    value.paymentMethodId,
-    "payment.paymentMethodId",
-    80
-  );
 
-  if (value.paymentMethodType !== "credit_card" && value.paymentMethodType !== "debit_card") {
-    throw new BadRequestException("payment.paymentMethodType deve ser credit_card ou debit_card");
+  if (value.paymentMethodType === "pix") {
+    return {
+      cardToken: null,
+      customerEmail,
+      installments: null,
+      paymentMethodId: null,
+      paymentMethodType: "pix"
+    };
   }
 
-  return {
-    cardToken,
-    customerEmail,
-    installments,
-    paymentMethodId,
-    paymentMethodType: value.paymentMethodType
-  };
+  if (value.paymentMethodType === "credit_card" || value.paymentMethodType === "debit_card") {
+    return {
+      cardToken: normalizeRequiredText(value.cardToken, "payment.cardToken", 300),
+      customerEmail,
+      installments: normalizeInstallments(value.installments),
+      paymentMethodId: normalizeRequiredText(value.paymentMethodId, "payment.paymentMethodId", 80),
+      paymentMethodType: value.paymentMethodType
+    };
+  }
+
+  throw new BadRequestException("payment.paymentMethodType deve ser pix, credit_card ou debit_card");
+}
+
+function getFoodPaymentMethodFromGateway(
+  paymentMethodType: PublicCheckoutPaymentInput["paymentMethodType"]
+): FoodPaymentMethod {
+  return paymentMethodType === "pix" ? "pix" : "card";
 }
 
 function buildPublicOrderInput(
@@ -3140,6 +3256,27 @@ function normalizeStockQuantity(value: unknown): number {
   return parsed;
 }
 
+function normalizeStockEntryInput(input: CreateFoodStockEntryInput): CreateFoodStockEntryInput {
+  return {
+    batchCode: normalizeOptionalText(input.batchCode, "batchCode", 80),
+    expiresAt: normalizeOptionalDate(input.expiresAt, "expiresAt"),
+    invoiceNumber: normalizeOptionalText(input.invoiceNumber, "invoiceNumber", 80),
+    notes: normalizeOptionalText(input.notes, "notes", 600),
+    productId: normalizeRequiredText(input.productId, "productId", 80),
+    quantity: normalizeStockEntryQuantity(input.quantity)
+  };
+}
+
+function normalizeStockEntryQuantity(value: unknown): number {
+  const parsed = Number(value);
+
+  if (!Number.isInteger(parsed) || parsed < 1 || parsed > 1000000) {
+    throw new BadRequestException("quantity deve estar entre 1 e 1000000");
+  }
+
+  return parsed;
+}
+
 function normalizeQuantity(value: unknown): number {
   const parsed = Number(value);
 
@@ -3148,6 +3285,26 @@ function normalizeQuantity(value: unknown): number {
   }
 
   return parsed;
+}
+
+function normalizeOptionalDate(value: unknown, field: string): string | null {
+  const normalized = normalizeOptionalText(value, field, 10);
+
+  if (!normalized) {
+    return null;
+  }
+
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(normalized)) {
+    throw new BadRequestException(`${field} deve estar no formato YYYY-MM-DD`);
+  }
+
+  const parsed = new Date(`${normalized}T00:00:00.000Z`);
+
+  if (Number.isNaN(parsed.getTime()) || parsed.toISOString().slice(0, 10) !== normalized) {
+    throw new BadRequestException(`${field} deve ser uma data valida`);
+  }
+
+  return normalized;
 }
 
 function hasEnoughStock(product: FoodProductContract, quantity: number): boolean {
@@ -3241,6 +3398,29 @@ function mapProduct(row: FoodProductRow): FoodProductContract {
     stockQuantity: row.stock_quantity,
     storeId: row.store_id,
     updatedAt: row.updated_at
+  };
+}
+
+function mapStockMovement(
+  row: FoodStockMovementRow,
+  product: FoodProductContract | null
+): FoodStockMovementContract {
+  return {
+    batchCode: row.batch_code,
+    companyId: row.company_id,
+    createdAt: row.created_at,
+    createdBy: row.created_by,
+    expiresAt: row.expires_at,
+    id: row.id,
+    invoiceNumber: row.invoice_number,
+    movementType: row.movement_type,
+    newQuantity: row.new_quantity,
+    notes: row.notes,
+    previousQuantity: row.previous_quantity,
+    productId: row.product_id,
+    productName: product?.name ?? null,
+    quantity: row.quantity,
+    storeId: row.store_id
   };
 }
 

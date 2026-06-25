@@ -7,7 +7,7 @@ import {
 } from "@/lib/public-store-urls";
 
 type PublicCustomerMenuProps = {
-  active: "account" | "menu" | "order";
+  active: "account" | "cart" | "menu" | "order" | "review";
   contactPhone?: string | null;
   isAuthenticated?: boolean;
   orderNumber?: string;
@@ -23,6 +23,7 @@ export function PublicCustomerMenu({
 }: PublicCustomerMenuProps) {
   const menuHref = storeUrl(storeContext);
   const accountHref = storeUrl(storeContext, "/conta");
+  const cartHref = storeUrl(storeContext, "/carrinho");
   const orderHref = orderNumber ? storeOrderUrl(storeContext, orderNumber) : undefined;
 
   return (
@@ -33,6 +34,9 @@ export function PublicCustomerMenu({
       <div>
         <Link className={active === "menu" ? "active" : ""} href={menuHref}>
           Cardapio
+        </Link>
+        <Link className={active === "cart" || active === "review" ? "active" : ""} href={cartHref}>
+          Carrinho
         </Link>
         {orderHref ? (
           <Link className={active === "order" ? "active" : ""} href={orderHref}>

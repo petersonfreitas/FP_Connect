@@ -16,6 +16,7 @@ import { ModuleAccessPolicy } from "../../auth/module-access-policy.decorator";
 import { buildModuleAccessResponse } from "../../auth/module-access-response";
 import type {
   CreateFoodOrderInput,
+  CreateFoodStockEntryInput,
   FoodOrderStatus,
   UpdateFoodOrderPaymentInput,
   UpdateFoodOrderStatusInput,
@@ -192,6 +193,37 @@ export class FoodController {
     @Param("productId") productId: string
   ) {
     return this.foodService.upsertProduct(companyId, actorUserId, input, productId);
+  }
+
+  @Get("stock/movements")
+  @ModuleAccessPolicy({
+    applicationKey: "food",
+    companyHeader: "x-fp-company-id",
+    permissionKey: "food.access"
+  })
+  listStockMovements(
+    @Headers("x-fp-company-id") companyId: string,
+    @Query("page") page: string | undefined,
+    @Query("pageSize") pageSize: string | undefined
+  ) {
+    return this.foodService.listStockMovements(companyId, {
+      page: normalizePage(page),
+      pageSize: normalizePageSize(pageSize)
+    });
+  }
+
+  @Post("stock/entries")
+  @ModuleAccessPolicy({
+    applicationKey: "food",
+    companyHeader: "x-fp-company-id",
+    permissionKey: "food.access"
+  })
+  createStockEntry(
+    @Body() input: CreateFoodStockEntryInput,
+    @Headers("x-fp-company-id") companyId: string,
+    @Headers("x-fp-actor-user-id") actorUserId: string
+  ) {
+    return this.foodService.createStockEntry(companyId, actorUserId, input);
   }
 
   @Get("menu")

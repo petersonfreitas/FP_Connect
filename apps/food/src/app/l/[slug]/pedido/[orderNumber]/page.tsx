@@ -108,13 +108,13 @@ export default async function PublicOrderPage({
       {query?.payment === "failed" ? (
         <Notice
           tone="danger"
-          message="Pagamento recusado. Voce pode tentar novamente com outro cartao."
+          message="Pagamento recusado. Uma nova tentativa via Gateway sera disponibilizada."
         />
       ) : null}
       {query?.payment === "pending" ? (
         <Notice
           tone="warning"
-          message="Pagamento pendente. Aguarde a confirmacao ou tente novamente com outro cartao."
+          message="Pagamento pendente. Aguarde a confirmacao do Gateway."
         />
       ) : null}
       {customerSessionResult?.error ? (

@@ -78,8 +78,11 @@ export function PublicOrderPaymentRetry({
 }: PublicOrderPaymentRetryProps) {
   const [cardError, setCardError] = useState<string | null>(null);
   const [cardStatus, setCardStatus] = useState<string | null>(null);
+  const [isPayingWithCard, setIsPayingWithCard] = useState(false);
+  const [isPayingWithPix, setIsPayingWithPix] = useState(false);
   const [mercadoPagoReady, setMercadoPagoReady] = useState(false);
-  const [payingWithCard, setPayingWithCard] = useState(false);
+  const [paymentMode, setPaymentMode] = useState<"card" | "pix">("pix");
+  const [pixError, setPixError] = useState<string | null>(null);
   const publicKey = checkout?.mercadoPago.enabled ? checkout.mercadoPago.publicKey : null;
   const loginHref = storeLoginUrl(storeContext, storeOrderUrl(storeContext, order.orderNumber));
   const accountHref = storeUrl(storeContext, "/conta");
@@ -87,28 +90,39 @@ export function PublicOrderPaymentRetry({
     Boolean(publicKey) && order.paymentStatus === "pending" && order.status !== "cancelled";
   const canRetry = isAuthenticated && isCustomerCompleteForCheckout && hasPendingPayment;
 
+  const completeRetry = useCallback(
+    (data: CreatePublicFoodCheckoutContract) => {
+      if (data.paymentUrl) {
+        window.location.href = data.paymentUrl;
+        return;
+      }
+
+      window.location.href = `${storeOrderUrl(
+        storeContext,
+        order.orderNumber
+      )}?retry=1&payment=${encodeURIComponent(data.paymentStatus)}`;
+    },
+    [order.orderNumber, storeContext]
+  );
+
   const submitCardPayment = useCallback(
     async (formData: CardPaymentFormData, additionalData: CardPaymentAdditionalData) => {
-      if (!isAuthenticated) {
-        window.location.href = loginHref;
-        return;
-      }
-
-      if (!isCustomerCompleteForCheckout) {
-        window.location.href = accountHref;
-        return;
-      }
-
+      const paymentMethodType = normalizePaymentMethodType(additionalData.paymentTypeId);
       const payload = buildRetryPayload({
-        additionalData,
-        formData,
         orderNumber: order.orderNumber,
+        payment: {
+          cardToken: normalizeFormText(formData.token),
+          customerEmail: normalizeFormText(formData.payer?.email),
+          installments: Number(formData.installments),
+          paymentMethodId: normalizeFormText(formData.payment_method_id),
+          paymentMethodType
+        },
         publicSlug: storeContext.publicSlug
       });
 
       setCardError(null);
       setCardStatus("Processando nova tentativa...");
-      setPayingWithCard(true);
+      setIsPayingWithCard(true);
 
       const response = await fetch("/api/public/checkout/mercado-pago/retry", {
         body: JSON.stringify(payload),
@@ -125,27 +139,17 @@ export function PublicOrderPaymentRetry({
         | null;
 
       if (!response.ok || !body?.data) {
-        setPayingWithCard(false);
+        setIsPayingWithCard(false);
         throw new Error(body?.error ?? "Nao foi possivel reprocessar o pagamento.");
       }
 
-      window.location.href = `${storeOrderUrl(
-        storeContext,
-        order.orderNumber
-      )}?retry=1&payment=${encodeURIComponent(body.data.paymentStatus)}`;
+      completeRetry(body.data);
     },
-    [
-      accountHref,
-      isAuthenticated,
-      isCustomerCompleteForCheckout,
-      loginHref,
-      order.orderNumber,
-      storeContext
-    ]
+    [completeRetry, order.orderNumber, storeContext.publicSlug]
   );
 
   useEffect(() => {
-    if (!canRetry || !publicKey || !mercadoPagoReady || order.totalCents <= 0) {
+    if (!canRetry || paymentMode !== "card" || !publicKey || !mercadoPagoReady) {
       return undefined;
     }
 
@@ -179,7 +183,7 @@ export function PublicOrderPaymentRetry({
             } catch (error) {
               setCardError(getErrorMessage(error));
               setCardStatus(null);
-              setPayingWithCard(false);
+              setIsPayingWithCard(false);
               throw error;
             }
           }
@@ -205,7 +209,14 @@ export function PublicOrderPaymentRetry({
       window.fpFoodRetryCardPaymentBrick?.unmount();
       window.fpFoodRetryCardPaymentBrick = undefined;
     };
-  }, [canRetry, mercadoPagoReady, order.totalCents, publicKey, submitCardPayment]);
+  }, [
+    canRetry,
+    mercadoPagoReady,
+    order.totalCents,
+    paymentMode,
+    publicKey,
+    submitCardPayment
+  ]);
 
   if (!hasPendingPayment) {
     return null;
@@ -241,6 +252,41 @@ export function PublicOrderPaymentRetry({
     );
   }
 
+  async function submitPixPayment() {
+    const payload = buildRetryPayload({
+      orderNumber: order.orderNumber,
+      payment: {
+        paymentMethodType: "pix"
+      },
+      publicSlug: storeContext.publicSlug
+    });
+
+    setIsPayingWithPix(true);
+    setPixError(null);
+
+    const response = await fetch("/api/public/checkout/mercado-pago/retry", {
+      body: JSON.stringify(payload),
+      headers: {
+        "Content-Type": "application/json"
+      },
+      method: "POST"
+    });
+    const body = (await response.json().catch(() => null)) as
+      | {
+          data?: CreatePublicFoodCheckoutContract;
+          error?: string;
+        }
+      | null;
+
+    if (!response.ok || !body?.data) {
+      setPixError(body?.error ?? "Nao foi possivel gerar a nova tentativa Pix.");
+      setIsPayingWithPix(false);
+      return;
+    }
+
+    completeRetry(body.data);
+  }
+
   return (
     <section className="public-online-payment">
       <Script
@@ -252,60 +298,73 @@ export function PublicOrderPaymentRetry({
       <div>
         <div className="eyebrow">Pagamento pendente</div>
         <h2>Tentar pagar novamente</h2>
-        <p>
-          Use outro cartao ou outro cenario de teste Mercado Pago para criar uma nova tentativa
-          sem duplicar o pedido.
-        </p>
+        <p>Crie uma nova tentativa Pix ou Cartao pelo FP Gateway/Mercado Pago.</p>
+      </div>
+
+      <div className="public-payment-tabs" role="tablist" aria-label="Forma de pagamento">
+        <button
+          className={paymentMode === "pix" ? "active" : ""}
+          onClick={() => setPaymentMode("pix")}
+          type="button"
+        >
+          Pix
+        </button>
+        <button
+          className={paymentMode === "card" ? "active" : ""}
+          onClick={() => setPaymentMode("card")}
+          type="button"
+        >
+          Cartao
+        </button>
       </div>
 
       <div className="public-payment-summary">
         <span>Total do pedido</span>
         <strong>{formatMoney(order.totalCents)}</strong>
       </div>
-      <div
-        aria-busy={payingWithCard}
-        className={payingWithCard ? "public-card-payment is-loading" : "public-card-payment"}
-        id="fp-food-retry-card-payment-brick"
-      />
-      {cardStatus ? <p className="public-payment-note">{cardStatus}</p> : null}
-      {cardError ? <p className="public-payment-error">{cardError}</p> : null}
+
+      {paymentMode === "pix" ? (
+        <div className="public-payment-method-panel">
+          <button
+            className="primary-action"
+            disabled={!canRetry || isPayingWithPix}
+            onClick={submitPixPayment}
+            type="button"
+          >
+            {isPayingWithPix ? "Gerando Pix..." : "Pagar com Pix"}
+          </button>
+          {pixError ? <p className="public-payment-error">{pixError}</p> : null}
+        </div>
+      ) : (
+        <div className="public-payment-method-panel">
+          <div
+            aria-busy={isPayingWithCard}
+            className={isPayingWithCard ? "public-card-payment is-loading" : "public-card-payment"}
+            id="fp-food-retry-card-payment-brick"
+          />
+          {cardStatus ? <p className="public-payment-note">{cardStatus}</p> : null}
+          {cardError ? <p className="public-payment-error">{cardError}</p> : null}
+        </div>
+      )}
     </section>
   );
 }
 
 function buildRetryPayload({
-  additionalData,
-  formData,
   orderNumber,
+  payment,
   publicSlug
 }: {
-  additionalData: CardPaymentAdditionalData;
-  formData: CardPaymentFormData;
   orderNumber: string;
+  payment: RetryPublicFoodPaymentInput["payment"];
   publicSlug: string;
 }): Omit<RetryPublicFoodPaymentInput, "authUserId" | "email"> & {
   orderNumber: string;
   publicSlug: string;
 } {
-  const cardToken = normalizeFormText(formData.token);
-  const customerEmail = normalizeFormText(formData.payer?.email);
-  const paymentMethodId = normalizeFormText(formData.payment_method_id);
-  const installments = Number(formData.installments);
-  const paymentMethodType = normalizePaymentMethodType(additionalData.paymentTypeId);
-
-  if (!cardToken || !customerEmail || !paymentMethodId || !Number.isFinite(installments)) {
-    throw new Error("Dados de pagamento incompletos no Mercado Pago.");
-  }
-
   return {
     orderNumber,
-    payment: {
-      cardToken,
-      customerEmail,
-      installments,
-      paymentMethodId,
-      paymentMethodType
-    },
+    payment,
     publicSlug
   };
 }

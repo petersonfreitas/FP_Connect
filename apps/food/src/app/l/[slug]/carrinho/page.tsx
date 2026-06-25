@@ -1,27 +1,18 @@
-import { trackPublicFoodOrderAction } from "@/app/actions";
-import { PublicStorefront } from "@/components/public-storefront";
-import { Notice } from "@/components/page-feedback";
+import { PublicCartManager } from "@/components/public-cart-manager";
 import { getCurrentPublicStoreUser } from "@/lib/auth";
 import { getPublicFoodMenu } from "@/lib/internal-api";
 import { createFallbackPublicStoreContext } from "@/lib/public-store-urls";
 
-type PublicStorePageProps = {
+type PublicCartPageProps = {
   params: Promise<{
     slug: string;
-  }>;
-  searchParams?: Promise<{
-    error?: string;
-    signedOut?: string;
   }>;
 };
 
 export const dynamic = "force-dynamic";
 
-export default async function PublicStorePage({
-  params,
-  searchParams
-}: PublicStorePageProps) {
-  const [{ slug }, query] = await Promise.all([params, searchParams]);
+export default async function PublicCartPage({ params }: PublicCartPageProps) {
+  const { slug } = await params;
   const storeContext = createFallbackPublicStoreContext(slug);
   const [menuResult, currentUser] = await Promise.all([
     getPublicFoodMenu(storeContext.publicSlug),
@@ -43,15 +34,10 @@ export default async function PublicStorePage({
   }
 
   return (
-    <>
-      {query?.error ? <Notice tone="danger" message={query.error} /> : null}
-      {query?.signedOut ? <Notice tone="success" message="Voce saiu desta loja." /> : null}
-      <PublicStorefront
-        isAuthenticated={Boolean(currentUser)}
-        menu={menuResult.data}
-        storeContext={storeContext}
-        trackOrderAction={trackPublicFoodOrderAction}
-      />
-    </>
+    <PublicCartManager
+      isAuthenticated={Boolean(currentUser)}
+      menu={menuResult.data}
+      storeContext={storeContext}
+    />
   );
 }
