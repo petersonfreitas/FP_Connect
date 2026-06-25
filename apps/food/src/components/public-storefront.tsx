@@ -2,7 +2,6 @@
 
 import { useEffect, useMemo, useState } from "react";
 import type { FoodMenuContract, FoodProductContract } from "@fp/types";
-import { PendingSubmitButton } from "@/components/pending-submit-button";
 import { PublicCustomerMenu } from "@/components/public-customer-menu";
 import {
   getPublicCartItemCount,
@@ -16,14 +15,12 @@ type PublicStorefrontProps = {
   isAuthenticated: boolean;
   menu: FoodMenuContract;
   storeContext: PublicStoreUrlContext;
-  trackOrderAction: (formData: FormData) => void | Promise<void>;
 };
 
 export function PublicStorefront({
   isAuthenticated,
   menu,
-  storeContext,
-  trackOrderAction
+  storeContext
 }: PublicStorefrontProps) {
   const products = useMemo(() => flattenProducts(menu), [menu]);
   const [cartItems, setCartItems] = useState(() => readPublicCart(menu.store.publicSlug));
@@ -68,7 +65,7 @@ export function PublicStorefront({
           <div className="public-hero-actions">
             <a href="#cardapio">Ver cardapio</a>
             <a href={cartHref}>Abrir carrinho</a>
-            <a href="#meus-pedidos">Meus pedidos</a>
+            <a href={storeUrl(storeContext, "/pedidos")}>Meus pedidos</a>
           </div>
         </div>
         <div className={canOrderNow ? "public-store-status" : "public-store-status closed"}>
@@ -102,26 +99,6 @@ export function PublicStorefront({
           <strong>Gateway</strong>
           <p>Finalizacao pelo FP Gateway com Mercado Pago.</p>
         </article>
-      </section>
-
-      <section className="public-order-lookup" id="meus-pedidos">
-        <div>
-          <div className="eyebrow">Meus pedidos</div>
-          <h2>Acompanhar pedido realizado</h2>
-          <p>Informe o numero do pedido para consultar o status atual.</p>
-        </div>
-        <form action={trackOrderAction}>
-          <input name="publicSlug" type="hidden" value={menu.store.publicSlug} />
-          <input
-            maxLength={40}
-            name="orderNumber"
-            placeholder="PED-20260616-123456"
-            required
-          />
-          <PendingSubmitButton className="secondary-action" pendingLabel="Buscando...">
-            Acompanhar
-          </PendingSubmitButton>
-        </form>
       </section>
 
       <section className="public-order-layout">

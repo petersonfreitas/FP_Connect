@@ -1,4 +1,3 @@
-import { trackPublicFoodOrderAction } from "@/app/actions";
 import { PublicStorefront } from "@/components/public-storefront";
 import { Notice } from "@/components/page-feedback";
 import { getCurrentPublicStoreUser } from "@/lib/auth";
@@ -50,7 +49,6 @@ export default async function PublicStorePage({
         isAuthenticated={Boolean(currentUser)}
         menu={menuResult.data}
         storeContext={storeContext}
-        trackOrderAction={trackPublicFoodOrderAction}
       />
     </>
   );

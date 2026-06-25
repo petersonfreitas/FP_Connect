@@ -2151,9 +2151,33 @@ textarea {
 
 .public-orders-panel {
   display: grid;
+  gap: 16px;
   margin: 0 auto;
-  max-width: 980px;
+  max-width: 1180px;
   padding: 0 24px 48px;
+  width: 100%;
+}
+
+.compact-public-order-lookup {
+  margin: 0 auto;
+  max-width: 1180px;
+  width: 100%;
+}
+
+.public-orders-filter {
+  margin: 0;
+}
+
+.public-orders-row {
+  grid-template-columns: minmax(160px, 1.2fr) 140px 140px 100px 170px 150px 120px;
+}
+
+.public-orders-row strong {
+  color: var(--foreground);
+}
+
+.public-orders-mobile {
+  display: none;
 }
 
 .public-orders-list {
@@ -2184,10 +2208,51 @@ textarea {
   color: var(--muted);
 }
 
+.public-order-card-statuses {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 10px;
+}
+
 .public-order-card strong {
   color: var(--accent-strong);
   font-size: 1.1rem;
   white-space: nowrap;
+}
+
+.public-status-chip {
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  display: inline-flex;
+  font-size: 0.78rem;
+  font-weight: 900;
+  padding: 6px 10px;
+  white-space: nowrap;
+}
+
+.public-status-chip.danger {
+  background: #fef3f2;
+  border-color: #fecdca;
+  color: #b42318;
+}
+
+.public-status-chip.neutral {
+  background: #f8fafc;
+  border-color: #d0d5dd;
+  color: #475467;
+}
+
+.public-status-chip.success {
+  background: #ecfdf3;
+  border-color: #abefc6;
+  color: #067647;
+}
+
+.public-status-chip.warning {
+  background: #fffaeb;
+  border-color: #fedf89;
+  color: #b54708;
 }
 
 .public-order-summary,
@@ -2343,6 +2408,15 @@ textarea {
   .public-order-item {
     align-items: stretch;
     flex-direction: column;
+  }
+
+  .public-orders-table {
+    display: none;
+  }
+
+  .public-orders-mobile {
+    display: grid;
+    gap: 12px;
   }
 
   .public-cart {
