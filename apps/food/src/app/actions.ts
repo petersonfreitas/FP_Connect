@@ -369,6 +369,7 @@ export async function createPublicFoodOrderAction(formData: FormData): Promise<v
     customerName: customerSessionResult.data.customer.fullName,
     deliveryAddressId: optionalText(formData.get("deliveryAddressId")),
     email: currentUser.email,
+    fulfillmentMethod: formData.get("fulfillmentMethod") === "pickup" ? "pickup" : "delivery",
     customerNote: optionalText(formData.get("customerNote")),
     customerPhone: customerSessionResult.data.primaryPhone?.phoneE164 ?? null,
     items

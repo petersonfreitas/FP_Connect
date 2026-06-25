@@ -5,8 +5,10 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import type {
   CreatePublicFoodCheckoutContract,
   CreatePublicFoodCheckoutInput,
+  FoodOrderFulfillmentMethod,
   FoodMenuContract,
   FoodPublicCartValidationContract,
+  FoodPublicCustomerAddressContract,
   FoodPublicCheckoutContract,
   ValidatePublicFoodCartInput
 } from "@fp/types";
@@ -71,6 +73,7 @@ declare global {
 }
 
 type PublicCartReviewProps = {
+  addresses: FoodPublicCustomerAddressContract[];
   checkout: FoodPublicCheckoutContract | null;
   isAuthenticated: boolean;
   isCustomerCompleteForCheckout: boolean;
@@ -79,6 +82,7 @@ type PublicCartReviewProps = {
 };
 
 export function PublicCartReview({
+  addresses,
   checkout,
   isAuthenticated,
   isCustomerCompleteForCheckout,
@@ -96,8 +100,17 @@ export function PublicCartReview({
   const [isPayingWithPix, setIsPayingWithPix] = useState(false);
   const [isPayingWithCard, setIsPayingWithCard] = useState(false);
   const [mercadoPagoReady, setMercadoPagoReady] = useState(false);
+  const [customerNote, setCustomerNote] = useState("");
+  const [fulfillmentMethod, setFulfillmentMethod] = useState<FoodOrderFulfillmentMethod>(
+    addresses.length > 0 && menu.availability.isDeliveryOpen ? "delivery" : "pickup"
+  );
   const [paymentMode, setPaymentMode] = useState<"card" | "pix">("pix");
   const [pixError, setPixError] = useState<string | null>(null);
+  const primaryAddress = useMemo(
+    () => addresses.find((address) => address.isPrimary) ?? addresses[0] ?? null,
+    [addresses]
+  );
+  const [selectedAddressId, setSelectedAddressId] = useState(primaryAddress?.id ?? "");
   const cartItemsCount = getPublicCartItemCount(cartItems);
   const cartHref = storeUrl(storeContext, "/carrinho");
   const accountHref = storeUrl(storeContext, "/conta");
@@ -109,7 +122,8 @@ export function PublicCartReview({
     publicKey &&
       validation?.isValidForCheckout &&
       isAuthenticated &&
-      isCustomerCompleteForCheckout
+      isCustomerCompleteForCheckout &&
+      isFulfillmentReady(fulfillmentMethod, selectedAddressId)
   );
   const issues = useMemo(
     () => validation?.issues ?? (validationError ? [validationError] : []),
@@ -148,6 +162,9 @@ export function PublicCartReview({
       const paymentMethodType = normalizePaymentMethodType(additionalData.paymentTypeId);
       const payload = buildCheckoutPayload({
         items: checkoutItems,
+        customerNote,
+        deliveryAddressId: fulfillmentMethod === "delivery" ? selectedAddressId : null,
+        fulfillmentMethod,
         payment: {
           cardToken: normalizeFormText(formData.token),
           customerEmail: normalizeFormText(formData.payer?.email),
@@ -183,7 +200,14 @@ export function PublicCartReview({
 
       completeCheckout(body.data);
     },
-    [checkoutItems, completeCheckout, menu.store.publicSlug]
+    [
+      checkoutItems,
+      completeCheckout,
+      customerNote,
+      fulfillmentMethod,
+      menu.store.publicSlug,
+      selectedAddressId
+    ]
   );
 
   useEffect(() => {
@@ -323,6 +347,9 @@ export function PublicCartReview({
   async function submitPixPayment() {
     const payload = buildCheckoutPayload({
       items: checkoutItems,
+      customerNote,
+      deliveryAddressId: fulfillmentMethod === "delivery" ? selectedAddressId : null,
+      fulfillmentMethod,
       payment: {
         paymentMethodType: "pix"
       },
@@ -481,6 +508,75 @@ export function PublicCartReview({
             </p>
           ) : null}
 
+          <div className="public-fulfillment-panel">
+            <strong>Recebimento</strong>
+            <label className="public-radio-option">
+              <input
+                checked={fulfillmentMethod === "delivery"}
+                disabled={!menu.availability.isDeliveryOpen}
+                name="fulfillmentMethod"
+                onChange={() => setFulfillmentMethod("delivery")}
+                type="radio"
+                value="delivery"
+              />
+              Entrega no endereco
+            </label>
+            <label className="public-radio-option">
+              <input
+                checked={fulfillmentMethod === "pickup"}
+                name="fulfillmentMethod"
+                onChange={() => setFulfillmentMethod("pickup")}
+                type="radio"
+                value="pickup"
+              />
+              Retirada em balcao
+            </label>
+
+            {fulfillmentMethod === "delivery" ? (
+              addresses.length > 0 ? (
+                <label>
+                  Endereco de entrega
+                  <select
+                    name="deliveryAddressId"
+                    onChange={(event) => setSelectedAddressId(event.target.value)}
+                    required
+                    value={selectedAddressId}
+                  >
+                    {addresses.map((address) => (
+                      <option key={address.id} value={address.id}>
+                        {formatAddressOption(address)}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              ) : (
+                <a className="secondary-action" href={accountHref}>
+                  Cadastrar endereco
+                </a>
+              )
+            ) : (
+              <p className="public-delivery-note">
+                A loja avisara quando o pedido estiver pronto para retirada.
+              </p>
+            )}
+
+            {!menu.availability.isDeliveryOpen ? (
+              <p className="public-delivery-note">
+                Entrega indisponivel neste horario.
+              </p>
+            ) : null}
+
+            <label>
+              Observacao
+              <textarea
+                maxLength={600}
+                onChange={(event) => setCustomerNote(event.target.value)}
+                rows={3}
+                value={customerNote}
+              />
+            </label>
+          </div>
+
           <div className="public-cart-actions">
             <a className="secondary-action" href={cartHref}>
               Editar carrinho
@@ -579,10 +675,16 @@ function formatStatus(status: string): string {
 }
 
 function buildCheckoutPayload({
+  customerNote,
+  deliveryAddressId,
+  fulfillmentMethod,
   items,
   payment,
   publicSlug
 }: {
+  customerNote: string;
+  deliveryAddressId: string | null;
+  fulfillmentMethod: FoodOrderFulfillmentMethod;
   items: PublicCartItem[];
   payment: CreatePublicFoodCheckoutInput["payment"];
   publicSlug: string;
@@ -592,6 +694,9 @@ function buildCheckoutPayload({
   }
 
   return {
+    customerNote: normalizeFormText(customerNote),
+    deliveryAddressId,
+    fulfillmentMethod,
     items,
     payment,
     publicSlug
@@ -613,6 +718,19 @@ function normalizeFormText(value: FormDataEntryValue | string | null | undefined
 
   const normalized = value.trim();
   return normalized.length > 0 ? normalized : null;
+}
+
+function isFulfillmentReady(
+  fulfillmentMethod: FoodOrderFulfillmentMethod,
+  selectedAddressId: string
+): boolean {
+  return fulfillmentMethod === "pickup" || selectedAddressId.trim().length > 0;
+}
+
+function formatAddressOption(address: FoodPublicCustomerAddressContract): string {
+  const label = address.label ? `${address.label} - ` : "";
+  const primary = address.isPrimary ? " (padrao)" : "";
+  return `${label}${address.street}, ${address.number} - ${address.city}/${address.state}${primary}`;
 }
 
 function getErrorMessage(error: unknown): string {

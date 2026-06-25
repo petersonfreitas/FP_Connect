@@ -1765,6 +1765,24 @@ textarea {
   padding: 14px;
 }
 
+.public-fulfillment-panel {
+  border-top: 1px solid var(--line);
+  display: grid;
+  gap: 12px;
+  padding-top: 14px;
+}
+
+.public-radio-option {
+  align-items: center;
+  display: flex;
+  gap: 8px;
+  font-weight: 900;
+}
+
+.public-radio-option input {
+  accent-color: var(--accent);
+}
+
 .public-online-payment {
   background: var(--panel);
   border: 1px solid var(--line);

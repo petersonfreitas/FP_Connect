@@ -165,6 +165,10 @@ export default async function PublicOrderPage({
             <h2>{order.customerName ?? "Cliente nao informado"}</h2>
             {order.customerPhone ? <p>{order.customerPhone}</p> : null}
             {order.customerNote ? <p>Obs.: {order.customerNote}</p> : null}
+            <p>
+              Recebimento:{" "}
+              {order.fulfillmentMethod === "pickup" ? "Retirada em balcao" : "Entrega"}
+            </p>
             {order.deliveryAddress ? (
               <p>
                 Entrega: {order.deliveryAddress.street}, {order.deliveryAddress.number} -{" "}

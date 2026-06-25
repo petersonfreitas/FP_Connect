@@ -25,6 +25,7 @@ import type {
   FoodOrderDetailContract,
   FoodMenuContract,
   FoodOrderContract,
+  FoodOrderFulfillmentMethod,
   FoodOrderItemContract,
   FoodOrderStatusHistoryContract,
   FoodOrderStatus,
@@ -150,6 +151,7 @@ type FoodOrderRow = {
   customer_store_access_id: string | null;
   customer_address_id: string | null;
   delivery_address_snapshot: Record<string, unknown> | null;
+  fulfillment_method: FoodOrderFulfillmentMethod;
   paid_at: string | null;
   paid_by: string | null;
   payment_method: FoodPaymentMethod | null;
@@ -278,6 +280,7 @@ type CreateOrderOptions = {
   eventSource: "internal-order-v0" | "public-store-v0";
   customerSession?: FoodPublicCustomerSessionContract | null;
   deliveryAddress?: FoodPublicCustomerAddressContract | null;
+  fulfillmentMethod?: FoodOrderFulfillmentMethod;
 };
 
 const storeSelect = [
@@ -369,6 +372,7 @@ const orderSelect = [
   "customer_store_access_id",
   "customer_address_id",
   "delivery_address_snapshot",
+  "fulfillment_method",
   "paid_at",
   "paid_by",
   "payment_method",
@@ -992,8 +996,7 @@ export class FoodService {
       isCompleteForCheckout: isCustomerCompleteForCheckout(
         account,
         customer,
-        primaryPhone,
-        primaryAddress
+        primaryPhone
       ),
       primaryAddress,
       primaryPhone,
@@ -1069,8 +1072,7 @@ export class FoodService {
       isCompleteForCheckout: isCustomerCompleteForCheckout(
         account,
         customer,
-        primaryPhone,
-        session.primaryAddress
+        primaryPhone
       ),
       primaryAddress: session.primaryAddress,
       primaryPhone,
@@ -1156,7 +1158,13 @@ export class FoodService {
     await this.ensurePublicStoreAvailable(store);
     await this.ensureOrderingOpen(store);
     const customerSession = await this.ensurePublicCheckoutCustomerSession(store, input);
-    const deliveryAddress = this.resolveCheckoutAddress(customerSession, input.deliveryAddressId);
+    const fulfillmentMethod = normalizeFulfillmentMethod(input.fulfillmentMethod);
+    await this.ensureFulfillmentAvailable(store, fulfillmentMethod);
+    const deliveryAddress = this.resolveCheckoutAddress(
+      customerSession,
+      fulfillmentMethod,
+      input.deliveryAddressId
+    );
 
     return this.createOrder(
       store.company_id,
@@ -1165,6 +1173,7 @@ export class FoodService {
       {
         customerSession,
         deliveryAddress,
+        fulfillmentMethod,
         eventSource: "public-store-v0"
       }
     );
@@ -1178,7 +1187,13 @@ export class FoodService {
     await this.ensurePublicStoreAvailable(store);
     await this.ensureOrderingOpen(store);
     const customerSession = await this.ensurePublicCheckoutCustomerSession(store, input);
-    const deliveryAddress = this.resolveCheckoutAddress(customerSession, input.deliveryAddressId);
+    const fulfillmentMethod = normalizeFulfillmentMethod(input.fulfillmentMethod);
+    await this.ensureFulfillmentAvailable(store, fulfillmentMethod);
+    const deliveryAddress = this.resolveCheckoutAddress(
+      customerSession,
+      fulfillmentMethod,
+      input.deliveryAddressId
+    );
     const payment = normalizePublicCheckoutPayment(input.payment);
     const order = await this.createOrder(
       store.company_id,
@@ -1187,6 +1202,7 @@ export class FoodService {
       {
         customerSession,
         deliveryAddress,
+        fulfillmentMethod,
         eventSource: "public-store-v0"
       }
     );
@@ -1312,8 +1328,13 @@ export class FoodService {
 
   private resolveCheckoutAddress(
     session: FoodPublicCustomerSessionContract,
+    fulfillmentMethod: FoodOrderFulfillmentMethod,
     deliveryAddressId: string | null | undefined
-  ): FoodPublicCustomerAddressContract {
+  ): FoodPublicCustomerAddressContract | null {
+    if (fulfillmentMethod === "pickup") {
+      return null;
+    }
+
     const normalizedAddressId = typeof deliveryAddressId === "string" ? deliveryAddressId.trim() : "";
     const address = normalizedAddressId
       ? session.addresses.find((item) => item.id === normalizedAddressId)
@@ -1448,6 +1469,7 @@ export class FoodService {
         delivery_address_snapshot: options.deliveryAddress
           ? buildDeliveryAddressSnapshot(options.deliveryAddress)
           : null,
+        fulfillment_method: options.fulfillmentMethod ?? "delivery",
         order_number: orderNumber,
         status: "created",
         store_id: store.id,
@@ -2033,6 +2055,22 @@ export class FoodService {
 
     if (!availability.isOrderingOpen) {
       throw new BadRequestException(availability.message);
+    }
+  }
+
+  private async ensureFulfillmentAvailable(
+    store: FoodStoreRow,
+    fulfillmentMethod: FoodOrderFulfillmentMethod
+  ): Promise<void> {
+    if (fulfillmentMethod === "pickup") {
+      return;
+    }
+
+    const hours = await this.listStoreHoursByStore(store.company_id, store.id);
+    const availability = calculateStoreAvailability(hours);
+
+    if (!availability.isDeliveryOpen) {
+      throw new BadRequestException("Entrega indisponivel neste horario.");
     }
   }
 
@@ -2905,6 +2943,12 @@ function getFoodPaymentMethodFromGateway(
   return paymentMethodType === "pix" ? "pix" : "card";
 }
 
+function normalizeFulfillmentMethod(
+  value: CreateFoodOrderInput["fulfillmentMethod"]
+): FoodOrderFulfillmentMethod {
+  return value === "pickup" ? "pickup" : "delivery";
+}
+
 function buildPublicOrderInput(
   input: CreateFoodOrderInput,
   session: FoodPublicCustomerSessionContract
@@ -3438,6 +3482,7 @@ function mapOrder(row: FoodOrderRow, items: FoodOrderItemContract[]): FoodOrderC
       row.delivery_address_snapshot,
       row.customer_address_id
     ),
+    fulfillmentMethod: row.fulfillment_method,
     id: row.id,
     items,
     orderNumber: row.order_number,
@@ -3574,15 +3619,13 @@ function mapDeliveryAddressSnapshot(
 function isCustomerCompleteForCheckout(
   account: FoodPublicCustomerAccountContract,
   customer: FoodPublicCustomerContract,
-  primaryPhone: FoodPublicCustomerPhoneContract | null,
-  primaryAddress: FoodPublicCustomerAddressContract | null
+  primaryPhone: FoodPublicCustomerPhoneContract | null
 ): boolean {
   return Boolean(
     account.status === "active" &&
       customer.status === "active" &&
       customer.fullName &&
       primaryPhone?.phoneE164 &&
-      primaryAddress?.id &&
       account.termsAcceptedAt &&
       account.privacyAcceptedAt
   );

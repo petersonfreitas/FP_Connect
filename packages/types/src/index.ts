@@ -205,6 +205,7 @@ export type FoodProductStatus = "available" | "hidden" | "unavailable";
 export type FoodStockMovementType = "entry";
 export type FoodPaymentMethod = "card" | "cash" | "other" | "pix";
 export type FoodPaymentStatus = "cancelled" | "paid" | "pending";
+export type FoodOrderFulfillmentMethod = "delivery" | "pickup";
 export type FoodCustomerStatus = "active" | "blocked" | "inactive";
 export type FoodCustomerOrigin = "counter" | "online" | "phone";
 export type FoodCustomerPreferredContactMethod =
@@ -481,6 +482,7 @@ export type FoodOrderContract = {
   customerId: string | null;
   customerStoreAccessId: string | null;
   deliveryAddress: FoodOrderDeliveryAddressContract | null;
+  fulfillmentMethod: FoodOrderFulfillmentMethod;
   orderNumber: string;
   status: FoodOrderStatus;
   customerName: string | null;
@@ -525,6 +527,7 @@ export type CreateFoodOrderInput = {
   customerName?: string | null;
   customerPhone?: string | null;
   deliveryAddressId?: string | null;
+  fulfillmentMethod?: FoodOrderFulfillmentMethod | null;
   customerNote?: string | null;
   items: CreateFoodOrderItemInput[];
 };
