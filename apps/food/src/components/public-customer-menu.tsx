@@ -1,16 +1,15 @@
 import Link from "next/link";
 import { publicCustomerSignOutAction } from "@/lib/auth-actions";
 import {
-  storeOrderUrl,
+  storeOrdersUrl,
   storeUrl,
   type PublicStoreUrlContext
 } from "@/lib/public-store-urls";
 
 type PublicCustomerMenuProps = {
-  active: "account" | "cart" | "menu" | "order" | "review";
+  active: "account" | "cart" | "menu" | "order" | "orders" | "review";
   contactPhone?: string | null;
   isAuthenticated?: boolean;
-  orderNumber?: string;
   storeContext: PublicStoreUrlContext;
 };
 
@@ -18,13 +17,12 @@ export function PublicCustomerMenu({
   active,
   contactPhone,
   isAuthenticated = false,
-  orderNumber,
   storeContext
 }: PublicCustomerMenuProps) {
   const menuHref = storeUrl(storeContext);
   const accountHref = storeUrl(storeContext, "/conta");
   const cartHref = storeUrl(storeContext, "/carrinho");
-  const orderHref = orderNumber ? storeOrderUrl(storeContext, orderNumber) : undefined;
+  const ordersHref = storeOrdersUrl(storeContext);
 
   return (
     <nav className="public-customer-menu" aria-label="Menu do cliente">
@@ -38,13 +36,9 @@ export function PublicCustomerMenu({
         <Link className={active === "cart" || active === "review" ? "active" : ""} href={cartHref}>
           Carrinho
         </Link>
-        {orderHref ? (
-          <Link className={active === "order" ? "active" : ""} href={orderHref}>
-            Meu pedido
-          </Link>
-        ) : (
-          <a href="#meus-pedidos">Meus pedidos</a>
-        )}
+        <Link className={active === "order" || active === "orders" ? "active" : ""} href={ordersHref}>
+          Meus pedidos
+        </Link>
         <Link className={active === "account" ? "active" : ""} href={accountHref}>
           Minha conta
         </Link>

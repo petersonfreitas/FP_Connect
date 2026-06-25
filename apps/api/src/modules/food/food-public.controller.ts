@@ -4,6 +4,7 @@ import type {
   CreatePublicFoodCheckoutInput,
   CreatePublicFoodOrderInput,
   EnsureFoodPublicCustomerInput,
+  ListPublicFoodCustomerOrdersInput,
   RetryPublicFoodPaymentInput,
   SetFoodPublicCustomerPrimaryAddressInput,
   UpdateFoodPublicCustomerProfileInput,
@@ -110,6 +111,14 @@ export class FoodPublicController {
       paymentMethodId,
       input
     );
+  }
+
+  @Post("stores/:publicSlug/customers/me/orders")
+  listPublicCustomerOrders(
+    @Body() input: ListPublicFoodCustomerOrdersInput,
+    @Param("publicSlug") publicSlug: string
+  ) {
+    return this.foodService.listPublicCustomerOrders(publicSlug, input);
   }
 
   @Get("stores/:publicSlug/orders/:orderNumber")

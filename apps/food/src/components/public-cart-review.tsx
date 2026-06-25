@@ -1,7 +1,7 @@
 "use client";
 
 import Script from "next/script";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
 import type {
   CreatePublicFoodCheckoutContract,
   CreatePublicFoodCheckoutInput,
@@ -82,6 +82,9 @@ type PublicCartReviewProps = {
   storeContext: PublicStoreUrlContext;
 };
 
+type CheckoutStepId = "account" | "cart" | "fulfillment" | "payment" | "shipping";
+type CheckoutStepStatus = "blocked" | "complete" | "current" | "pending";
+
 export function PublicCartReview({
   addresses,
   checkout,
@@ -108,6 +111,7 @@ export function PublicCartReview({
     addresses.length > 0 && menu.availability.isDeliveryOpen ? "delivery" : "pickup"
   );
   const [paymentMode, setPaymentMode] = useState<"card" | "pix">("pix");
+  const [activeStep, setActiveStep] = useState<CheckoutStepId>("cart");
   const [pixError, setPixError] = useState<string | null>(null);
   const primaryAddress = useMemo(
     () => addresses.find((address) => address.isPrimary) ?? addresses[0] ?? null,
@@ -119,6 +123,7 @@ export function PublicCartReview({
   const accountHref = storeUrl(storeContext, "/conta");
   const reviewHref = storeUrl(storeContext, "/revisao");
   const loginHref = storeLoginUrl(storeContext, reviewHref);
+  const accountReady = isAuthenticated && isCustomerCompleteForCheckout;
   const canValidate = isAuthenticated && isCustomerCompleteForCheckout && cartItems.length > 0;
   const publicKey = checkout?.mercadoPago.enabled ? checkout.mercadoPago.publicKey : null;
   const canPay = Boolean(
@@ -128,6 +133,9 @@ export function PublicCartReview({
       isCustomerCompleteForCheckout &&
       isFulfillmentReady(fulfillmentMethod, selectedAddressId)
   );
+  const cartReady = Boolean(validation?.isValidForCheckout);
+  const fulfillmentReady = isFulfillmentReady(fulfillmentMethod, selectedAddressId);
+  const paymentReady = canPay && Boolean(publicKey);
   const issues = useMemo(
     () => validation?.issues ?? (validationError ? [validationError] : []),
     [validation?.issues, validationError]
@@ -420,81 +428,284 @@ export function PublicCartReview({
         </div>
       </section>
 
-      <section className="public-cart-page">
-        <div className="public-cart-management">
-          <div className="public-section-heading">
-            <div>
-              <div className="eyebrow">Tabela</div>
-              <h2>Resumo validado</h2>
-              <p>Os valores abaixo usam a resposta atual do servidor Food.</p>
-            </div>
-            <span>{validation?.items.length ?? cartItems.length} produto(s)</span>
-          </div>
-
-          {!isAuthenticated ? (
-            <div className="empty-state public-empty-cart">
-              Entre nesta loja para revisar o carrinho com seus dados de cliente.
-              <a className="primary-action" href={loginHref}>
-                Entrar para revisar
-              </a>
-            </div>
-          ) : !isCustomerCompleteForCheckout ? (
-            <div className="empty-state public-empty-cart">
-              Complete seu cadastro antes de revisar o carrinho.
-              <a className="primary-action" href={accountHref}>
-                Completar cadastro
-              </a>
-            </div>
-          ) : cartItems.length === 0 ? (
-            <div className="empty-state public-empty-cart">
-              Seu carrinho esta vazio.
-              <a className="primary-action" href={storeUrl(storeContext)}>
-                Voltar ao cardapio
-              </a>
-            </div>
-          ) : isValidating ? (
-            <div className="empty-state public-empty-cart">Validando carrinho com a loja...</div>
-          ) : validation ? (
-            <div className="data-table" role="table" aria-label="Resumo do carrinho validado">
-              <div className="data-row public-review-row data-row-head" role="row">
-                <span>Produto</span>
-                <span>Qtd.</span>
-                <span>Unitario</span>
-                <span>Subtotal</span>
-                <span>Status</span>
+      <section className="public-checkout-layout">
+        <div className="public-checkout-accordion">
+          <CheckoutAccordionStep
+            active={activeStep === "cart"}
+            eyebrow="Resumo"
+            onOpen={() => setActiveStep("cart")}
+            status={getStepStatus(cartReady, isValidating)}
+            title="Carrinho e valores"
+          >
+            <div className="public-section-heading">
+              <div>
+                <div className="eyebrow">Tabela</div>
+                <h2>Resumo validado</h2>
+                <p>Os valores abaixo usam a resposta atual do servidor Food.</p>
               </div>
-              {validation.items.map((item) => (
-                <div className="data-row public-review-row" role="row" key={item.productId}>
-                  <span>{item.productName ?? "Produto indisponivel"}</span>
-                  <span>{item.quantity}</span>
-                  <span>{formatMoney(item.unitPriceCents)}</span>
-                  <span>{formatMoney(item.totalPriceCents)}</span>
-                  <span>{formatStatus(item.status)}</span>
-                </div>
-              ))}
+              <span>{validation?.items.length ?? cartItems.length} produto(s)</span>
             </div>
-          ) : (
-            <div className="empty-state public-empty-cart">
-              {validationError ?? "Nao foi possivel validar o carrinho."}
-            </div>
-          )}
 
-          {issues.length > 0 ? (
-            <div className="public-review-issues">
-              <strong>Pontos para corrigir</strong>
-              {issues.map((issue) => (
-                <span key={issue}>{issue}</span>
-              ))}
+            {cartItems.length === 0 ? (
+              <div className="empty-state public-empty-cart">
+                Seu carrinho esta vazio.
+                <a className="primary-action" href={storeUrl(storeContext)}>
+                  Voltar ao cardapio
+                </a>
+              </div>
+            ) : !accountReady ? (
+              <div className="empty-state public-empty-cart">
+                Entre e complete seu cadastro para a loja validar o carrinho.
+              </div>
+            ) : isValidating ? (
+              <div className="empty-state public-empty-cart">Validando carrinho com a loja...</div>
+            ) : validation ? (
+              <div className="data-table" role="table" aria-label="Resumo do carrinho validado">
+                <div className="data-row public-review-row data-row-head" role="row">
+                  <span>Produto</span>
+                  <span>Qtd.</span>
+                  <span>Unitario</span>
+                  <span>Subtotal</span>
+                  <span>Status</span>
+                </div>
+                {validation.items.map((item) => (
+                  <div className="data-row public-review-row" role="row" key={item.productId}>
+                    <span>{item.productName ?? "Produto indisponivel"}</span>
+                    <span>{item.quantity}</span>
+                    <span>{formatMoney(item.unitPriceCents)}</span>
+                    <span>{formatMoney(item.totalPriceCents)}</span>
+                    <span>{formatStatus(item.status)}</span>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="empty-state public-empty-cart">
+                {validationError ?? "Nao foi possivel validar o carrinho."}
+              </div>
+            )}
+
+            {issues.length > 0 ? (
+              <div className="public-review-issues">
+                <strong>Pontos para corrigir</strong>
+                {issues.map((issue) => (
+                  <span key={issue}>{issue}</span>
+                ))}
+              </div>
+            ) : null}
+          </CheckoutAccordionStep>
+
+          <CheckoutAccordionStep
+            active={activeStep === "account"}
+            eyebrow="Conta"
+            onOpen={() => setActiveStep("account")}
+            status={getStepStatus(accountReady, false)}
+            title="Conta do cliente"
+          >
+            {!isAuthenticated ? (
+              <div className="empty-state public-empty-cart">
+                Entre nesta loja para finalizar o pedido com seus dados.
+                <a className="primary-action" href={loginHref}>
+                  Entrar para comprar
+                </a>
+              </div>
+            ) : !isCustomerCompleteForCheckout ? (
+              <div className="empty-state public-empty-cart">
+                Complete nome, telefone e aceites antes de finalizar.
+                <a className="primary-action" href={accountHref}>
+                  Completar cadastro
+                </a>
+              </div>
+            ) : (
+              <div className="public-checkout-ready">
+                <strong>Cadastro pronto para compra.</strong>
+                <span>Nome, telefone e aceites serao usados no pedido.</span>
+              </div>
+            )}
+          </CheckoutAccordionStep>
+
+          <CheckoutAccordionStep
+            active={activeStep === "fulfillment"}
+            eyebrow="Recebimento"
+            onOpen={() => setActiveStep("fulfillment")}
+            status={getStepStatus(Boolean(fulfillmentMethod), false)}
+            title="Entrega ou retirada"
+          >
+            <div className="public-fulfillment-panel">
+              <label className="public-radio-option">
+                <input
+                  checked={fulfillmentMethod === "delivery"}
+                  disabled={!menu.availability.isDeliveryOpen}
+                  name="fulfillmentMethod"
+                  onChange={() => setFulfillmentMethod("delivery")}
+                  type="radio"
+                  value="delivery"
+                />
+                Entrega no endereco
+              </label>
+              <label className="public-radio-option">
+                <input
+                  checked={fulfillmentMethod === "pickup"}
+                  name="fulfillmentMethod"
+                  onChange={() => setFulfillmentMethod("pickup")}
+                  type="radio"
+                  value="pickup"
+                />
+                Retirada em balcao
+              </label>
+
+              {!menu.availability.isDeliveryOpen ? (
+                <p className="public-delivery-note">
+                  Entrega indisponivel neste horario.
+                </p>
+              ) : null}
             </div>
-          ) : null}
+          </CheckoutAccordionStep>
+
+          <CheckoutAccordionStep
+            active={activeStep === "shipping"}
+            eyebrow={fulfillmentMethod === "pickup" ? "Retirada" : "Endereco"}
+            onOpen={() => setActiveStep("shipping")}
+            status={getStepStatus(fulfillmentReady, false)}
+            title={fulfillmentMethod === "pickup" ? "Dados de retirada" : "Endereco e observacao"}
+          >
+            <div className="public-fulfillment-panel">
+              {fulfillmentMethod === "delivery" ? (
+                addresses.length > 0 ? (
+                  <label>
+                    Endereco de entrega
+                    <select
+                      name="deliveryAddressId"
+                      onChange={(event) => setSelectedAddressId(event.target.value)}
+                      required
+                      value={selectedAddressId}
+                    >
+                      {addresses.map((address) => (
+                        <option key={address.id} value={address.id}>
+                          {formatAddressOption(address)}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                ) : (
+                  <a className="secondary-action" href={accountHref}>
+                    Cadastrar endereco
+                  </a>
+                )
+              ) : (
+                <p className="public-delivery-note">
+                  A loja avisara quando o pedido estiver pronto para retirada.
+                </p>
+              )}
+
+              <label>
+                Observacao
+                <textarea
+                  maxLength={600}
+                  onChange={(event) => setCustomerNote(event.target.value)}
+                  rows={3}
+                  value={customerNote}
+                />
+              </label>
+            </div>
+          </CheckoutAccordionStep>
+
+          <CheckoutAccordionStep
+            active={activeStep === "payment"}
+            eyebrow="Pagamento"
+            onOpen={() => setActiveStep("payment")}
+            status={getStepStatus(paymentReady, false)}
+            title="Pagamento e confirmacao"
+          >
+            {!validation?.isValidForCheckout ? (
+              <div className="empty-state public-empty-cart">
+                Corrija os passos anteriores para liberar o pagamento.
+              </div>
+            ) : !publicKey ? (
+              <div className="empty-state public-empty-cart">
+                Pagamento online ainda nao configurado para esta loja.
+              </div>
+            ) : (
+              <div className="public-online-payment" id="pagamento">
+                <div>
+                  <div className="eyebrow">Gateway</div>
+                  <h2>Escolha como pagar</h2>
+                  <p>Pix e cartao usam Mercado Pago via FP Gateway.</p>
+                </div>
+
+                <div className="public-payment-tabs" role="tablist" aria-label="Forma de pagamento">
+                  <button
+                    className={paymentMode === "pix" ? "active" : ""}
+                    onClick={() => setPaymentMode("pix")}
+                    type="button"
+                  >
+                    Pix
+                  </button>
+                  <button
+                    className={paymentMode === "card" ? "active" : ""}
+                    onClick={() => setPaymentMode("card")}
+                    type="button"
+                  >
+                    Cartao
+                  </button>
+                </div>
+
+                <div className="public-payment-summary">
+                  <span>Total validado</span>
+                  <strong>{formatMoney(validation.totalCents)}</strong>
+                </div>
+
+                {paymentMode === "pix" ? (
+                  <div className="public-payment-method-panel">
+                    <p>
+                      Ao confirmar, o Gateway cria a cobranca Pix no Mercado Pago e abre a
+                      experiencia de pagamento retornada pelo provedor.
+                    </p>
+                    <button
+                      className="primary-action"
+                      disabled={!canPay || isPayingWithPix}
+                      onClick={submitPixPayment}
+                      type="button"
+                    >
+                      {isPayingWithPix ? "Gerando Pix..." : "Pagar com Pix"}
+                    </button>
+                    {pixError ? <p className="public-payment-error">{pixError}</p> : null}
+                  </div>
+                ) : (
+                  <div className="public-payment-method-panel">
+                    {!hasSavedPaymentMethods ? (
+                      <label className="checkbox-field public-save-card-option">
+                        <input
+                          checked={saveCardForFuture}
+                          onChange={(event) => setSaveCardForFuture(event.target.checked)}
+                          type="checkbox"
+                        />
+                        Salvar este cartao tokenizado para compras futuras nesta loja.
+                      </label>
+                    ) : null}
+                    <div
+                      aria-busy={isPayingWithCard}
+                      className={
+                        isPayingWithCard
+                          ? "public-card-payment is-loading"
+                          : "public-card-payment"
+                      }
+                      id="fp-food-checkout-card-payment-brick"
+                    />
+                    {cardStatus ? <p className="public-payment-note">{cardStatus}</p> : null}
+                    {cardError ? <p className="public-payment-error">{cardError}</p> : null}
+                  </div>
+                )}
+              </div>
+            )}
+          </CheckoutAccordionStep>
         </div>
 
-        <aside className="public-cart">
+        <aside className="public-cart public-checkout-summary">
           <div className="public-cart-heading">
             <div>
-              <div className="eyebrow">Totais</div>
+              <div className="eyebrow">Revisao final</div>
               <h2>Pedido</h2>
-              <p>Pagamento via Gateway disponivel abaixo. Entrega/retirada sera refinado no proximo bloco.</p>
+              <p>Confira cada etapa antes de gerar o pagamento.</p>
             </div>
           </div>
 
@@ -513,169 +724,82 @@ export function PublicCartReview({
             </p>
           ) : null}
 
-          <div className="public-fulfillment-panel">
-            <strong>Recebimento</strong>
-            <label className="public-radio-option">
-              <input
-                checked={fulfillmentMethod === "delivery"}
-                disabled={!menu.availability.isDeliveryOpen}
-                name="fulfillmentMethod"
-                onChange={() => setFulfillmentMethod("delivery")}
-                type="radio"
-                value="delivery"
-              />
-              Entrega no endereco
-            </label>
-            <label className="public-radio-option">
-              <input
-                checked={fulfillmentMethod === "pickup"}
-                name="fulfillmentMethod"
-                onChange={() => setFulfillmentMethod("pickup")}
-                type="radio"
-                value="pickup"
-              />
-              Retirada em balcao
-            </label>
-
-            {fulfillmentMethod === "delivery" ? (
-              addresses.length > 0 ? (
-                <label>
-                  Endereco de entrega
-                  <select
-                    name="deliveryAddressId"
-                    onChange={(event) => setSelectedAddressId(event.target.value)}
-                    required
-                    value={selectedAddressId}
-                  >
-                    {addresses.map((address) => (
-                      <option key={address.id} value={address.id}>
-                        {formatAddressOption(address)}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-              ) : (
-                <a className="secondary-action" href={accountHref}>
-                  Cadastrar endereco
-                </a>
-              )
-            ) : (
-              <p className="public-delivery-note">
-                A loja avisara quando o pedido estiver pronto para retirada.
-              </p>
-            )}
-
-            {!menu.availability.isDeliveryOpen ? (
-              <p className="public-delivery-note">
-                Entrega indisponivel neste horario.
-              </p>
-            ) : null}
-
-            <label>
-              Observacao
-              <textarea
-                maxLength={600}
-                onChange={(event) => setCustomerNote(event.target.value)}
-                rows={3}
-                value={customerNote}
-              />
-            </label>
+          <div className="public-checkout-summary-status">
+            <span>{accountReady ? "Conta pronta" : "Conta pendente"}</span>
+            <span>{cartReady ? "Carrinho validado" : "Carrinho pendente"}</span>
+            <span>{fulfillmentReady ? "Recebimento pronto" : "Recebimento pendente"}</span>
           </div>
 
           <div className="public-cart-actions">
             <a className="secondary-action" href={cartHref}>
               Editar carrinho
             </a>
-            <a className="primary-action" href="#pagamento">
+            <button
+              className="primary-action"
+              disabled={!cartReady}
+              onClick={() => setActiveStep("payment")}
+              type="button"
+            >
               Ir para pagamento
-            </a>
+            </button>
           </div>
         </aside>
       </section>
-
-      {validation?.isValidForCheckout ? (
-        <section className="public-online-payment" id="pagamento">
-          <div>
-            <div className="eyebrow">Pagamento via Gateway</div>
-            <h2>Escolha como pagar</h2>
-            <p>Pix e cartao usam Mercado Pago via FP Gateway.</p>
-          </div>
-
-          {!publicKey ? (
-            <div className="empty-state public-empty-cart">
-              Pagamento online ainda nao configurado para esta loja.
-            </div>
-          ) : (
-            <>
-              <div className="public-payment-tabs" role="tablist" aria-label="Forma de pagamento">
-                <button
-                  className={paymentMode === "pix" ? "active" : ""}
-                  onClick={() => setPaymentMode("pix")}
-                  type="button"
-                >
-                  Pix
-                </button>
-                <button
-                  className={paymentMode === "card" ? "active" : ""}
-                  onClick={() => setPaymentMode("card")}
-                  type="button"
-                >
-                  Cartao
-                </button>
-              </div>
-
-              <div className="public-payment-summary">
-                <span>Total validado</span>
-                <strong>{formatMoney(validation.totalCents)}</strong>
-              </div>
-
-              {paymentMode === "pix" ? (
-                <div className="public-payment-method-panel">
-                  <p>
-                    Ao confirmar, o Gateway cria a cobranca Pix no Mercado Pago e abre a
-                    experiencia de pagamento retornada pelo provedor.
-                  </p>
-                  <button
-                    className="primary-action"
-                    disabled={!canPay || isPayingWithPix}
-                    onClick={submitPixPayment}
-                    type="button"
-                  >
-                    {isPayingWithPix ? "Gerando Pix..." : "Pagar com Pix"}
-                  </button>
-                  {pixError ? <p className="public-payment-error">{pixError}</p> : null}
-                </div>
-              ) : (
-                <div className="public-payment-method-panel">
-                  {!hasSavedPaymentMethods ? (
-                    <label className="checkbox-field public-save-card-option">
-                      <input
-                        checked={saveCardForFuture}
-                        onChange={(event) => setSaveCardForFuture(event.target.checked)}
-                        type="checkbox"
-                      />
-                      Salvar este cartao tokenizado para compras futuras nesta loja.
-                    </label>
-                  ) : null}
-                  <div
-                    aria-busy={isPayingWithCard}
-                    className={
-                      isPayingWithCard
-                        ? "public-card-payment is-loading"
-                        : "public-card-payment"
-                    }
-                    id="fp-food-checkout-card-payment-brick"
-                  />
-                  {cardStatus ? <p className="public-payment-note">{cardStatus}</p> : null}
-                  {cardError ? <p className="public-payment-error">{cardError}</p> : null}
-                </div>
-              )}
-            </>
-          )}
-        </section>
-      ) : null}
     </main>
   );
+}
+
+function CheckoutAccordionStep({
+  active,
+  children,
+  eyebrow,
+  onOpen,
+  status,
+  title
+}: {
+  active: boolean;
+  children: ReactNode;
+  eyebrow: string;
+  onOpen: () => void;
+  status: CheckoutStepStatus;
+  title: string;
+}) {
+  return (
+    <article className={active ? "public-checkout-step active" : "public-checkout-step"}>
+      <button
+        aria-expanded={active}
+        className="public-checkout-step-header"
+        onClick={onOpen}
+        type="button"
+      >
+        <span>
+          <small>{eyebrow}</small>
+          <strong>{title}</strong>
+        </span>
+        <em className={`checkout-step-status ${status}`}>{formatStepStatus(status)}</em>
+      </button>
+      {active ? <div className="public-checkout-step-body">{children}</div> : null}
+    </article>
+  );
+}
+
+function getStepStatus(isComplete: boolean, isCurrent: boolean): CheckoutStepStatus {
+  if (isComplete) {
+    return "complete";
+  }
+
+  return isCurrent ? "current" : "pending";
+}
+
+function formatStepStatus(status: CheckoutStepStatus): string {
+  const labels: Record<CheckoutStepStatus, string> = {
+    blocked: "Bloqueado",
+    complete: "Pronto",
+    current: "Em andamento",
+    pending: "Pendente"
+  };
+
+  return labels[status];
 }
 
 function formatStatus(status: string): string {

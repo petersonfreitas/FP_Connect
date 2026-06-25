@@ -43,6 +43,10 @@ export function storeOrderUrl(context: PublicStoreUrlContext, orderNumber: strin
   return storeUrl(context, `/pedido/${encodeURIComponent(orderNumber)}`);
 }
 
+export function storeOrdersUrl(context: PublicStoreUrlContext): string {
+  return storeUrl(context, "/pedidos");
+}
+
 export function normalizeStoreRedirectPath(
   value: string,
   context: PublicStoreUrlContext

@@ -51,6 +51,7 @@ import type {
   FoodStoreStatus,
   FoodStockMovementContract,
   FoodStockMovementType,
+  ListPublicFoodCustomerOrdersInput,
   PaginatedContract,
   RetryPublicFoodPaymentInput,
   SetFoodPublicCustomerPrimaryAddressInput,
@@ -1565,6 +1566,47 @@ export class FoodService {
     const store = await this.getStoreByPublicSlug(publicSlug);
     await this.ensurePublicStoreReadable(store);
     return this.getPublicOrderFromStore(store, orderNumber);
+  }
+
+  async listPublicCustomerOrders(
+    publicSlug: string,
+    input: ListPublicFoodCustomerOrdersInput
+  ): Promise<PaginatedContract<FoodOrderContract>> {
+    const store = await this.getStoreByPublicSlug(publicSlug);
+    await this.ensurePublicStoreReadable(store);
+    const session = await this.buildPublicCustomerSession(store, input);
+    const page = 1;
+    const pageSize = 20;
+    const { data, error, count } = await this.supabase.food
+      .from("orders")
+      .select(orderSelect, { count: "exact" })
+      .eq("company_id", store.company_id)
+      .eq("store_id", store.id)
+      .is("deleted_at", null)
+      .or(
+        [
+          `customer_store_access_id.eq.${session.storeAccess.id}`,
+          `customer_id.eq.${session.customer.id}`
+        ].join(",")
+      )
+      .order("created_at", { ascending: false })
+      .range(0, pageSize - 1);
+
+    if (error) {
+      throwSupabaseError(error);
+    }
+
+    const rows = (data ?? []) as unknown as FoodOrderRow[];
+    const itemsByOrderId = await this.listOrderItemsByOrderIds(
+      store.company_id,
+      rows.map((order) => order.id)
+    );
+
+    return toPaginated(
+      rows.map((order) => mapOrder(order, itemsByOrderId.get(order.id) ?? [])),
+      { page, pageSize },
+      count ?? 0
+    );
   }
 
   private async buildMenu(store: FoodStoreRow | FoodStoreContract): Promise<FoodMenuContract> {

@@ -20,6 +20,7 @@ import type {
   FoodStockMovementContract,
   FoodStoreContract,
   FoodStoreHourContract,
+  ListPublicFoodCustomerOrdersInput,
   ModuleAccessContract,
   PaginatedContract,
   RetryPublicFoodPaymentInput,
@@ -517,6 +518,19 @@ export async function getPublicFoodOrder(
 ): Promise<InternalApiResult<FoodOrderContract>> {
   return fetchPublicInternal<FoodOrderContract>(
     `food/public/stores/${encodeURIComponent(publicSlug)}/orders/${encodeURIComponent(orderNumber)}`
+  );
+}
+
+export async function listPublicFoodCustomerOrders(
+  publicSlug: string,
+  input: ListPublicFoodCustomerOrdersInput
+): Promise<InternalApiResult<PaginatedContract<FoodOrderContract>>> {
+  return fetchPublicInternal<PaginatedContract<FoodOrderContract>>(
+    `food/public/stores/${encodeURIComponent(publicSlug)}/customers/me/orders`,
+    {
+      body: JSON.stringify(input),
+      method: "POST"
+    }
   );
 }
 

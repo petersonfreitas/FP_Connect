@@ -630,6 +630,8 @@ export type UpsertFoodPublicCustomerAddressInput = EnsureFoodPublicCustomerInput
 
 export type SetFoodPublicCustomerPrimaryAddressInput = EnsureFoodPublicCustomerInput;
 
+export type ListPublicFoodCustomerOrdersInput = EnsureFoodPublicCustomerInput;
+
 export type CreatePublicFoodCheckoutContract = {
   order: FoodOrderContract;
   paymentRequestId: string | null;

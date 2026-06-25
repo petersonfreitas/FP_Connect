@@ -95,7 +95,6 @@ export default async function PublicOrderPage({
       <PublicCustomerMenu
         active="order"
         isAuthenticated={Boolean(currentUser)}
-        orderNumber={order.orderNumber}
         storeContext={storeContext}
       />
 
