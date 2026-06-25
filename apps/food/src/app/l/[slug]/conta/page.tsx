@@ -1,14 +1,17 @@
 import { redirect } from "next/navigation";
 import {
   deletePublicCustomerAddressAction,
+  deletePublicCustomerPaymentMethodAction,
   savePublicCustomerAddressAction,
   savePublicCustomerProfileAction,
   setPublicCustomerPrimaryAddressAction,
+  setPublicCustomerPrimaryPaymentMethodAction,
   updatePublicCustomerAddressAction
 } from "@/app/actions";
 import { Notice } from "@/components/page-feedback";
 import { PublicCustomerAddressesForm } from "@/components/public-customer-addresses-form";
 import { PublicCustomerMenu } from "@/components/public-customer-menu";
+import { PublicCustomerPaymentMethods } from "@/components/public-customer-payment-methods";
 import { PublicCustomerProfileForm } from "@/components/public-customer-profile-form";
 import { getCurrentPublicStoreUser } from "@/lib/auth";
 import {
@@ -31,6 +34,8 @@ type PublicCustomerAccountPageProps = {
     addressSaved?: string;
     addressUpdated?: string;
     error?: string;
+    paymentMethodDeleted?: string;
+    paymentMethodPrimary?: string;
     saved?: string;
   }>;
 };
@@ -74,6 +79,12 @@ export default async function PublicCustomerAccountPage({
       {query?.addressDeleted ? <Notice tone="success" message="Endereco removido." /> : null}
       {query?.addressPrimary ? (
         <Notice tone="success" message="Endereco padrao atualizado." />
+      ) : null}
+      {query?.paymentMethodPrimary ? (
+        <Notice tone="success" message="Cartao padrao atualizado." />
+      ) : null}
+      {query?.paymentMethodDeleted ? (
+        <Notice tone="success" message="Cartao removido." />
       ) : null}
       {query?.error ? <Notice tone="danger" message={query.error} /> : null}
       {customerSessionResult.error ? (
@@ -123,6 +134,13 @@ export default async function PublicCustomerAccountPage({
         saveAction={savePublicCustomerAddressAction}
         setPrimaryAction={setPublicCustomerPrimaryAddressAction}
         updateAction={updatePublicCustomerAddressAction}
+      />
+
+      <PublicCustomerPaymentMethods
+        deleteAction={deletePublicCustomerPaymentMethodAction}
+        paymentMethods={session?.paymentMethods ?? []}
+        publicSlug={storeContext.publicSlug}
+        setPrimaryAction={setPublicCustomerPrimaryPaymentMethodAction}
       />
     </main>
   );

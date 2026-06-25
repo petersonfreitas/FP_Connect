@@ -86,6 +86,32 @@ export class FoodPublicController {
     return this.foodService.deletePublicCustomerAddress(publicSlug, addressId, input);
   }
 
+  @Patch("stores/:publicSlug/customers/me/payment-methods/:paymentMethodId/primary")
+  setPublicCustomerPrimaryPaymentMethod(
+    @Body() input: SetFoodPublicCustomerPrimaryAddressInput,
+    @Param("paymentMethodId") paymentMethodId: string,
+    @Param("publicSlug") publicSlug: string
+  ) {
+    return this.foodService.setPublicCustomerPrimaryPaymentMethod(
+      publicSlug,
+      paymentMethodId,
+      input
+    );
+  }
+
+  @Delete("stores/:publicSlug/customers/me/payment-methods/:paymentMethodId")
+  deletePublicCustomerPaymentMethod(
+    @Body() input: SetFoodPublicCustomerPrimaryAddressInput,
+    @Param("paymentMethodId") paymentMethodId: string,
+    @Param("publicSlug") publicSlug: string
+  ) {
+    return this.foodService.deletePublicCustomerPaymentMethod(
+      publicSlug,
+      paymentMethodId,
+      input
+    );
+  }
+
   @Get("stores/:publicSlug/orders/:orderNumber")
   getPublicOrder(
     @Param("orderNumber") orderNumber: string,

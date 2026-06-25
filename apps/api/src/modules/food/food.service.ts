@@ -39,6 +39,8 @@ import type {
   FoodPublicCustomerAccountContract,
   FoodPublicCustomerAddressContract,
   FoodPublicCustomerContract,
+  FoodPublicCustomerPaymentMethodContract,
+  FoodPublicCustomerPaymentMethodStatus,
   FoodPublicCustomerPhoneContract,
   FoodPublicCustomerSessionContract,
   FoodPublicCustomerStoreAccessContract,
@@ -241,6 +243,20 @@ type FoodCustomerAddressRow = {
   street: string;
 };
 
+type FoodCustomerPaymentMethodRow = {
+  card_brand: string | null;
+  card_last4: string | null;
+  customer_id: string;
+  id: string;
+  is_default: boolean;
+  payment_method_id: string | null;
+  payment_method_type: "credit_card" | "debit_card";
+  provider_card_id: string | null;
+  provider_key: "mercado_pago";
+  status: FoodPublicCustomerPaymentMethodStatus;
+  store_id: string | null;
+};
+
 type FoodDashboardOrderRow = {
   id: string;
   status: FoodOrderStatus;
@@ -265,6 +281,7 @@ type PublicCheckoutPaymentInput = {
   installments: number | null;
   paymentMethodId: string | null;
   paymentMethodType: "credit_card" | "debit_card" | "pix";
+  saveForFuture: boolean;
 };
 
 type PaginationOptions = {
@@ -460,6 +477,20 @@ const customerAddressSelect = [
   "state",
   "reference",
   "is_primary"
+].join(",");
+
+const customerPaymentMethodSelect = [
+  "id",
+  "customer_id",
+  "store_id",
+  "provider_key",
+  "provider_card_id",
+  "payment_method_id",
+  "payment_method_type",
+  "card_brand",
+  "card_last4",
+  "is_default",
+  "status"
 ].join(",");
 
 const validStatuses = new Set<FoodStoreStatus>([
@@ -988,6 +1019,13 @@ export class FoodService {
       customer.id
     );
     const primaryAddress = addresses.find((address) => address.isPrimary) ?? null;
+    const paymentMethods = await this.listCustomerPaymentMethods(
+      store.company_id,
+      store.id,
+      customer.id
+    );
+    const primaryPaymentMethod =
+      paymentMethods.find((paymentMethod) => paymentMethod.isDefault) ?? null;
 
     return {
       account,
@@ -998,7 +1036,9 @@ export class FoodService {
         customer,
         primaryPhone
       ),
+      paymentMethods,
       primaryAddress,
+      primaryPaymentMethod,
       primaryPhone,
       storeAccess
     };
@@ -1074,7 +1114,9 @@ export class FoodService {
         customer,
         primaryPhone
       ),
+      paymentMethods: session.paymentMethods,
       primaryAddress: session.primaryAddress,
+      primaryPaymentMethod: session.primaryPaymentMethod,
       primaryPhone,
       storeAccess: session.storeAccess
     };
@@ -1228,6 +1270,76 @@ export class FoodService {
     return this.buildPublicCustomerSession(store, input);
   }
 
+  async setPublicCustomerPrimaryPaymentMethod(
+    publicSlug: string,
+    paymentMethodId: string,
+    input: SetFoodPublicCustomerPrimaryAddressInput
+  ): Promise<FoodPublicCustomerSessionContract> {
+    const store = await this.getStoreByPublicSlug(publicSlug);
+    await this.ensurePublicStoreReadable(store);
+    const session = await this.buildPublicCustomerSession(store, input);
+    const paymentMethod = await this.getCustomerPaymentMethod(
+      store.company_id,
+      store.id,
+      session.customer.id,
+      paymentMethodId
+    );
+
+    await this.clearDefaultCustomerPaymentMethods(store.company_id, store.id, session.customer.id);
+
+    const { error } = await this.supabase.food
+      .from("customer_payment_methods")
+      .update({
+        is_default: true
+      })
+      .eq("id", paymentMethod.id);
+
+    if (error) {
+      throwSupabaseError(error);
+    }
+
+    return this.buildPublicCustomerSession(store, input);
+  }
+
+  async deletePublicCustomerPaymentMethod(
+    publicSlug: string,
+    paymentMethodId: string,
+    input: SetFoodPublicCustomerPrimaryAddressInput
+  ): Promise<FoodPublicCustomerSessionContract> {
+    const store = await this.getStoreByPublicSlug(publicSlug);
+    await this.ensurePublicStoreReadable(store);
+    const session = await this.buildPublicCustomerSession(store, input);
+    const paymentMethod = await this.getCustomerPaymentMethod(
+      store.company_id,
+      store.id,
+      session.customer.id,
+      paymentMethodId
+    );
+
+    const { error } = await this.supabase.food
+      .from("customer_payment_methods")
+      .update({
+        deleted_at: new Date().toISOString(),
+        is_default: false,
+        status: "inactive"
+      })
+      .eq("id", paymentMethod.id);
+
+    if (error) {
+      throwSupabaseError(error);
+    }
+
+    if (paymentMethod.isDefault) {
+      await this.ensureCustomerHasDefaultPaymentMethod(
+        store.company_id,
+        store.id,
+        session.customer.id
+      );
+    }
+
+    return this.buildPublicCustomerSession(store, input);
+  }
+
   async createPublicOrder(
     publicSlug: string,
     input: CreatePublicFoodOrderInput
@@ -1311,6 +1423,15 @@ export class FoodService {
       sourceReferenceType: "food_order"
     });
 
+    if (payment.saveForFuture && payment.paymentMethodType !== "pix") {
+      await this.savePendingPublicCustomerPaymentMethod(
+        store,
+        customerSession,
+        payment,
+        paymentRequest.id
+      );
+    }
+
     if (paymentRequest.status === "paid") {
       const paidOrder = await this.markOrderPaymentFromGateway(
         store.company_id,
@@ -1379,6 +1500,15 @@ export class FoodService {
       sourceReferenceId: order.id,
       sourceReferenceType: "food_order"
     });
+
+    if (payment.saveForFuture && payment.paymentMethodType !== "pix") {
+      await this.savePendingPublicCustomerPaymentMethod(
+        store,
+        customerSession,
+        payment,
+        paymentRequest.id
+      );
+    }
 
     if (paymentRequest.status === "paid") {
       const paidOrder = await this.markOrderPaymentFromGateway(
@@ -2096,6 +2226,147 @@ export class FoodService {
         is_primary: true
       })
       .eq("id", nextAddressId);
+
+    if (updateError) {
+      throwSupabaseError(updateError);
+    }
+  }
+
+  private async listCustomerPaymentMethods(
+    companyId: string,
+    storeId: string,
+    customerId: string
+  ): Promise<FoodPublicCustomerPaymentMethodContract[]> {
+    const { data, error } = await this.supabase.food
+      .from("customer_payment_methods")
+      .select(customerPaymentMethodSelect)
+      .eq("company_id", companyId)
+      .eq("customer_id", customerId)
+      .eq("store_id", storeId)
+      .is("deleted_at", null)
+      .neq("status", "inactive")
+      .order("is_default", { ascending: false })
+      .order("created_at", { ascending: false });
+
+    if (error) {
+      throwSupabaseError(error);
+    }
+
+    return ((data ?? []) as unknown as FoodCustomerPaymentMethodRow[]).map(
+      mapCustomerPaymentMethod
+    );
+  }
+
+  private async getCustomerPaymentMethod(
+    companyId: string,
+    storeId: string,
+    customerId: string,
+    paymentMethodId: string
+  ): Promise<FoodPublicCustomerPaymentMethodContract> {
+    const { data, error } = await this.supabase.food
+      .from("customer_payment_methods")
+      .select(customerPaymentMethodSelect)
+      .eq("id", normalizeUuid(paymentMethodId, "paymentMethodId"))
+      .eq("company_id", companyId)
+      .eq("customer_id", customerId)
+      .eq("store_id", storeId)
+      .is("deleted_at", null)
+      .single();
+
+    if (error) {
+      throwSupabaseError(error);
+    }
+
+    return mapCustomerPaymentMethod(data as unknown as FoodCustomerPaymentMethodRow);
+  }
+
+  private async savePendingPublicCustomerPaymentMethod(
+    store: FoodStoreRow,
+    session: FoodPublicCustomerSessionContract,
+    payment: PublicCheckoutPaymentInput,
+    paymentRequestId: string
+  ): Promise<void> {
+    if (payment.paymentMethodType === "pix" || !payment.paymentMethodId) {
+      return;
+    }
+
+    const hasDefault = session.paymentMethods.some((paymentMethod) => paymentMethod.isDefault);
+
+    const { error } = await this.supabase.food
+      .from("customer_payment_methods")
+      .insert({
+        card_brand: payment.paymentMethodId,
+        company_id: store.company_id,
+        customer_account_id: session.account.id,
+        customer_id: session.customer.id,
+        customer_store_access_id: session.storeAccess.id,
+        is_default: !hasDefault,
+        payment_method_id: payment.paymentMethodId,
+        payment_method_type: payment.paymentMethodType,
+        provider_key: "mercado_pago",
+        provider_payment_request_id: paymentRequestId,
+        status: "pending_tokenization",
+        store_id: store.id
+      });
+
+    if (error) {
+      throwSupabaseError(error);
+    }
+  }
+
+  private async clearDefaultCustomerPaymentMethods(
+    companyId: string,
+    storeId: string,
+    customerId: string
+  ): Promise<void> {
+    const { error } = await this.supabase.food
+      .from("customer_payment_methods")
+      .update({
+        is_default: false
+      })
+      .eq("company_id", companyId)
+      .eq("customer_id", customerId)
+      .eq("store_id", storeId)
+      .is("deleted_at", null);
+
+    if (error) {
+      throwSupabaseError(error);
+    }
+  }
+
+  private async ensureCustomerHasDefaultPaymentMethod(
+    companyId: string,
+    storeId: string,
+    customerId: string
+  ): Promise<void> {
+    const { data, error } = await this.supabase.food
+      .from("customer_payment_methods")
+      .select("id")
+      .eq("company_id", companyId)
+      .eq("customer_id", customerId)
+      .eq("store_id", storeId)
+      .is("deleted_at", null)
+      .neq("status", "inactive")
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    if (error) {
+      throwSupabaseError(error);
+    }
+
+    const nextPaymentMethodId = (data as { id?: string } | null)?.id;
+
+    if (!nextPaymentMethodId) {
+      return;
+    }
+
+    const { error: updateError } = await this.supabase.food
+      .from("customer_payment_methods")
+      .update({
+        is_default: true
+      })
+      .eq("id", nextPaymentMethodId);
 
     if (updateError) {
       throwSupabaseError(updateError);
@@ -3037,7 +3308,8 @@ function normalizePublicCheckoutPayment(
       customerEmail,
       installments: null,
       paymentMethodId: null,
-      paymentMethodType: "pix"
+      paymentMethodType: "pix",
+      saveForFuture: false
     };
   }
 
@@ -3047,7 +3319,8 @@ function normalizePublicCheckoutPayment(
       customerEmail,
       installments: normalizeInstallments(value.installments),
       paymentMethodId: normalizeRequiredText(value.paymentMethodId, "payment.paymentMethodId", 80),
-      paymentMethodType: value.paymentMethodType
+      paymentMethodType: value.paymentMethodType,
+      saveForFuture: value.saveForFuture === true
     };
   }
 
@@ -3707,6 +3980,24 @@ function mapCustomerAddress(row: FoodCustomerAddressRow): FoodPublicCustomerAddr
     state: row.state,
     storeId: row.store_id,
     street: row.street
+  };
+}
+
+function mapCustomerPaymentMethod(
+  row: FoodCustomerPaymentMethodRow
+): FoodPublicCustomerPaymentMethodContract {
+  return {
+    cardBrand: row.card_brand,
+    cardLast4: row.card_last4,
+    customerId: row.customer_id,
+    id: row.id,
+    isDefault: row.is_default,
+    paymentMethodId: row.payment_method_id,
+    paymentMethodType: row.payment_method_type,
+    providerCardId: row.provider_card_id,
+    providerKey: row.provider_key,
+    status: row.status,
+    storeId: row.store_id
   };
 }
 

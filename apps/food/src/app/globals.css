@@ -1391,6 +1391,18 @@ textarea {
   font-weight: 900;
 }
 
+.public-payment-method-summary {
+  display: grid;
+  gap: 4px;
+}
+
+.public-save-card-option {
+  background: var(--surface-muted);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 10px;
+}
+
 .public-address-item p,
 .public-address-item small {
   color: var(--muted);

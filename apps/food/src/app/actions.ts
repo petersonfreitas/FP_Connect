@@ -27,9 +27,11 @@ import {
   createFoodStockEntry,
   createPublicFoodOrder,
   deletePublicFoodCustomerAddress,
+  deletePublicFoodCustomerPaymentMethod,
   ensurePublicFoodCustomerStoreAccess,
   savePublicFoodCustomerAddress,
   setPrimaryPublicFoodCustomerAddress,
+  setPrimaryPublicFoodCustomerPaymentMethod,
   saveFoodStoreHours,
   updateFoodCategory,
   updateFoodOrderPayment,
@@ -537,6 +539,64 @@ export async function setPublicCustomerPrimaryAddressAction(
   }
 
   redirect(`${accountPath}?addressPrimary=1`);
+}
+
+export async function setPublicCustomerPrimaryPaymentMethodAction(
+  formData: FormData
+): Promise<void> {
+  const publicSlug = normalizePublicSlug(formData.get("publicSlug"));
+  const paymentMethodId = String(formData.get("paymentMethodId") ?? "").trim();
+  const storeContext = createFallbackPublicStoreContext(publicSlug);
+  const accountPath = storeUrl(storeContext, "/conta");
+  const currentUser = await getCurrentPublicStoreUser(publicSlug);
+
+  if (!currentUser) {
+    redirect(storeLoginUrl(storeContext, accountPath));
+  }
+
+  if (!paymentMethodId) {
+    redirect(`${accountPath}?error=${encodeURIComponent("Cartao nao informado.")}`);
+  }
+
+  const result = await setPrimaryPublicFoodCustomerPaymentMethod(publicSlug, paymentMethodId, {
+    authUserId: currentUser.id,
+    email: currentUser.email
+  });
+
+  if (result.error) {
+    redirect(`${accountPath}?error=${encodeURIComponent(truncateQueryValue(result.error))}`);
+  }
+
+  redirect(`${accountPath}?paymentMethodPrimary=1`);
+}
+
+export async function deletePublicCustomerPaymentMethodAction(
+  formData: FormData
+): Promise<void> {
+  const publicSlug = normalizePublicSlug(formData.get("publicSlug"));
+  const paymentMethodId = String(formData.get("paymentMethodId") ?? "").trim();
+  const storeContext = createFallbackPublicStoreContext(publicSlug);
+  const accountPath = storeUrl(storeContext, "/conta");
+  const currentUser = await getCurrentPublicStoreUser(publicSlug);
+
+  if (!currentUser) {
+    redirect(storeLoginUrl(storeContext, accountPath));
+  }
+
+  if (!paymentMethodId) {
+    redirect(`${accountPath}?error=${encodeURIComponent("Cartao nao informado.")}`);
+  }
+
+  const result = await deletePublicFoodCustomerPaymentMethod(publicSlug, paymentMethodId, {
+    authUserId: currentUser.id,
+    email: currentUser.email
+  });
+
+  if (result.error) {
+    redirect(`${accountPath}?error=${encodeURIComponent(truncateQueryValue(result.error))}`);
+  }
+
+  redirect(`${accountPath}?paymentMethodDeleted=1`);
 }
 
 function requireCompanyId(formData: FormData): string {

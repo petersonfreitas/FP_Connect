@@ -430,12 +430,33 @@ export type FoodPublicCustomerAddressContract = {
   street: string;
 };
 
+export type FoodPublicCustomerPaymentMethodStatus =
+  | "active"
+  | "inactive"
+  | "pending_tokenization";
+
+export type FoodPublicCustomerPaymentMethodContract = {
+  cardBrand: string | null;
+  cardLast4: string | null;
+  customerId: string;
+  id: string;
+  isDefault: boolean;
+  paymentMethodId: string | null;
+  paymentMethodType: "credit_card" | "debit_card";
+  providerCardId: string | null;
+  providerKey: "mercado_pago";
+  status: FoodPublicCustomerPaymentMethodStatus;
+  storeId: string | null;
+};
+
 export type FoodPublicCustomerSessionContract = {
   account: FoodPublicCustomerAccountContract;
   addresses: FoodPublicCustomerAddressContract[];
   customer: FoodPublicCustomerContract;
   isCompleteForCheckout: boolean;
+  paymentMethods: FoodPublicCustomerPaymentMethodContract[];
   primaryAddress: FoodPublicCustomerAddressContract | null;
+  primaryPaymentMethod: FoodPublicCustomerPaymentMethodContract | null;
   primaryPhone: FoodPublicCustomerPhoneContract | null;
   storeAccess: FoodPublicCustomerStoreAccessContract;
 };
@@ -546,6 +567,7 @@ export type CreatePublicFoodCheckoutInput = CreatePublicFoodOrderInput & {
     installments?: number | null;
     paymentMethodId?: string | null;
     paymentMethodType?: "credit_card" | "debit_card" | "pix" | null;
+    saveForFuture?: boolean | null;
   } | null;
 };
 

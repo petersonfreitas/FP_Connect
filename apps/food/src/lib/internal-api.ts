@@ -399,6 +399,38 @@ export async function setPrimaryPublicFoodCustomerAddress(
   );
 }
 
+export async function setPrimaryPublicFoodCustomerPaymentMethod(
+  publicSlug: string,
+  paymentMethodId: string,
+  input: SetFoodPublicCustomerPrimaryAddressInput
+): Promise<InternalApiResult<FoodPublicCustomerSessionContract>> {
+  return fetchPublicInternal<FoodPublicCustomerSessionContract>(
+    `food/public/stores/${encodeURIComponent(publicSlug)}/customers/me/payment-methods/${encodeURIComponent(
+      paymentMethodId
+    )}/primary`,
+    {
+      body: JSON.stringify(input),
+      method: "PATCH"
+    }
+  );
+}
+
+export async function deletePublicFoodCustomerPaymentMethod(
+  publicSlug: string,
+  paymentMethodId: string,
+  input: SetFoodPublicCustomerPrimaryAddressInput
+): Promise<InternalApiResult<FoodPublicCustomerSessionContract>> {
+  return fetchPublicInternal<FoodPublicCustomerSessionContract>(
+    `food/public/stores/${encodeURIComponent(publicSlug)}/customers/me/payment-methods/${encodeURIComponent(
+      paymentMethodId
+    )}`,
+    {
+      body: JSON.stringify(input),
+      method: "DELETE"
+    }
+  );
+}
+
 export async function listFoodOrders(
   companyId: string,
   pagination: PaginationParams = {}

@@ -57,6 +57,9 @@ export default async function PublicCartReviewPage({ params }: PublicCartReviewP
       <PublicCartReview
         addresses={customerSessionResult?.data?.addresses ?? []}
         checkout={checkoutResult.data}
+        hasSavedPaymentMethods={
+          (customerSessionResult?.data?.paymentMethods.length ?? 0) > 0
+        }
         isAuthenticated={Boolean(currentUser)}
         isCustomerCompleteForCheckout={
           customerSessionResult?.data?.isCompleteForCheckout ?? false

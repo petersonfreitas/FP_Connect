@@ -75,6 +75,7 @@ declare global {
 type PublicCartReviewProps = {
   addresses: FoodPublicCustomerAddressContract[];
   checkout: FoodPublicCheckoutContract | null;
+  hasSavedPaymentMethods: boolean;
   isAuthenticated: boolean;
   isCustomerCompleteForCheckout: boolean;
   menu: FoodMenuContract;
@@ -84,6 +85,7 @@ type PublicCartReviewProps = {
 export function PublicCartReview({
   addresses,
   checkout,
+  hasSavedPaymentMethods,
   isAuthenticated,
   isCustomerCompleteForCheckout,
   menu,
@@ -101,6 +103,7 @@ export function PublicCartReview({
   const [isPayingWithCard, setIsPayingWithCard] = useState(false);
   const [mercadoPagoReady, setMercadoPagoReady] = useState(false);
   const [customerNote, setCustomerNote] = useState("");
+  const [saveCardForFuture, setSaveCardForFuture] = useState(false);
   const [fulfillmentMethod, setFulfillmentMethod] = useState<FoodOrderFulfillmentMethod>(
     addresses.length > 0 && menu.availability.isDeliveryOpen ? "delivery" : "pickup"
   );
@@ -170,7 +173,8 @@ export function PublicCartReview({
           customerEmail: normalizeFormText(formData.payer?.email),
           installments: Number(formData.installments),
           paymentMethodId: normalizeFormText(formData.payment_method_id),
-          paymentMethodType
+          paymentMethodType,
+          saveForFuture: saveCardForFuture
         },
         publicSlug: menu.store.publicSlug
       });
@@ -206,6 +210,7 @@ export function PublicCartReview({
       customerNote,
       fulfillmentMethod,
       menu.store.publicSlug,
+      saveCardForFuture,
       selectedAddressId
     ]
   );
@@ -642,6 +647,16 @@ export function PublicCartReview({
                 </div>
               ) : (
                 <div className="public-payment-method-panel">
+                  {!hasSavedPaymentMethods ? (
+                    <label className="checkbox-field public-save-card-option">
+                      <input
+                        checked={saveCardForFuture}
+                        onChange={(event) => setSaveCardForFuture(event.target.checked)}
+                        type="checkbox"
+                      />
+                      Salvar este cartao tokenizado para compras futuras nesta loja.
+                    </label>
+                  ) : null}
                   <div
                     aria-busy={isPayingWithCard}
                     className={
