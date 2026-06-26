@@ -26,26 +26,63 @@ export function PublicCustomerMenu({
   const accountHref = storeUrl(storeContext, "/conta");
   const cartHref = storeUrl(storeContext, "/carrinho");
   const ordersHref = storeOrdersUrl(storeContext);
+  const navItems = [
+    {
+      href: menuHref,
+      icon: "CA",
+      isActive: active === "menu",
+      label: "Cardapio"
+    },
+    {
+      href: cartHref,
+      icon: "CR",
+      isActive: active === "cart" || active === "review",
+      label: "Carrinho"
+    },
+    {
+      href: ordersHref,
+      icon: "PD",
+      isActive: active === "order" || active === "orders",
+      label: "Pedidos"
+    },
+    {
+      href: accountHref,
+      icon: "CO",
+      isActive: active === "account",
+      label: "Conta"
+    }
+  ];
 
   return (
     <nav className="public-customer-menu" aria-label="Menu do cliente">
       <Link className="public-customer-brand" href={menuHref}>
-        FP Food
+        <span className="public-brand-icon" aria-hidden="true">
+          FP
+        </span>
+        <span>
+          <strong>FP Food</strong>
+          <small>Vitrine publica</small>
+        </span>
       </Link>
       <div className="public-customer-links">
-        <Link className={active === "menu" ? "active" : ""} href={menuHref}>
-          Cardapio
-        </Link>
-        <Link className={active === "cart" || active === "review" ? "active" : ""} href={cartHref}>
-          Carrinho
-        </Link>
-        <Link className={active === "order" || active === "orders" ? "active" : ""} href={ordersHref}>
-          Meus pedidos
-        </Link>
-        <Link className={active === "account" ? "active" : ""} href={accountHref}>
-          Minha conta
-        </Link>
-        {contactPhone ? <a href={`tel:${contactPhone}`}>Ajuda</a> : <a href="#ajuda">Ajuda</a>}
+        {navItems.map((item) => (
+          <Link
+            className={item.isActive ? "public-nav-link active" : "public-nav-link"}
+            href={item.href}
+            key={item.label}
+          >
+            <span className="public-nav-icon" aria-hidden="true">
+              {item.icon}
+            </span>
+            <span>{item.label}</span>
+          </Link>
+        ))}
+        <a className="public-nav-link" href={contactPhone ? `tel:${contactPhone}` : "#ajuda"}>
+          <span className="public-nav-icon" aria-hidden="true">
+            AJ
+          </span>
+          <span>Ajuda</span>
+        </a>
       </div>
       <div className="public-account-badge" aria-label="Conta do cliente">
         <span className="public-account-avatar" aria-hidden="true">

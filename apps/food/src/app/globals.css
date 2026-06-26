@@ -1310,36 +1310,114 @@ textarea {
   background: var(--panel);
   border: 1px solid var(--line);
   border-radius: 8px;
+  box-shadow: 0 10px 28px rgb(23 32 39 / 7%);
   display: flex;
-  gap: 18px;
+  gap: 16px;
   justify-content: space-between;
-  padding: 12px 14px;
+  padding: 10px;
+  position: sticky;
+  top: 14px;
+  z-index: 10;
 }
 
 .public-customer-brand {
+  align-items: center;
   color: var(--accent-strong);
-  font-size: 18px;
+  display: flex;
+  gap: 10px;
+  min-width: max-content;
+  padding: 4px 6px 4px 4px;
+}
+
+.public-brand-icon {
+  align-items: center;
+  background: var(--accent-strong);
+  border-radius: 8px;
+  color: #ffffff;
+  display: inline-flex;
+  font-size: 0.78rem;
   font-weight: 950;
+  height: 40px;
+  justify-content: center;
+  letter-spacing: 0;
+  width: 40px;
+}
+
+.public-customer-brand span:last-child {
+  display: grid;
+  gap: 1px;
+}
+
+.public-customer-brand strong {
+  color: var(--accent-strong);
+  font-size: 16px;
+  font-weight: 950;
+  line-height: 1.1;
+}
+
+.public-customer-brand small {
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 850;
+  line-height: 1.2;
 }
 
 .public-customer-links {
   align-items: center;
   display: flex;
   flex-wrap: wrap;
-  gap: 8px;
+  gap: 6px;
+  justify-content: center;
 }
 
-.public-customer-links a {
-  border-radius: 999px;
+.public-nav-link {
+  align-items: center;
+  border: 1px solid transparent;
+  border-radius: 8px;
   color: var(--muted);
+  display: inline-flex;
+  gap: 7px;
   font-weight: 900;
-  padding: 8px 11px;
+  min-height: 42px;
+  padding: 6px 9px 6px 6px;
+  transition:
+    background 0.16s ease,
+    border-color 0.16s ease,
+    color 0.16s ease,
+    transform 0.16s ease;
 }
 
-.public-customer-links a.active,
-.public-customer-links a:hover {
+.public-nav-link.active,
+.public-nav-link:hover {
   background: var(--accent-soft);
+  border-color: rgb(23 99 79 / 18%);
   color: var(--accent-strong);
+}
+
+.public-nav-link:hover {
+  transform: translateY(-1px);
+}
+
+.public-nav-icon {
+  align-items: center;
+  background: #f0f6f4;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  color: var(--accent-strong);
+  display: inline-flex;
+  flex: 0 0 auto;
+  font-size: 0.68rem;
+  font-weight: 950;
+  height: 28px;
+  justify-content: center;
+  letter-spacing: 0;
+  width: 28px;
+}
+
+.public-nav-link.active .public-nav-icon,
+.public-nav-link:hover .public-nav-icon {
+  background: #ffffff;
+  border-color: rgb(23 99 79 / 22%);
 }
 
 .public-account-badge {
@@ -1685,8 +1763,8 @@ textarea {
 
 .public-product-grid {
   display: grid;
-  gap: 14px;
-  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 16px;
+  grid-template-columns: repeat(auto-fill, minmax(min(220px, 100%), 1fr));
 }
 
 .public-product-card {
@@ -1694,7 +1772,18 @@ textarea {
   border: 1px solid var(--line);
   border-radius: 8px;
   display: grid;
+  min-height: 100%;
   overflow: hidden;
+  transition:
+    border-color 0.16s ease,
+    box-shadow 0.16s ease,
+    transform 0.16s ease;
+}
+
+.public-product-card:hover {
+  border-color: rgb(23 99 79 / 20%);
+  box-shadow: 0 12px 28px rgb(23 32 39 / 8%);
+  transform: translateY(-2px);
 }
 
 .public-product-image {
@@ -1706,6 +1795,7 @@ textarea {
 }
 
 .public-product-body {
+  align-content: space-between;
   padding: 16px;
 }
 
@@ -2482,6 +2572,13 @@ textarea {
 
   .public-customer-links {
     align-items: stretch;
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .public-nav-link {
+    justify-content: flex-start;
+    width: 100%;
   }
 
   .public-account-badge {
@@ -2581,7 +2678,6 @@ textarea {
   .public-order-detail-grid,
   .public-fulfillment-choice-grid,
   .public-order-layout,
-  .public-product-grid,
   .public-store-overview,
   .kitchen-board,
   .public-order-lookup,
