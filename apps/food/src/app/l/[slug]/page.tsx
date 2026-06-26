@@ -46,6 +46,7 @@ export default async function PublicStorePage({
       {query?.error ? <Notice tone="danger" message={query.error} /> : null}
       {query?.signedOut ? <Notice tone="success" message="Voce saiu desta loja." /> : null}
       <PublicStorefront
+        customerEmail={currentUser?.email}
         isAuthenticated={Boolean(currentUser)}
         menu={menuResult.data}
         storeContext={storeContext}

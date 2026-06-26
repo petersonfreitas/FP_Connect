@@ -35,6 +35,7 @@ export default async function PublicCartPage({ params }: PublicCartPageProps) {
 
   return (
     <PublicCartManager
+      customerEmail={currentUser?.email}
       isAuthenticated={Boolean(currentUser)}
       menu={menuResult.data}
       storeContext={storeContext}

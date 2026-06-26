@@ -69,6 +69,7 @@ export default async function PublicCustomerAccountPage({
       <PublicCustomerMenu
         active="account"
         contactPhone={menuResult.data?.store.contactPhone}
+        customerEmail={currentUser.email}
         isAuthenticated
         storeContext={storeContext}
       />

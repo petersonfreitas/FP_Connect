@@ -101,6 +101,7 @@ export default async function PublicOrdersPage({
       <PublicCustomerMenu
         active="orders"
         contactPhone={menuResult.data?.store.contactPhone}
+        customerEmail={currentUser.email}
         isAuthenticated
         storeContext={storeContext}
       />

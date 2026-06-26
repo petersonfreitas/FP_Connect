@@ -75,6 +75,7 @@ declare global {
 type PublicCartReviewProps = {
   addresses: FoodPublicCustomerAddressContract[];
   checkout: FoodPublicCheckoutContract | null;
+  customerEmail?: string | null;
   hasSavedPaymentMethods: boolean;
   isAuthenticated: boolean;
   isCustomerCompleteForCheckout: boolean;
@@ -88,6 +89,7 @@ type CheckoutStepStatus = "blocked" | "complete" | "current" | "pending";
 export function PublicCartReview({
   addresses,
   checkout,
+  customerEmail,
   hasSavedPaymentMethods,
   isAuthenticated,
   isCustomerCompleteForCheckout,
@@ -464,6 +466,7 @@ export function PublicCartReview({
       <PublicCustomerMenu
         active="review"
         contactPhone={menu.store.contactPhone}
+        customerEmail={customerEmail}
         isAuthenticated={isAuthenticated}
         storeContext={storeContext}
       />

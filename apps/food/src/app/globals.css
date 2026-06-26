@@ -196,6 +196,7 @@ textarea {
   background: var(--panel);
   border: 1px solid var(--line);
   border-radius: 8px;
+  box-shadow: 0 8px 20px rgb(23 32 39 / 6%);
   color: var(--muted);
   display: flex;
   font-size: 13px;
@@ -203,7 +204,24 @@ textarea {
   margin: 0 0 20px auto;
   max-width: 1180px;
   padding: 8px;
+  position: sticky;
+  top: 16px;
   width: fit-content;
+  z-index: 5;
+}
+
+.workspace-account-avatar {
+  align-items: center;
+  background: var(--accent-soft);
+  border-radius: 8px;
+  color: var(--accent-strong);
+  display: inline-flex;
+  font-size: 0.78rem;
+  font-weight: 950;
+  height: 36px;
+  justify-content: center;
+  letter-spacing: 0;
+  width: 36px;
 }
 
 .workspace-user {
@@ -1304,40 +1322,75 @@ textarea {
   font-weight: 950;
 }
 
-.public-customer-menu div {
+.public-customer-links {
   align-items: center;
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
 }
 
-.public-customer-menu div a {
+.public-customer-links a {
   border-radius: 999px;
   color: var(--muted);
   font-weight: 900;
   padding: 8px 11px;
 }
 
-.public-customer-menu-form {
-  margin: 0;
-}
-
-.public-customer-menu-form button {
-  background: transparent;
-  border: 0;
-  border-radius: 999px;
-  color: var(--muted);
-  cursor: pointer;
-  font: inherit;
-  font-weight: 900;
-  padding: 8px 11px;
-}
-
-.public-customer-menu div a.active,
-.public-customer-menu div a:hover,
-.public-customer-menu-form button:hover {
+.public-customer-links a.active,
+.public-customer-links a:hover {
   background: var(--accent-soft);
   color: var(--accent-strong);
+}
+
+.public-account-badge {
+  align-items: center;
+  background: #f8fafc;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  display: flex;
+  gap: 10px;
+  margin-left: auto;
+  min-width: 0;
+  padding: 7px;
+}
+
+.public-account-avatar {
+  align-items: center;
+  background: var(--accent-soft);
+  border-radius: 8px;
+  color: var(--accent-strong);
+  display: inline-flex;
+  font-size: 0.78rem;
+  font-weight: 950;
+  height: 34px;
+  justify-content: center;
+  letter-spacing: 0;
+  width: 34px;
+}
+
+.public-account-user {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.public-account-user span,
+.public-account-user small {
+  max-width: 220px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.public-account-user span {
+  color: var(--foreground);
+  font-size: 0.86rem;
+  font-weight: 800;
+}
+
+.public-account-user small {
+  color: var(--muted);
+  font-size: 0.78rem;
 }
 
 .public-account-panel {
@@ -1556,6 +1609,10 @@ textarea {
   grid-template-columns: minmax(0, 1fr) 360px;
 }
 
+.public-menu-layout {
+  display: grid;
+}
+
 .public-menu,
 .public-category,
 .public-product-body,
@@ -1594,6 +1651,14 @@ textarea {
   margin: 0;
 }
 
+.public-section-actions {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  justify-content: flex-end;
+}
+
 .public-category h2,
 .public-cart h2,
 .public-product-card h3 {
@@ -1621,7 +1686,7 @@ textarea {
 .public-product-grid {
   display: grid;
   gap: 14px;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
 }
 
 .public-product-card {
@@ -2094,11 +2159,69 @@ textarea {
   font-weight: 800;
 }
 
+.public-payment-retry-panel {
+  background: #fffbeb;
+  border-color: #fedf89;
+  margin: 0 auto;
+  max-width: 1180px;
+}
+
+.public-order-header {
+  align-items: center;
+  background: linear-gradient(135deg, #ffffff, #f0fdf9);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  display: flex;
+  gap: 24px;
+  justify-content: space-between;
+  padding: 24px;
+}
+
+.public-order-header h1 {
+  letter-spacing: 0;
+  margin: 6px 0;
+}
+
+.public-order-header p {
+  color: var(--muted);
+  line-height: 1.5;
+  margin: 0;
+  max-width: 760px;
+}
+
+.public-order-header-meta,
+.public-order-header-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.public-order-header-meta {
+  color: var(--muted);
+  font-size: 0.9rem;
+  margin-top: 10px;
+}
+
+.public-order-header-actions {
+  align-items: flex-end;
+  justify-content: flex-end;
+  min-width: 180px;
+}
+
+.public-order-header-actions strong {
+  color: var(--accent-strong);
+  flex-basis: 100%;
+  font-size: 1.8rem;
+  text-align: right;
+}
+
 .public-order-status,
 .public-order-detail {
   background: var(--panel);
   border: 1px solid var(--line);
   border-radius: 8px;
+  display: grid;
+  gap: 18px;
   padding: 24px;
 }
 
@@ -2147,6 +2270,51 @@ textarea {
 .public-order-items {
   display: grid;
   gap: 16px;
+}
+
+.public-order-detail-grid {
+  display: grid;
+  gap: 14px;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.public-order-info-card {
+  background: #f8fafc;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  display: grid;
+  gap: 6px;
+  padding: 16px;
+}
+
+.public-order-info-card h2 {
+  letter-spacing: 0;
+  margin: 0;
+}
+
+.public-order-info-card p {
+  color: var(--muted);
+  line-height: 1.5;
+  margin: 0;
+}
+
+.public-order-total-card strong {
+  color: var(--accent-strong);
+  font-size: 1.8rem;
+}
+
+.public-order-items-panel {
+  border-top: 1px solid var(--line);
+  display: grid;
+  gap: 12px;
+  padding-top: 18px;
+}
+
+.plain-section-heading {
+  background: transparent;
+  border: 0;
+  border-radius: 0;
+  padding: 0;
 }
 
 .public-orders-panel {
@@ -2312,6 +2480,19 @@ textarea {
     flex-direction: column;
   }
 
+  .public-customer-links {
+    align-items: stretch;
+  }
+
+  .public-account-badge {
+    margin-left: 0;
+    width: 100%;
+  }
+
+  .public-account-user {
+    flex: 1;
+  }
+
   .topbar,
   .session-box,
   .workspace-account,
@@ -2356,6 +2537,7 @@ textarea {
   .order-card-heading,
   .order-item-row,
   .order-status-form,
+  .public-order-header,
   .public-hero,
   .public-section-heading,
   .public-cart-heading,
@@ -2381,6 +2563,10 @@ textarea {
     justify-content: stretch;
   }
 
+  .public-section-actions {
+    justify-content: flex-start;
+  }
+
   .order-detail-grid {
     grid-template-columns: 1fr;
   }
@@ -2392,6 +2578,7 @@ textarea {
 
   .public-cart-page,
   .public-checkout-layout,
+  .public-order-detail-grid,
   .public-fulfillment-choice-grid,
   .public-order-layout,
   .public-product-grid,
@@ -2408,6 +2595,14 @@ textarea {
   .public-order-item {
     align-items: stretch;
     flex-direction: column;
+  }
+
+  .public-order-header-actions {
+    justify-content: flex-start;
+  }
+
+  .public-order-header-actions strong {
+    text-align: left;
   }
 
   .public-orders-table {

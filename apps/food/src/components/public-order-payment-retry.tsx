@@ -224,7 +224,7 @@ export function PublicOrderPaymentRetry({
 
   if (!isAuthenticated) {
     return (
-      <section className="public-online-payment">
+      <section className="public-online-payment public-payment-retry-panel">
         <div>
           <div className="eyebrow">Pagamento pendente</div>
           <h2>Entre para pagar novamente</h2>
@@ -239,7 +239,7 @@ export function PublicOrderPaymentRetry({
 
   if (!isCustomerCompleteForCheckout) {
     return (
-      <section className="public-online-payment">
+      <section className="public-online-payment public-payment-retry-panel">
         <div>
           <div className="eyebrow">Pagamento pendente</div>
           <h2>Complete seu cadastro</h2>
@@ -288,7 +288,7 @@ export function PublicOrderPaymentRetry({
   }
 
   return (
-    <section className="public-online-payment">
+    <section className="public-online-payment public-payment-retry-panel">
       <Script
         onReady={() => setMercadoPagoReady(true)}
         src="https://sdk.mercadopago.com/js/v2"

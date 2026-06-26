@@ -123,6 +123,9 @@ export async function FoodShell({ activePath, children }: FoodShellProps) {
 
       <section className="workspace">
         <div className="workspace-account" aria-label="Usuario logado">
+          <span className="workspace-account-avatar" aria-hidden="true">
+            FD
+          </span>
           <div className="workspace-user">
             <span>{user.email ?? "Usuario autenticado"}</span>
             <small>FP Food</small>

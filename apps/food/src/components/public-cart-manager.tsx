@@ -17,12 +17,14 @@ import {
 } from "@/lib/public-store-urls";
 
 type PublicCartManagerProps = {
+  customerEmail?: string | null;
   isAuthenticated: boolean;
   menu: FoodMenuContract;
   storeContext: PublicStoreUrlContext;
 };
 
 export function PublicCartManager({
+  customerEmail,
   isAuthenticated,
   menu,
   storeContext
@@ -71,6 +73,7 @@ export function PublicCartManager({
       <PublicCustomerMenu
         active="cart"
         contactPhone={menu.store.contactPhone}
+        customerEmail={customerEmail}
         isAuthenticated={isAuthenticated}
         storeContext={storeContext}
       />

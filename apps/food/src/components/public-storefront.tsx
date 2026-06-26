@@ -12,12 +12,14 @@ import {
 import { storeUrl, type PublicStoreUrlContext } from "@/lib/public-store-urls";
 
 type PublicStorefrontProps = {
+  customerEmail?: string | null;
   isAuthenticated: boolean;
   menu: FoodMenuContract;
   storeContext: PublicStoreUrlContext;
 };
 
 export function PublicStorefront({
+  customerEmail,
   isAuthenticated,
   menu,
   storeContext
@@ -27,10 +29,6 @@ export function PublicStorefront({
   const canOrderNow = menu.availability.isOrderingOpen;
   const cartHref = storeUrl(storeContext, "/carrinho");
   const cartItemsCount = getPublicCartItemCount(cartItems);
-  const cartTotalCents = cartItems.reduce((sum, item) => {
-    const product = products.find((currentProduct) => currentProduct.id === item.productId);
-    return product ? sum + product.priceCents * item.quantity : sum;
-  }, 0);
 
   useEffect(() => {
     setCartItems(readPublicCart(menu.store.publicSlug));
@@ -49,6 +47,7 @@ export function PublicStorefront({
       <PublicCustomerMenu
         active="menu"
         contactPhone={menu.store.contactPhone}
+        customerEmail={customerEmail}
         isAuthenticated={isAuthenticated}
         storeContext={storeContext}
       />
@@ -101,7 +100,7 @@ export function PublicStorefront({
         </article>
       </section>
 
-      <section className="public-order-layout">
+      <section className="public-menu-layout">
         <div className="public-menu" id="cardapio">
           <div className="public-section-heading">
             <div>
@@ -109,7 +108,12 @@ export function PublicStorefront({
               <h2>Escolha os itens do pedido</h2>
               <p>Adicione produtos ao carrinho e revise tudo antes do pagamento.</p>
             </div>
-            <span>{products.length} produto(s)</span>
+            <div className="public-section-actions">
+              <span>{products.length} produto(s)</span>
+              <a className="secondary-action compact-action" href={cartHref}>
+                Ver carrinho ({cartItemsCount})
+              </a>
+            </div>
           </div>
 
           {menu.categories.map((category) => (
@@ -152,51 +156,6 @@ export function PublicStorefront({
             </div>
           ) : null}
         </div>
-
-        <aside className="public-cart">
-          <div className="public-cart-heading">
-            <div>
-              <div className="eyebrow">Carrinho</div>
-              <h2>Resumo</h2>
-              <p>Edite quantidades e avance para a revisao.</p>
-            </div>
-            <span>{cartItemsCount} item(ns)</span>
-          </div>
-
-          {cartItemsCount > 0 ? (
-            <div className="public-cart-items">
-              {cartItems.map((item) => {
-                const product = products.find((currentProduct) => currentProduct.id === item.productId);
-
-                return (
-                  <div className="public-cart-row" key={item.productId}>
-                    <span>
-                      {item.quantity}x {product?.name ?? "Produto indisponivel"}
-                    </span>
-                    <strong>{formatMoney((product?.priceCents ?? 0) * item.quantity)}</strong>
-                  </div>
-                );
-              })}
-            </div>
-          ) : (
-            <div className="empty-state public-empty-cart">Adicione itens ao carrinho.</div>
-          )}
-
-          <div className="public-cart-total">
-            <span>Total estimado</span>
-            <strong>{formatMoney(cartTotalCents)}</strong>
-          </div>
-
-          {!canOrderNow ? (
-            <p className="public-delivery-note">
-              {menu.availability.message} O cardapio segue disponivel para consulta.
-            </p>
-          ) : null}
-
-          <a className="primary-action" href={cartHref}>
-            Ver carrinho
-          </a>
-        </aside>
       </section>
     </main>
   );

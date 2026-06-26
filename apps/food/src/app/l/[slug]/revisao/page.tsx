@@ -57,6 +57,7 @@ export default async function PublicCartReviewPage({ params }: PublicCartReviewP
       <PublicCartReview
         addresses={customerSessionResult?.data?.addresses ?? []}
         checkout={checkoutResult.data}
+        customerEmail={currentUser?.email}
         hasSavedPaymentMethods={
           (customerSessionResult?.data?.paymentMethods.length ?? 0) > 0
         }
