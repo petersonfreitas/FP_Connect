@@ -8,6 +8,7 @@ import {
   getPublicCartItemCount,
   readPublicCart,
   setPublicCartLineQuantity,
+  setPublicCartProduct,
   type PublicCartItem
 } from "@/lib/public-cart-store";
 import {
@@ -32,6 +33,9 @@ export function PublicCartManager({
   const [cartItems, setCartItems] = useState<PublicCartItem[]>(() =>
     readPublicCart(menu.store.publicSlug)
   );
+  const [editingItem, setEditingItem] = useState<PublicCartItem | null>(null);
+  const [editingQuantity, setEditingQuantity] = useState(1);
+  const [editingItemNote, setEditingItemNote] = useState("");
   const cartRows = useMemo(
     () =>
       cartItems.map((item) => ({
@@ -48,6 +52,12 @@ export function PublicCartManager({
   const menuHref = storeUrl(storeContext);
   const reviewHref = storeUrl(storeContext, "/revisao");
   const canReview = cartItemsCount > 0 && menu.availability.isOrderingOpen;
+  const editingProduct =
+    editingItem ? products.find((product) => product.id === editingItem.productId) ?? null : null;
+  const editingMaxQuantity =
+    editingItem && editingProduct
+      ? getLineMaxQuantity(editingItem, editingProduct, cartItems)
+      : 0;
 
   useEffect(() => {
     setCartItems(readPublicCart(menu.store.publicSlug));
@@ -62,6 +72,50 @@ export function PublicCartManager({
       : 99;
     const nextQuantity = Math.min(Math.max(quantity, 0), maxQuantity);
     setCartItems(setPublicCartLineQuantity(menu.store.publicSlug, item.lineId, nextQuantity));
+  }
+
+  function openEditItem(item: PublicCartItem, product: FoodProductContract | null) {
+    if (!product) {
+      return;
+    }
+
+    const maxQuantity = getLineMaxQuantity(item, product, cartItems);
+
+    setEditingItem(item);
+    setEditingQuantity(Math.min(Math.max(item.quantity, 1), maxQuantity));
+    setEditingItemNote(item.itemNote ?? "");
+  }
+
+  function closeEditItem() {
+    setEditingItem(null);
+    setEditingQuantity(1);
+    setEditingItemNote("");
+  }
+
+  function changeEditingQuantity(delta: number) {
+    if (!editingItem || !editingProduct) {
+      return;
+    }
+
+    const maxQuantity = getLineMaxQuantity(editingItem, editingProduct, cartItems);
+    const nextQuantity = Math.min(Math.max(editingQuantity + delta, 1), maxQuantity);
+
+    setEditingQuantity(nextQuantity);
+  }
+
+  function saveEditedItem() {
+    if (!editingItem || !editingProduct || editingQuantity <= 0) {
+      return;
+    }
+
+    setCartItems(
+      setPublicCartProduct(menu.store.publicSlug, {
+        ...editingItem,
+        itemNote: editingItemNote,
+        quantity: editingQuantity
+      })
+    );
+    closeEditItem();
   }
 
   function removeProduct(lineId: string) {
@@ -154,13 +208,23 @@ export function PublicCartManager({
                     </button>
                   </div>
                   <strong>{formatMoney((product?.priceCents ?? 0) * item.quantity)}</strong>
-                  <button
-                    className="link-button danger-link"
-                    onClick={() => removeProduct(item.lineId)}
-                    type="button"
-                  >
-                    Remover
-                  </button>
+                  <div className="public-cart-row-actions">
+                    <button
+                      className="link-button"
+                      disabled={!product}
+                      onClick={() => openEditItem(item, product)}
+                      type="button"
+                    >
+                      Editar
+                    </button>
+                    <button
+                      className="link-button danger-link"
+                      onClick={() => removeProduct(item.lineId)}
+                      type="button"
+                    >
+                      Remover
+                    </button>
+                  </div>
                 </article>
               ))}
             </div>
@@ -214,7 +278,157 @@ export function PublicCartManager({
           </div>
         </aside>
       </section>
+
+      {editingItem && editingProduct ? (
+        <CartItemEditModal
+          itemNote={editingItemNote}
+          maxQuantity={editingMaxQuantity}
+          onClose={closeEditItem}
+          onDecrease={() => changeEditingQuantity(-1)}
+          onIncrease={() => changeEditingQuantity(1)}
+          onItemNoteChange={setEditingItemNote}
+          onSave={saveEditedItem}
+          product={editingProduct}
+          quantity={editingQuantity}
+        />
+      ) : null}
     </main>
+  );
+}
+
+function CartItemEditModal({
+  itemNote,
+  maxQuantity,
+  onClose,
+  onDecrease,
+  onIncrease,
+  onItemNoteChange,
+  onSave,
+  product,
+  quantity
+}: {
+  itemNote: string;
+  maxQuantity: number;
+  onClose: () => void;
+  onDecrease: () => void;
+  onIncrease: () => void;
+  onItemNoteChange: (value: string) => void;
+  onSave: () => void;
+  product: FoodProductContract;
+  quantity: number;
+}) {
+  const isUnavailable = maxQuantity <= 0;
+  const subtotal = product.priceCents * quantity;
+
+  useEffect(() => {
+    function handleKeyDown(event: KeyboardEvent) {
+      if (event.key === "Escape") {
+        onClose();
+      }
+    }
+
+    window.addEventListener("keydown", handleKeyDown);
+
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [onClose]);
+
+  return (
+    <div className="public-product-modal-backdrop" onClick={onClose} role="presentation">
+      <section
+        aria-labelledby="public-cart-edit-modal-title"
+        aria-modal="true"
+        className="public-product-modal"
+        onClick={(event) => event.stopPropagation()}
+        role="dialog"
+      >
+        <button
+          aria-label="Fechar edicao do item"
+          className="public-product-modal-close"
+          onClick={onClose}
+          type="button"
+        >
+          x
+        </button>
+
+        <div className="public-product-modal-media">
+          {product.imageUrl ? (
+            <img alt={product.name} src={product.imageUrl} />
+          ) : (
+            <span>Sem imagem</span>
+          )}
+        </div>
+
+        <div className="public-product-modal-content">
+          <div>
+            <div className="eyebrow">Editar item</div>
+            <h2 id="public-cart-edit-modal-title">{product.name}</h2>
+            {product.description ? <p>{product.description}</p> : null}
+          </div>
+
+          <div className="public-product-modal-meta">
+            <strong>{formatMoney(product.priceCents)}</strong>
+            <span>
+              {product.stockControlEnabled
+                ? `${maxQuantity} disponivel(is) para esta linha`
+                : "Disponivel para pedido"}
+            </span>
+          </div>
+
+          <div className="public-product-modal-quantity">
+            <span>Quantidade</span>
+            <div className="quantity-control">
+              <button
+                aria-label="Diminuir quantidade"
+                disabled={quantity <= 1 || isUnavailable}
+                onClick={onDecrease}
+                type="button"
+              >
+                -
+              </button>
+              <span>{isUnavailable ? 0 : quantity}</span>
+              <button
+                aria-label="Aumentar quantidade"
+                disabled={isUnavailable || quantity >= maxQuantity}
+                onClick={onIncrease}
+                type="button"
+              >
+                +
+              </button>
+            </div>
+          </div>
+
+          <div className="public-product-modal-total">
+            <span>Subtotal</span>
+            <strong>{formatMoney(isUnavailable ? 0 : subtotal)}</strong>
+          </div>
+
+          <label className="public-product-item-note">
+            Observacao do item
+            <textarea
+              maxLength={300}
+              onChange={(event) => onItemNoteChange(event.target.value)}
+              placeholder="Ex.: sem cebola, molho a parte"
+              rows={3}
+              value={itemNote}
+            />
+          </label>
+
+          <div className="public-product-modal-actions">
+            <button className="secondary-action" onClick={onClose} type="button">
+              Cancelar
+            </button>
+            <button
+              className="primary-action"
+              disabled={isUnavailable}
+              onClick={onSave}
+              type="button"
+            >
+              Atualizar carrinho
+            </button>
+          </div>
+        </div>
+      </section>
+    </div>
   );
 }
 
@@ -236,4 +450,20 @@ function getProductQuantity(items: PublicCartItem[], productId: string): number 
   return items
     .filter((item) => item.productId === productId)
     .reduce((sum, item) => sum + item.quantity, 0);
+}
+
+function getLineMaxQuantity(
+  item: PublicCartItem,
+  product: FoodProductContract,
+  items: PublicCartItem[]
+): number {
+  if (!product.stockControlEnabled) {
+    return 99;
+  }
+
+  const otherProductQuantity = items
+    .filter((cartItem) => cartItem.productId === item.productId && cartItem.lineId !== item.lineId)
+    .reduce((sum, cartItem) => sum + cartItem.quantity, 0);
+
+  return Math.max(product.stockQuantity - otherProductQuantity, 0);
 }

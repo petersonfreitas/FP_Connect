@@ -145,6 +145,7 @@ Este arquivo controla o avanco dos modulos do ecossistema.
 - [x] Logout publico da vitrine por loja
 - [x] Bloqueio de checkout sem login e sem cadastro completo
 - [x] Validacao server-side de carrinho publico
+- [x] Carrinho publico com linhas separadas por observacao e edicao de quantidade/observacao por linha
 - [x] Pedido publico vinculado ao consumidor autenticado
 - [x] Criacao de pedido interno V0
 - [x] Painel interno de pedidos
@@ -160,6 +161,8 @@ Este arquivo controla o avanco dos modulos do ecossistema.
 - [x] Smoke test publico com cartao Mercado Pago sandbox
 - [ ] Smoke test publico com cartao de debito Mercado Pago sandbox
 - [x] Retentativa publica de pagamento com cartao sem duplicar pedido
+- [ ] Grupos de complementos por produto com ingredientes inclusos removiveis
+- [ ] Snapshot de complementos no carrinho e nos itens do pedido
 - [ ] Realtime futuro para pedidos, cozinha e acompanhamento publico
 - [x] Eventos de pedido para Robots
 - [ ] Integracao com Tracking

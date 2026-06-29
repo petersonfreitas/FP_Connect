@@ -2421,6 +2421,13 @@ textarea {
   font-weight: 800;
 }
 
+.public-cart-row-actions {
+  align-items: flex-start;
+  display: grid;
+  gap: 8px;
+  justify-items: start;
+}
+
 .public-cart-item-image {
   background: #ffffff;
   border: 1px solid var(--line);
