@@ -13,6 +13,7 @@
   "devDependencies": {
     "@nestjs/cli": "11.0.23",
     "@nestjs/schematics": "11.1.0",
+    "@types/express": "^5.0.6",
     "@types/node": "25.9.2",
     "typescript": "6.0.3"
   },
@@ -21,8 +22,10 @@
     "@nestjs/core": "11.1.26",
     "@nestjs/platform-express": "11.1.26",
     "@supabase/supabase-js": "2.108.1",
+    "express": "^5.2.1",
     "mercadopago": "^3.1.0",
     "reflect-metadata": "0.2.2",
-    "rxjs": "7.8.2"
+    "rxjs": "7.8.2",
+    "sharp": "^0.35.2"
   }
 }

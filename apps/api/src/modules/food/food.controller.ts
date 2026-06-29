@@ -20,6 +20,7 @@ import type {
   FoodOrderStatus,
   UpdateFoodOrderPaymentInput,
   UpdateFoodOrderStatusInput,
+  UploadFoodProductImageInput,
   UpsertFoodCategoryInput,
   UpsertFoodProductInput,
   UpsertFoodStoreHoursInput,
@@ -193,6 +194,20 @@ export class FoodController {
     @Param("productId") productId: string
   ) {
     return this.foodService.upsertProduct(companyId, actorUserId, input, productId);
+  }
+
+  @Post("products/:productId/image")
+  @ModuleAccessPolicy({
+    applicationKey: "food",
+    companyHeader: "x-fp-company-id",
+    permissionKey: "food.access"
+  })
+  uploadProductImage(
+    @Body() input: UploadFoodProductImageInput,
+    @Headers("x-fp-company-id") companyId: string,
+    @Param("productId") productId: string
+  ) {
+    return this.foodService.uploadProductImage(companyId, productId, input);
   }
 
   @Get("stock/movements")

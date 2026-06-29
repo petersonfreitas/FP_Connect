@@ -28,6 +28,8 @@ import type {
   UpdateFoodOrderPaymentInput,
   UpdateFoodOrderStatusInput,
   UpdateFoodPublicCustomerProfileInput,
+  UploadFoodProductImageContract,
+  UploadFoodProductImageInput,
   UpsertFoodPublicCustomerAddressInput,
   ValidatePublicFoodCartInput,
   FoodPublicCartValidationContract,
@@ -234,6 +236,20 @@ export async function updateFoodProduct(
       "X-FP-Company-Id": companyId
     },
     method: "PATCH"
+  });
+}
+
+export async function uploadFoodProductImage(
+  companyId: string,
+  productId: string,
+  input: UploadFoodProductImageInput
+): Promise<InternalApiResult<UploadFoodProductImageContract>> {
+  return fetchInternal<UploadFoodProductImageContract>(`food/products/${productId}/image`, {
+    body: JSON.stringify(input),
+    headers: {
+      "X-FP-Company-Id": companyId
+    },
+    method: "POST"
   });
 }
 

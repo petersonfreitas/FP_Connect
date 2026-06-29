@@ -37,6 +37,7 @@ import {
   updateFoodOrderPayment,
   updateFoodOrderStatus,
   updateFoodProduct,
+  uploadFoodProductImage,
   updatePublicFoodCustomerAddress,
   updatePublicFoodCustomerProfile,
   upsertFoodStore
@@ -84,6 +85,8 @@ const validCustomerContactMethods = new Set<FoodCustomerPreferredContactMethod>(
   "landline",
   "whatsapp"
 ]);
+const validProductImageTypes = new Set(["image/jpeg", "image/png", "image/webp"]);
+const productImageMaxBytes = 3 * 1024 * 1024;
 
 export async function saveFoodStoreAction(formData: FormData): Promise<void> {
   const companyId = String(formData.get("companyId") ?? "").trim();
@@ -135,10 +138,12 @@ export async function saveFoodCategoryAction(formData: FormData): Promise<void> 
 export async function saveFoodProductAction(formData: FormData): Promise<void> {
   const companyId = requireCompanyId(formData);
   const productId = optionalText(formData.get("productId"));
+  const imageFile = readProductImageFile(formData);
+  const removeImage = formData.get("removeImage") === "on";
   const input: UpsertFoodProductInput = {
     categoryId: optionalText(formData.get("categoryId")),
     description: optionalText(formData.get("description")),
-    imageUrl: optionalText(formData.get("imageUrl")),
+    imageUrl: removeImage && !imageFile ? null : optionalText(formData.get("imageUrl")),
     name: String(formData.get("name") ?? ""),
     priceCents: parseMoneyToCents(formData.get("price")),
     slug: optionalText(formData.get("slug")),
@@ -147,14 +152,85 @@ export async function saveFoodProductAction(formData: FormData): Promise<void> {
     stockControlEnabled: formData.get("stockControlEnabled") === "on",
     stockMinQuantity: optionalInteger(formData.get("stockMinQuantity")) ?? 0
   };
+
+  if (productId && imageFile) {
+    const imageInput = await buildProductImageUploadInput(imageFile);
+
+    if (imageInput.error || !imageInput.data) {
+      redirectWithResult(
+        "/cadastro/produtos",
+        companyId,
+        imageInput.error ?? "Imagem do produto invalida.",
+        "productUpdated"
+      );
+    }
+
+    const imageData = imageInput.data;
+    const uploadResult = await uploadFoodProductImage(companyId, productId, imageData);
+
+    if (uploadResult.error || !uploadResult.data) {
+      redirectWithResult(
+        "/cadastro/produtos",
+        companyId,
+        uploadResult.error ?? "Nao foi possivel enviar a imagem do produto.",
+        "productUpdated"
+      );
+    }
+
+    input.imageUrl = uploadResult.data.imageUrl;
+  }
+
   const result = productId
     ? await updateFoodProduct(companyId, productId, input)
     : await createFoodProduct(companyId, input);
 
+  if (result.error || !result.data) {
+    redirectWithResult(
+      "/cadastro/produtos",
+      companyId,
+      result.error,
+      productId ? "productUpdated" : "productCreated"
+    );
+  }
+
+  if (!productId && imageFile) {
+    const imageInput = await buildProductImageUploadInput(imageFile);
+
+    if (imageInput.error || !imageInput.data) {
+      redirectWithResult(
+        "/cadastro/produtos",
+        companyId,
+        imageInput.error ?? "Imagem do produto invalida.",
+        "productCreated"
+      );
+    }
+
+    const imageData = imageInput.data;
+    const uploadResult = await uploadFoodProductImage(companyId, result.data.id, imageData);
+
+    if (uploadResult.error || !uploadResult.data) {
+      redirectWithResult(
+        "/cadastro/produtos",
+        companyId,
+        uploadResult.error ?? "Nao foi possivel enviar a imagem do produto.",
+        "productCreated"
+      );
+    }
+
+    const updateResult = await updateFoodProduct(companyId, result.data.id, {
+      ...input,
+      imageUrl: uploadResult.data.imageUrl
+    });
+
+    if (updateResult.error) {
+      redirectWithResult("/cadastro/produtos", companyId, updateResult.error, "productCreated");
+    }
+  }
+
   redirectWithResult(
     "/cadastro/produtos",
     companyId,
-    result.error,
+    null,
     productId ? "productUpdated" : "productCreated"
   );
 }
@@ -634,6 +710,54 @@ function buildPublicCustomerAddressInput(
     reference: optionalText(formData.get("reference")),
     state: String(formData.get("state") ?? ""),
     street: String(formData.get("street") ?? "")
+  };
+}
+
+function readProductImageFile(formData: FormData): File | null {
+  const value = formData.get("imageFile");
+
+  if (!(value instanceof File) || value.size === 0) {
+    return null;
+  }
+
+  return value;
+}
+
+async function buildProductImageUploadInput(file: File): Promise<
+  | {
+      data: {
+        contentBase64: string;
+        contentType: string;
+        fileName: string;
+      };
+      error: null;
+    }
+  | {
+      data: null;
+      error: string;
+    }
+> {
+  if (!validProductImageTypes.has(file.type)) {
+    return {
+      data: null,
+      error: "Imagem do produto deve ser JPG, PNG ou WEBP."
+    };
+  }
+
+  if (file.size > productImageMaxBytes) {
+    return {
+      data: null,
+      error: "Imagem do produto deve ter no maximo 3 MB."
+    };
+  }
+
+  return {
+    data: {
+      contentBase64: Buffer.from(await file.arrayBuffer()).toString("base64"),
+      contentType: file.type,
+      fileName: file.name
+    },
+    error: null
   };
 }
 

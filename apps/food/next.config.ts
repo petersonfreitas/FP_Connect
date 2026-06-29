@@ -5,6 +5,11 @@ import type { NextConfig } from "next";
 const workspaceRoot = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
 
 const nextConfig: NextConfig = {
+  experimental: {
+    serverActions: {
+      bodySizeLimit: "6mb"
+    }
+  },
   reactStrictMode: true,
   turbopack: {
     root: workspaceRoot

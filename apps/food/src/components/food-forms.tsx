@@ -451,10 +451,31 @@ export function ProductForm({
         </label>
       </div>
 
-      <label>
-        Imagem URL
-        <input defaultValue={product?.imageUrl ?? ""} maxLength={500} name="imageUrl" type="url" />
-      </label>
+      <div className="product-image-field">
+        <input name="imageUrl" type="hidden" value={product?.imageUrl ?? ""} />
+        <div className="product-image-preview">
+          {product?.imageUrl ? (
+            <img alt={product.name} src={product.imageUrl} />
+          ) : (
+            <span>Sem imagem</span>
+          )}
+        </div>
+        <div>
+          <label>
+            Imagem do produto
+            <input accept="image/jpeg,image/png,image/webp" name="imageFile" type="file" />
+          </label>
+          <p className="muted-copy">
+            Use JPG, PNG ou WEBP de ate 3 MB. A imagem aparece na vitrine e no carrinho.
+          </p>
+          {product?.imageUrl ? (
+            <label className="checkbox-field product-remove-image">
+              <input name="removeImage" type="checkbox" />
+              Remover imagem atual ao salvar
+            </label>
+          ) : null}
+        </div>
+      </div>
 
       <div className="form-footer">
         <span>{product ? "Alteracoes emitem food.menu.updated." : "Produtos disponiveis aparecem na previa."}</span>

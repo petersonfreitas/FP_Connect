@@ -1,5 +1,6 @@
 import "reflect-metadata";
 import { NestFactory } from "@nestjs/core";
+import { json, urlencoded } from "express";
 import { existsSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { cwd, loadEnvFile } from "node:process";
@@ -10,7 +11,11 @@ import { requestMetricsMiddleware } from "./observability/request-metrics.middle
 loadLocalEnv();
 
 async function bootstrap() {
-  const app = await NestFactory.create(AppModule);
+  const app = await NestFactory.create(AppModule, {
+    bodyParser: false
+  });
+  app.use(json({ limit: "6mb" }));
+  app.use(urlencoded({ extended: true, limit: "6mb" }));
   app.use(requestMetricsMiddleware);
   app.setGlobalPrefix("api");
 

@@ -109,6 +109,13 @@ export function PublicCartManager({
             <div className="public-cart-list">
               {cartRows.map(({ item, product }) => (
                 <article className="public-cart-edit-row" key={item.productId}>
+                  {product?.imageUrl ? (
+                    <img alt={product.name} className="public-cart-item-image" src={product.imageUrl} />
+                  ) : (
+                    <span className="public-cart-item-image placeholder" aria-hidden="true">
+                      Foto
+                    </span>
+                  )}
                   <div>
                     <strong>{product?.name ?? "Produto indisponivel"}</strong>
                     {product ? (

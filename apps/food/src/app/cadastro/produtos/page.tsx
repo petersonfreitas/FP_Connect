@@ -113,6 +113,7 @@ export default async function ProductsPage({ searchParams }: ProductsPageProps) 
             {products.length > 0 ? (
               <div className="data-table" role="table" aria-label="Produtos cadastrados">
                 <div className="data-row food-products-row data-row-head" role="row">
+                  <span>Imagem</span>
                   <span>Produto</span>
                   <span>Categoria</span>
                   <span>Preco</span>
@@ -122,6 +123,17 @@ export default async function ProductsPage({ searchParams }: ProductsPageProps) 
                 </div>
                 {products.map((product) => (
                   <div className="data-row food-products-row" role="row" key={product.id}>
+                    <span>
+                      {product.imageUrl ? (
+                        <img
+                          alt={product.name}
+                          className="product-list-image"
+                          src={product.imageUrl}
+                        />
+                      ) : (
+                        <span className="product-list-placeholder">Sem foto</span>
+                      )}
+                    </span>
                     <span>
                       <strong>{product.name}</strong>
                       <small>{product.slug}</small>

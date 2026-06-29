@@ -180,7 +180,11 @@ function PublicProductCard({
     <article className="public-product-card">
       {product.imageUrl ? (
         <img alt={product.name} className="public-product-image" src={product.imageUrl} />
-      ) : null}
+      ) : (
+        <div className="public-product-image public-product-image-placeholder" aria-hidden="true">
+          <span>Sem imagem</span>
+        </div>
+      )}
       <div className="public-product-body">
         <div>
           <h3>{product.name}</h3>

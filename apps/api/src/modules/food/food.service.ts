@@ -6,6 +6,7 @@ import {
   NotFoundException
 } from "@nestjs/common";
 import { randomUUID } from "node:crypto";
+import sharp from "sharp";
 import { GatewayService } from "../gateway/gateway.service";
 import type { GatewayPaymentRequestContract } from "../gateway/gateway.contracts";
 import { RobotsService } from "../robots/robots.service";
@@ -58,6 +59,8 @@ import type {
   UpdateFoodOrderPaymentInput,
   UpdateFoodOrderStatusInput,
   UpdateFoodPublicCustomerProfileInput,
+  UploadFoodProductImageContract,
+  UploadFoodProductImageInput,
   UpsertFoodPublicCustomerAddressInput,
   UpsertFoodCategoryInput,
   UpsertFoodProductInput,
@@ -359,6 +362,10 @@ const productSelect = [
   "created_at",
   "updated_at"
 ].join(",");
+
+const foodProductImagesBucket = "food-product-images";
+const foodProductImageMaxBytes = 3 * 1024 * 1024;
+const foodProductImageContentTypes = new Set(["image/jpeg", "image/png", "image/webp"]);
 
 const stockMovementSelect = [
   "id",
@@ -818,6 +825,49 @@ export class FoodService {
     await this.emitMenuUpdated(companyId, actorUserId, "product", product.id);
 
     return product;
+  }
+
+  async uploadProductImage(
+    companyId: string,
+    productId: string,
+    input: UploadFoodProductImageInput
+  ): Promise<UploadFoodProductImageContract> {
+    const normalizedProductId = normalizeUuid(productId, "productId");
+    const productsById = await this.listProductsByIds(companyId, [normalizedProductId]);
+    const product = productsById.get(normalizedProductId);
+
+    if (!product) {
+      throw new NotFoundException("Produto Food nao encontrado");
+    }
+
+    const file = normalizeProductImageInput(input);
+    const webpBuffer = await convertProductImageToWebp(file.buffer);
+    const objectPath = [
+      "food-products",
+      companyId,
+      normalizedProductId,
+      `${Date.now()}-${slugify(file.fileName)}-${randomUUID()}.webp`
+    ].join("/");
+    const { error } = await this.supabase.admin.storage
+      .from(foodProductImagesBucket)
+      .upload(objectPath, webpBuffer, {
+        cacheControl: "31536000",
+        contentType: "image/webp",
+        upsert: false
+      });
+
+    if (error) {
+      throw new InternalServerErrorException(`Nao foi possivel enviar imagem: ${error.message}`);
+    }
+
+    const { data } = this.supabase.admin.storage
+      .from(foodProductImagesBucket)
+      .getPublicUrl(objectPath);
+
+    return {
+      imageUrl: data.publicUrl,
+      path: objectPath
+    };
   }
 
   async listStockMovements(
@@ -3574,6 +3624,56 @@ function normalizeProductStatus(value: unknown): FoodProductStatus {
   }
 
   return value as FoodProductStatus;
+}
+
+function normalizeProductImageInput(input: UploadFoodProductImageInput): {
+  buffer: Buffer;
+  contentType: string;
+  fileName: string;
+} {
+  const contentType = normalizeRequiredText(input.contentType, "contentType", 120).toLowerCase();
+
+  if (!foodProductImageContentTypes.has(contentType)) {
+    throw new BadRequestException("Imagem do produto deve ser JPG, PNG ou WEBP");
+  }
+
+  const fileName = normalizeRequiredText(input.fileName, "fileName", 180);
+  const contentBase64 = normalizeRequiredText(input.contentBase64, "contentBase64", 5_000_000);
+  const buffer = Buffer.from(contentBase64, "base64");
+
+  if (buffer.length === 0) {
+    throw new BadRequestException("Imagem do produto esta vazia");
+  }
+
+  if (buffer.length > foodProductImageMaxBytes) {
+    throw new BadRequestException("Imagem do produto deve ter no maximo 3 MB");
+  }
+
+  return {
+    buffer,
+    contentType,
+    fileName
+  };
+}
+
+async function convertProductImageToWebp(buffer: Buffer): Promise<Buffer> {
+  try {
+    return await sharp(buffer)
+      .rotate()
+      .resize({
+        fit: "inside",
+        height: 900,
+        withoutEnlargement: true,
+        width: 1200
+      })
+      .webp({
+        effort: 4,
+        quality: 82
+      })
+      .toBuffer();
+  } catch {
+    throw new BadRequestException("Nao foi possivel processar a imagem do produto");
+  }
 }
 
 function normalizeOrderStatus(value: unknown): FoodOrderStatus {

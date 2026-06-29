@@ -120,6 +120,17 @@ export type UpsertFoodProductInput = {
   sortOrder?: number | null;
 };
 
+export type UploadFoodProductImageInput = {
+  contentBase64: string;
+  contentType: string;
+  fileName: string;
+};
+
+export type UploadFoodProductImageContract = {
+  imageUrl: string;
+  path: string;
+};
+
 export type FoodStockMovementContract = {
   batchCode: string | null;
   companyId: string;
