@@ -205,9 +205,10 @@ export class FoodController {
   uploadProductImage(
     @Body() input: UploadFoodProductImageInput,
     @Headers("x-fp-company-id") companyId: string,
+    @Headers("x-fp-actor-user-id") actorUserId: string,
     @Param("productId") productId: string
   ) {
-    return this.foodService.uploadProductImage(companyId, productId, input);
+    return this.foodService.uploadProductImage(companyId, actorUserId, productId, input);
   }
 
   @Get("stock/movements")

@@ -3,6 +3,7 @@ import {
   ForbiddenException,
   Injectable,
   InternalServerErrorException,
+  Logger,
   NotFoundException
 } from "@nestjs/common";
 import { randomUUID } from "node:crypto";
@@ -540,6 +541,8 @@ const saoPauloTimeZone = "America/Sao_Paulo";
 
 @Injectable()
 export class FoodService {
+  private readonly logger = new Logger(FoodService.name);
+
   constructor(
     private readonly gateway: GatewayService,
     private readonly supabase: SupabaseService,
@@ -782,6 +785,15 @@ export class FoodService {
     productId?: string
   ): Promise<FoodProductContract> {
     const store = await this.findStore(companyId);
+    const normalizedProductId = productId ? normalizeUuid(productId, "productId") : null;
+    const currentProduct = normalizedProductId
+      ? await this.findProductById(companyId, normalizedProductId)
+      : null;
+
+    if (normalizedProductId && !currentProduct) {
+      throw new NotFoundException("Produto Food nao encontrado");
+    }
+
     const normalized = await this.normalizeProductInput(companyId, input);
     const row = {
       category_id: normalized.categoryId,
@@ -803,7 +815,7 @@ export class FoodService {
       ? await this.supabase.food
           .from("products")
           .update(row)
-          .eq("id", productId)
+          .eq("id", normalizedProductId)
           .eq("company_id", companyId)
           .is("deleted_at", null)
           .select(productSelect)
@@ -822,6 +834,10 @@ export class FoodService {
     }
 
     const product = mapProduct(data as unknown as FoodProductRow);
+    if (currentProduct?.imageUrl && currentProduct.imageUrl !== product.imageUrl) {
+      await this.removeProductImageObject(companyId, product.id, currentProduct.imageUrl);
+    }
+
     await this.emitMenuUpdated(companyId, actorUserId, "product", product.id);
 
     return product;
@@ -829,6 +845,7 @@ export class FoodService {
 
   async uploadProductImage(
     companyId: string,
+    actorUserId: string,
     productId: string,
     input: UploadFoodProductImageInput
   ): Promise<UploadFoodProductImageContract> {
@@ -863,11 +880,66 @@ export class FoodService {
     const { data } = this.supabase.admin.storage
       .from(foodProductImagesBucket)
       .getPublicUrl(objectPath);
+    const { error: updateError } = await this.supabase.food
+      .from("products")
+      .update({
+        image_url: data.publicUrl,
+        updated_by: actorUserId
+      })
+      .eq("id", normalizedProductId)
+      .eq("company_id", companyId)
+      .is("deleted_at", null)
+      .select("id")
+      .single();
+
+    if (updateError) {
+      await this.removeProductImageObjectByPath(objectPath);
+      throwSupabaseError(updateError);
+    }
+
+    if (product.imageUrl && product.imageUrl !== data.publicUrl) {
+      await this.removeProductImageObject(companyId, normalizedProductId, product.imageUrl);
+    }
+
+    await this.emitMenuUpdated(companyId, actorUserId, "product", normalizedProductId);
 
     return {
       imageUrl: data.publicUrl,
       path: objectPath
     };
+  }
+
+  private async findProductById(
+    companyId: string,
+    productId: string
+  ): Promise<FoodProductContract | null> {
+    const productsById = await this.listProductsByIds(companyId, [productId]);
+
+    return productsById.get(productId) ?? null;
+  }
+
+  private async removeProductImageObject(
+    companyId: string,
+    productId: string,
+    imageUrl: string
+  ): Promise<void> {
+    const objectPath = extractProductImageObjectPath(companyId, productId, imageUrl);
+
+    if (!objectPath) {
+      return;
+    }
+
+    await this.removeProductImageObjectByPath(objectPath);
+  }
+
+  private async removeProductImageObjectByPath(objectPath: string): Promise<void> {
+    const { error } = await this.supabase.admin.storage
+      .from(foodProductImagesBucket)
+      .remove([objectPath]);
+
+    if (error) {
+      this.logger.warn(`Nao foi possivel remover imagem Food ${objectPath}: ${error.message}`);
+    }
   }
 
   async listStockMovements(
@@ -3981,6 +4053,38 @@ function normalizeOptionalUrl(value: unknown, field: string, maxLength: number):
   }
 
   return normalized;
+}
+
+function extractProductImageObjectPath(
+  companyId: string,
+  productId: string,
+  imageUrl: string
+): string | null {
+  let pathname: string;
+
+  try {
+    pathname = new URL(imageUrl).pathname;
+  } catch {
+    return null;
+  }
+
+  const publicObjectMarker = `/object/public/${foodProductImagesBucket}/`;
+  const markerIndex = pathname.indexOf(publicObjectMarker);
+
+  if (markerIndex === -1) {
+    return null;
+  }
+
+  const objectPath = decodeURIComponent(
+    pathname.slice(markerIndex + publicObjectMarker.length)
+  );
+  const expectedPrefix = `food-products/${companyId}/${productId}/`;
+
+  if (!objectPath.startsWith(expectedPrefix) || !objectPath.endsWith(".webp")) {
+    return null;
+  }
+
+  return objectPath;
 }
 
 function mapStore(row: FoodStoreRow): FoodStoreContract {

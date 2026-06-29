@@ -140,10 +140,11 @@ export async function saveFoodProductAction(formData: FormData): Promise<void> {
   const productId = optionalText(formData.get("productId"));
   const imageFile = readProductImageFile(formData);
   const removeImage = formData.get("removeImage") === "on";
+  const shouldRemoveImage = removeImage && !imageFile;
   const input: UpsertFoodProductInput = {
     categoryId: optionalText(formData.get("categoryId")),
     description: optionalText(formData.get("description")),
-    imageUrl: removeImage && !imageFile ? null : optionalText(formData.get("imageUrl")),
+    imageUrl: shouldRemoveImage ? null : optionalText(formData.get("imageUrl")),
     name: String(formData.get("name") ?? ""),
     priceCents: parseMoneyToCents(formData.get("price")),
     slug: optionalText(formData.get("slug")),

@@ -746,9 +746,28 @@ textarea {
   width: 100%;
 }
 
+.product-image-actions {
+  display: grid;
+  gap: 10px;
+}
+
+.product-image-replace-hint {
+  background: #eef8f3;
+  border: 1px solid #b7dfca;
+  border-radius: 8px;
+  color: #17643d;
+  font-size: 0.82rem;
+  font-weight: 800;
+  padding: 8px 10px;
+}
+
 .product-remove-image {
   color: var(--muted);
   margin-top: 10px;
+}
+
+.product-remove-image:has(input:disabled) {
+  opacity: 0.55;
 }
 
 .form-actions {
