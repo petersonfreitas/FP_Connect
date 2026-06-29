@@ -97,6 +97,7 @@ export default async function ProductsPage({ searchParams }: ProductsPageProps) 
             <ProductForm
               categories={categories}
               companyId={selectedCompany.company.id}
+              key={editingProduct?.id ?? "new-product"}
               product={editingProduct}
             />
           </section>
