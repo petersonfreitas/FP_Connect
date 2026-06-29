@@ -7,7 +7,7 @@ import {
   signOut,
   updatePasswordWithRecoveryToken
 } from "./auth";
-import { activateCurrentUserInvite } from "./internal-api";
+import { activateCurrentUserInvite, getCurrentAdminAccess } from "./internal-api";
 
 export async function signInAction(formData: FormData): Promise<void> {
   const email = String(formData.get("email") ?? "");
@@ -18,6 +18,16 @@ export async function signInAction(formData: FormData): Promise<void> {
   if (!result.ok) {
     const nextParam = next ? `&next=${encodeURIComponent(next)}` : "";
     redirect(`/login?error=${encodeURIComponent(result.error)}${nextParam}`);
+  }
+
+  const accessResult = await getCurrentAdminAccess();
+
+  if (!hasConsolePortalAccess(accessResult.data)) {
+    await signOut();
+    const nextParam = next ? `&next=${encodeURIComponent(next)}` : "";
+    const error =
+      "Este usuario nao possui acesso ao portal FP Connect. Use o login da vitrine publica da loja correta.";
+    redirect(`/login?error=${encodeURIComponent(error)}${nextParam}`);
   }
 
   redirect(next || "/");
@@ -76,4 +86,10 @@ function normalizeRedirectPath(value: string): string {
   }
 
   return path;
+}
+
+function hasConsolePortalAccess(
+  access: Awaited<ReturnType<typeof getCurrentAdminAccess>>["data"]
+): boolean {
+  return Boolean(access && (access.isSuperAdmin || access.isPlatformUser || access.companies.length > 0));
 }

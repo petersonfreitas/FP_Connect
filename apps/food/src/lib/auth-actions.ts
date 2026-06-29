@@ -7,6 +7,7 @@ import {
   signOut,
   signOutPublicStore
 } from "./auth";
+import { getCurrentAdminAccess } from "./internal-api";
 import {
   createFallbackPublicStoreContext,
   normalizePublicSlug,
@@ -23,6 +24,16 @@ export async function signInAction(formData: FormData): Promise<void> {
   if (!result.ok) {
     const nextParam = next ? `&next=${encodeURIComponent(next)}` : "";
     redirect(`/login?error=${encodeURIComponent(result.error)}${nextParam}`);
+  }
+
+  const accessResult = await getCurrentAdminAccess();
+
+  if (!hasFoodPortalAccess(accessResult.data)) {
+    await signOut();
+    const nextParam = next ? `&next=${encodeURIComponent(next)}` : "";
+    const error =
+      "Este usuario nao possui acesso ao portal operacional do FP Food. Use o login da vitrine publica da loja correta.";
+    redirect(`/login?error=${encodeURIComponent(error)}${nextParam}`);
   }
 
   redirect(next || "/");
@@ -73,4 +84,14 @@ function normalizeRedirectPath(value: string): string {
   }
 
   return path;
+}
+
+function hasFoodPortalAccess(
+  access: Awaited<ReturnType<typeof getCurrentAdminAccess>>["data"]
+): boolean {
+  return Boolean(
+    access?.companies.some((companyAccess) =>
+      companyAccess.modules.some((moduleAccess) => moduleAccess.applicationKey === "food")
+    )
+  );
 }
