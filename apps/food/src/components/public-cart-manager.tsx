@@ -6,9 +6,8 @@ import { PublicCustomerMenu } from "@/components/public-customer-menu";
 import {
   clearPublicCart,
   getPublicCartItemCount,
-  getPublicCartQuantity,
   readPublicCart,
-  setPublicCartProductQuantity,
+  setPublicCartLineQuantity,
   type PublicCartItem
 } from "@/lib/public-cart-store";
 import {
@@ -54,14 +53,19 @@ export function PublicCartManager({
     setCartItems(readPublicCart(menu.store.publicSlug));
   }, [menu.store.publicSlug]);
 
-  function updateQuantity(product: FoodProductContract | null, productId: string, quantity: number) {
-    const maxQuantity = product?.stockControlEnabled ? product.stockQuantity : 99;
+  function updateQuantity(item: PublicCartItem, product: FoodProductContract | null, quantity: number) {
+    const otherProductQuantity = cartItems
+      .filter((cartItem) => cartItem.productId === item.productId && cartItem.lineId !== item.lineId)
+      .reduce((sum, cartItem) => sum + cartItem.quantity, 0);
+    const maxQuantity = product?.stockControlEnabled
+      ? Math.max(product.stockQuantity - otherProductQuantity, 0)
+      : 99;
     const nextQuantity = Math.min(Math.max(quantity, 0), maxQuantity);
-    setCartItems(setPublicCartProductQuantity(menu.store.publicSlug, productId, nextQuantity));
+    setCartItems(setPublicCartLineQuantity(menu.store.publicSlug, item.lineId, nextQuantity));
   }
 
-  function removeProduct(productId: string) {
-    setCartItems(setPublicCartProductQuantity(menu.store.publicSlug, productId, 0));
+  function removeProduct(lineId: string) {
+    setCartItems(setPublicCartLineQuantity(menu.store.publicSlug, lineId, 0));
   }
 
   function clearCart() {
@@ -108,7 +112,7 @@ export function PublicCartManager({
           {cartRows.length > 0 ? (
             <div className="public-cart-list">
               {cartRows.map(({ item, product }) => (
-                <article className="public-cart-edit-row" key={item.productId}>
+                <article className="public-cart-edit-row" key={item.lineId}>
                   {product?.imageUrl ? (
                     <img alt={product.name} className="public-cart-item-image" src={product.imageUrl} />
                   ) : (
@@ -130,19 +134,20 @@ export function PublicCartManager({
                   <div className="quantity-control">
                     <button
                       aria-label="Diminuir quantidade"
-                      onClick={() => updateQuantity(product, item.productId, item.quantity - 1)}
+                      onClick={() => updateQuantity(item, product, item.quantity - 1)}
                       type="button"
                     >
                       -
                     </button>
-                    <span>{getPublicCartQuantity(cartItems, item.productId)}</span>
+                    <span>{item.quantity}</span>
                     <button
                       aria-label="Aumentar quantidade"
                       disabled={
                         !product ||
-                        (product.stockControlEnabled && item.quantity >= product.stockQuantity)
+                        (product.stockControlEnabled &&
+                          getProductQuantity(cartItems, item.productId) >= product.stockQuantity)
                       }
-                      onClick={() => updateQuantity(product, item.productId, item.quantity + 1)}
+                      onClick={() => updateQuantity(item, product, item.quantity + 1)}
                       type="button"
                     >
                       +
@@ -151,7 +156,7 @@ export function PublicCartManager({
                   <strong>{formatMoney((product?.priceCents ?? 0) * item.quantity)}</strong>
                   <button
                     className="link-button danger-link"
-                    onClick={() => removeProduct(item.productId)}
+                    onClick={() => removeProduct(item.lineId)}
                     type="button"
                   >
                     Remover
@@ -225,4 +230,10 @@ function formatMoney(value: number): string {
     currency: "BRL",
     style: "currency"
   }).format(value / 100);
+}
+
+function getProductQuantity(items: PublicCartItem[], productId: string): number {
+  return items
+    .filter((item) => item.productId === productId)
+    .reduce((sum, item) => sum + item.quantity, 0);
 }

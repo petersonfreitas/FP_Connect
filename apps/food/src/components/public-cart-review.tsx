@@ -3,6 +3,7 @@
 import Script from "next/script";
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
 import type {
+  CreateFoodOrderItemInput,
   CreatePublicFoodCheckoutContract,
   CreatePublicFoodCheckoutInput,
   FoodOrderFulfillmentMethod,
@@ -185,10 +186,8 @@ export function PublicCartReview({
     () =>
       validation?.items
         .filter((item) => item.status === "available")
-        .map((item) => ({
-          itemNote:
-            cartItems.find((cartItem) => cartItem.productId === item.productId)?.itemNote ??
-            null,
+        .map((item, index) => ({
+          itemNote: cartItems[index]?.itemNote ?? null,
           productId: item.productId,
           quantity: item.quantity
         })) ?? [],
@@ -531,27 +530,30 @@ export function PublicCartReview({
                   <span>Subtotal</span>
                   <span>Status</span>
                 </div>
-                {validation.items.map((item) => (
-                  <div className="data-row public-review-row" role="row" key={item.productId}>
-                    <span>
-                      {item.productName ?? "Produto indisponivel"}
-                      {cartItems.find((cartItem) => cartItem.productId === item.productId)
-                        ?.itemNote ? (
-                        <small className="public-item-note">
-                          Obs.:{" "}
-                          {
-                            cartItems.find((cartItem) => cartItem.productId === item.productId)
-                              ?.itemNote
-                          }
-                        </small>
-                      ) : null}
-                    </span>
-                    <span>{item.quantity}</span>
-                    <span>{formatMoney(item.unitPriceCents)}</span>
-                    <span>{formatMoney(item.totalPriceCents)}</span>
-                    <span>{formatStatus(item.status)}</span>
-                  </div>
-                ))}
+                {validation.items.map((item, index) => {
+                  const cartItem = cartItems[index] ?? null;
+
+                  return (
+                    <div
+                      className="data-row public-review-row"
+                      role="row"
+                      key={`${item.productId}:${index}`}
+                    >
+                      <span>
+                        {item.productName ?? "Produto indisponivel"}
+                        {cartItem?.itemNote ? (
+                          <small className="public-item-note">
+                            Obs.: {cartItem.itemNote}
+                          </small>
+                        ) : null}
+                      </span>
+                      <span>{item.quantity}</span>
+                      <span>{formatMoney(item.unitPriceCents)}</span>
+                      <span>{formatMoney(item.totalPriceCents)}</span>
+                      <span>{formatStatus(item.status)}</span>
+                    </div>
+                  );
+                })}
               </div>
             ) : (
               <div className="empty-state public-empty-cart">
@@ -1102,7 +1104,7 @@ function buildCheckoutPayload({
   customerNote: string;
   deliveryAddressId: string | null;
   fulfillmentMethod: FoodOrderFulfillmentMethod;
-  items: PublicCartItem[];
+  items: CreateFoodOrderItemInput[];
   payment: CreatePublicFoodCheckoutInput["payment"];
   publicSlug: string;
 }): Omit<CreatePublicFoodCheckoutInput, "authUserId" | "email"> & { publicSlug: string } {

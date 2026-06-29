@@ -4,10 +4,10 @@ import { useEffect, useMemo, useState } from "react";
 import type { FoodMenuContract, FoodProductContract } from "@fp/types";
 import { PublicCustomerMenu } from "@/components/public-customer-menu";
 import {
+  addPublicCartProduct,
   getPublicCartItemCount,
   getPublicCartQuantity,
-  readPublicCart,
-  setPublicCartProduct
+  readPublicCart
 } from "@/lib/public-cart-store";
 import { storeUrl, type PublicStoreUrlContext } from "@/lib/public-store-urls";
 
@@ -45,14 +45,11 @@ export function PublicStorefront({
   }, [menu.store.publicSlug]);
 
   function openProductDetail(product: FoodProductContract) {
-    const currentQuantity = getPublicCartQuantity(cartItems, product.id);
-    const currentItem = cartItems.find((item) => item.productId === product.id);
-    const maxQuantity = getProductMaxQuantity(product);
-    const initialQuantity = currentQuantity > 0 ? currentQuantity : 1;
+    const maxQuantity = getAvailableProductQuantity(product, cartItems);
 
     setSelectedProduct(product);
-    setSelectedQuantity(Math.min(initialQuantity, maxQuantity));
-    setSelectedItemNote(currentItem?.itemNote ?? "");
+    setSelectedQuantity(Math.min(1, maxQuantity));
+    setSelectedItemNote("");
   }
 
   function closeProductDetail() {
@@ -66,7 +63,7 @@ export function PublicStorefront({
       return;
     }
 
-    const maxQuantity = getProductMaxQuantity(selectedProduct);
+    const maxQuantity = getAvailableProductQuantity(selectedProduct, cartItems);
     const nextQuantity = Math.min(Math.max(selectedQuantity + delta, 1), maxQuantity);
 
     setSelectedQuantity(nextQuantity);
@@ -77,8 +74,12 @@ export function PublicStorefront({
       return;
     }
 
+    if (selectedQuantity <= 0) {
+      return;
+    }
+
     setCartItems(
-      setPublicCartProduct(menu.store.publicSlug, {
+      addPublicCartProduct(menu.store.publicSlug, {
         itemNote: selectedItemNote,
         productId: selectedProduct.id,
         quantity: selectedQuantity
@@ -255,6 +256,7 @@ export function PublicStorefront({
           onItemNoteChange={setSelectedItemNote}
           onSave={saveSelectedProductToCart}
           itemNote={selectedItemNote}
+          maxQuantity={getAvailableProductQuantity(selectedProduct, cartItems)}
           product={selectedProduct}
           quantity={selectedQuantity}
         />
@@ -330,6 +332,7 @@ function ProductDetailModal({
   onItemNoteChange,
   onSave,
   itemNote,
+  maxQuantity,
   product,
   quantity
 }: {
@@ -341,12 +344,13 @@ function ProductDetailModal({
   onItemNoteChange: (value: string) => void;
   onSave: () => void;
   itemNote: string;
+  maxQuantity: number;
   product: FoodProductContract;
   quantity: number;
 }) {
   const isStockControlled = product.stockControlEnabled;
   const isOutOfStock = isStockControlled && product.stockQuantity <= 0;
-  const maxQuantity = getProductMaxQuantity(product);
+  const isUnavailable = isOutOfStock || maxQuantity <= 0;
   const subtotal = product.priceCents * quantity;
 
   useEffect(() => {
@@ -397,7 +401,13 @@ function ProductDetailModal({
           <div className="public-product-modal-meta">
             <strong>{formatMoney(product.priceCents)}</strong>
             {isStockControlled ? (
-              <span>{isOutOfStock ? "Sem estoque" : `${product.stockQuantity} em estoque`}</span>
+              <span>
+                {isOutOfStock
+                  ? "Sem estoque"
+                  : maxQuantity <= 0
+                    ? "Limite em estoque ja esta no carrinho"
+                    : `${product.stockQuantity} em estoque`}
+              </span>
             ) : (
               <span>Disponivel para pedido</span>
             )}
@@ -408,16 +418,16 @@ function ProductDetailModal({
             <div className="quantity-control">
               <button
                 aria-label="Diminuir quantidade"
-                disabled={quantity <= 1 || isOutOfStock}
+                disabled={quantity <= 1 || isUnavailable}
                 onClick={onDecrease}
                 type="button"
               >
                 -
               </button>
-              <span>{isOutOfStock ? 0 : quantity}</span>
+              <span>{isUnavailable ? 0 : quantity}</span>
               <button
                 aria-label="Aumentar quantidade"
-                disabled={isOutOfStock || quantity >= maxQuantity}
+                disabled={isUnavailable || quantity >= maxQuantity}
                 onClick={onIncrease}
                 type="button"
               >
@@ -428,7 +438,7 @@ function ProductDetailModal({
 
           <div className="public-product-modal-total">
             <span>Subtotal</span>
-            <strong>{formatMoney(isOutOfStock ? 0 : subtotal)}</strong>
+            <strong>{formatMoney(isUnavailable ? 0 : subtotal)}</strong>
           </div>
 
           <label className="public-product-item-note">
@@ -448,11 +458,11 @@ function ProductDetailModal({
             </button>
             <button
               className="primary-action"
-              disabled={isOutOfStock}
+              disabled={isUnavailable}
               onClick={onSave}
               type="button"
             >
-              {cartQuantity > 0 ? "Atualizar carrinho" : "Adicionar ao carrinho"}
+              Adicionar ao carrinho
             </button>
             {cartQuantity > 0 ? (
               <a className="link-button" href={cartHref}>
@@ -482,4 +492,14 @@ function formatMoney(value: number): string {
 
 function getProductMaxQuantity(product: FoodProductContract): number {
   return product.stockControlEnabled ? Math.max(product.stockQuantity, 0) : 99;
+}
+
+function getAvailableProductQuantity(
+  product: FoodProductContract,
+  cartItems: Array<{ productId: string; quantity: number }>
+): number {
+  const cartQuantity = getPublicCartQuantity(cartItems, product.id);
+  const maxQuantity = getProductMaxQuantity(product);
+
+  return Math.max(maxQuantity - cartQuantity, 0);
 }
