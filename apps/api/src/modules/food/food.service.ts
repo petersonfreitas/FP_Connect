@@ -177,6 +177,7 @@ type FoodOrderItemRow = {
   order_id: string;
   product_id: string | null;
   product_name: string;
+  item_note: string | null;
   unit_price_cents: number;
   quantity: number;
   total_price_cents: number;
@@ -417,6 +418,7 @@ const orderItemSelect = [
   "order_id",
   "product_id",
   "product_name",
+  "item_note",
   "unit_price_cents",
   "quantity",
   "total_price_cents"
@@ -1865,6 +1867,7 @@ export class FoodService {
       .insert(
         normalized.items.map((item) => ({
           company_id: companyId,
+          item_note: item.itemNote,
           order_id: orderRow.id,
           product_id: item.productId,
           product_name: item.productName,
@@ -2868,6 +2871,7 @@ export class FoodService {
     }
 
     const normalizedItems = input.items.map((item) => ({
+      itemNote: normalizeOptionalText(item.itemNote, "itemNote", 300),
       productId: normalizeRequiredText(item.productId, "productId", 80),
       quantity: normalizeQuantity(item.quantity)
     }));
@@ -2896,6 +2900,7 @@ export class FoodService {
         return {
           productId: product.id,
           productName: product.name,
+          itemNote: item.itemNote,
           quantity: item.quantity,
           totalPriceCents: product.priceCents * item.quantity,
           unitPriceCents: product.priceCents
@@ -4211,6 +4216,7 @@ function mapOrderItem(row: FoodOrderItemRow): FoodOrderItemContract {
   return {
     companyId: row.company_id,
     id: row.id,
+    itemNote: row.item_note,
     orderId: row.order_id,
     productId: row.product_id,
     productName: row.product_name,

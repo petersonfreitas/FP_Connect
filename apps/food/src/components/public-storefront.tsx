@@ -7,7 +7,7 @@ import {
   getPublicCartItemCount,
   getPublicCartQuantity,
   readPublicCart,
-  setPublicCartProductQuantity
+  setPublicCartProduct
 } from "@/lib/public-cart-store";
 import { storeUrl, type PublicStoreUrlContext } from "@/lib/public-store-urls";
 
@@ -26,11 +26,19 @@ export function PublicStorefront({
 }: PublicStorefrontProps) {
   const products = useMemo(() => flattenProducts(menu), [menu]);
   const [cartItems, setCartItems] = useState(() => readPublicCart(menu.store.publicSlug));
+  const [activeCategoryId, setActiveCategoryId] = useState<string>("all");
   const [selectedProduct, setSelectedProduct] = useState<FoodProductContract | null>(null);
   const [selectedQuantity, setSelectedQuantity] = useState(1);
+  const [selectedItemNote, setSelectedItemNote] = useState("");
   const canOrderNow = menu.availability.isOrderingOpen;
   const cartHref = storeUrl(storeContext, "/carrinho");
   const cartItemsCount = getPublicCartItemCount(cartItems);
+  const visibleCategories =
+    activeCategoryId === "all"
+      ? menu.categories
+      : menu.categories.filter((category) => category.id === activeCategoryId);
+  const showUncategorizedProducts =
+    activeCategoryId === "all" || activeCategoryId === "uncategorized";
 
   useEffect(() => {
     setCartItems(readPublicCart(menu.store.publicSlug));
@@ -38,16 +46,19 @@ export function PublicStorefront({
 
   function openProductDetail(product: FoodProductContract) {
     const currentQuantity = getPublicCartQuantity(cartItems, product.id);
+    const currentItem = cartItems.find((item) => item.productId === product.id);
     const maxQuantity = getProductMaxQuantity(product);
     const initialQuantity = currentQuantity > 0 ? currentQuantity : 1;
 
     setSelectedProduct(product);
     setSelectedQuantity(Math.min(initialQuantity, maxQuantity));
+    setSelectedItemNote(currentItem?.itemNote ?? "");
   }
 
   function closeProductDetail() {
     setSelectedProduct(null);
     setSelectedQuantity(1);
+    setSelectedItemNote("");
   }
 
   function changeSelectedQuantity(delta: number) {
@@ -67,11 +78,11 @@ export function PublicStorefront({
     }
 
     setCartItems(
-      setPublicCartProductQuantity(
-        menu.store.publicSlug,
-        selectedProduct.id,
-        selectedQuantity
-      )
+      setPublicCartProduct(menu.store.publicSlug, {
+        itemNote: selectedItemNote,
+        productId: selectedProduct.id,
+        quantity: selectedQuantity
+      })
     );
     closeProductDetail();
   }
@@ -150,43 +161,87 @@ export function PublicStorefront({
             </div>
           </div>
 
-          {menu.categories.map((category) => (
-            <div className="public-category" key={category.id}>
-              <div>
-                <h2>{category.name}</h2>
-                {category.description ? <p>{category.description}</p> : null}
-              </div>
+          <div className="public-menu-with-categories">
+            <aside className="public-category-filter" aria-label="Categorias do cardapio">
+              <span>Categorias</span>
+              <button
+                className={activeCategoryId === "all" ? "active" : ""}
+                onClick={() => setActiveCategoryId("all")}
+                type="button"
+              >
+                Todos
+                <small>{products.length}</small>
+              </button>
+              {menu.categories.map((category) => (
+                <button
+                  className={activeCategoryId === category.id ? "active" : ""}
+                  key={category.id}
+                  onClick={() => setActiveCategoryId(category.id)}
+                  type="button"
+                >
+                  {category.name}
+                  <small>{category.products.length}</small>
+                </button>
+              ))}
+              {menu.uncategorizedProducts.length > 0 ? (
+                <button
+                  className={activeCategoryId === "uncategorized" ? "active" : ""}
+                  onClick={() => setActiveCategoryId("uncategorized")}
+                  type="button"
+                >
+                  Outros produtos
+                  <small>{menu.uncategorizedProducts.length}</small>
+                </button>
+              ) : null}
+            </aside>
 
-              <div className="public-product-grid">
-                {category.products.map((product) => (
-                  <PublicProductCard
-                    cartQuantity={getPublicCartQuantity(cartItems, product.id)}
-                    key={product.id}
-                    onOpen={() => openProductDetail(product)}
-                    product={product}
-                  />
-                ))}
-              </div>
-            </div>
-          ))}
+            <div className="public-menu-catalog">
+              {visibleCategories.map((category) => (
+                <div className="public-category" key={category.id}>
+                  <div>
+                    <h2>{category.name}</h2>
+                    {category.description ? <p>{category.description}</p> : null}
+                  </div>
 
-          {menu.uncategorizedProducts.length > 0 ? (
-            <div className="public-category">
-              <div>
-                <h2>Outros produtos</h2>
-              </div>
-              <div className="public-product-grid">
-                {menu.uncategorizedProducts.map((product) => (
-                  <PublicProductCard
-                    cartQuantity={getPublicCartQuantity(cartItems, product.id)}
-                    key={product.id}
-                    onOpen={() => openProductDetail(product)}
-                    product={product}
-                  />
-                ))}
-              </div>
+                  <div className="public-product-grid">
+                    {category.products.map((product) => (
+                      <PublicProductCard
+                        cartQuantity={getPublicCartQuantity(cartItems, product.id)}
+                        key={product.id}
+                        onOpen={() => openProductDetail(product)}
+                        product={product}
+                      />
+                    ))}
+                  </div>
+                </div>
+              ))}
+
+              {showUncategorizedProducts && menu.uncategorizedProducts.length > 0 ? (
+                <div className="public-category">
+                  <div>
+                    <h2>Outros produtos</h2>
+                  </div>
+                  <div className="public-product-grid">
+                    {menu.uncategorizedProducts.map((product) => (
+                      <PublicProductCard
+                        cartQuantity={getPublicCartQuantity(cartItems, product.id)}
+                        key={product.id}
+                        onOpen={() => openProductDetail(product)}
+                        product={product}
+                      />
+                    ))}
+                  </div>
+                </div>
+              ) : null}
+
+              {visibleCategories.length === 0 && !showUncategorizedProducts ? (
+                <div className="empty-state public-empty-cart">
+                  Nenhum produto encontrado nesta categoria.
+                </div>
+              ) : null}
             </div>
-          ) : null}
+          </div>
+
         </div>
       </section>
 
@@ -197,7 +252,9 @@ export function PublicStorefront({
           onClose={closeProductDetail}
           onDecrease={() => changeSelectedQuantity(-1)}
           onIncrease={() => changeSelectedQuantity(1)}
+          onItemNoteChange={setSelectedItemNote}
           onSave={saveSelectedProductToCart}
+          itemNote={selectedItemNote}
           product={selectedProduct}
           quantity={selectedQuantity}
         />
@@ -270,7 +327,9 @@ function ProductDetailModal({
   onClose,
   onDecrease,
   onIncrease,
+  onItemNoteChange,
   onSave,
+  itemNote,
   product,
   quantity
 }: {
@@ -279,7 +338,9 @@ function ProductDetailModal({
   onClose: () => void;
   onDecrease: () => void;
   onIncrease: () => void;
+  onItemNoteChange: (value: string) => void;
   onSave: () => void;
+  itemNote: string;
   product: FoodProductContract;
   quantity: number;
 }) {
@@ -369,6 +430,17 @@ function ProductDetailModal({
             <span>Subtotal</span>
             <strong>{formatMoney(isOutOfStock ? 0 : subtotal)}</strong>
           </div>
+
+          <label className="public-product-item-note">
+            Observacao do item
+            <textarea
+              maxLength={300}
+              onChange={(event) => onItemNoteChange(event.target.value)}
+              placeholder="Ex.: sem cebola, molho a parte"
+              rows={3}
+              value={itemNote}
+            />
+          </label>
 
           <div className="public-product-modal-actions">
             <button className="secondary-action" onClick={onClose} type="button">

@@ -107,6 +107,7 @@ Este arquivo registra decisoes arquiteturais e operacionais para evitar retrabal
 | DEC-099 | Logins operacionais devem validar o contrato de acesso imediatamente apos o Supabase Auth aceitar as credenciais; usuarios sem acesso interno ao portal devem ter a sessao descartada e continuar usando somente a vitrine publica contextual da loja. | Aprovada |
 | DEC-100 | Imagens publicas de produtos do FP Food ficam em bucket Supabase Storage publico para leitura, mas uploads devem passar pelo backend interno validado por empresa, modulo e permissao; JPG, PNG e WEBP de entrada sao convertidos para WEBP otimizado antes do storage, o limite funcional do arquivo original e 3 MB e os limites tecnicos de Server Action/API devem acomodar o overhead do upload. O produto guarda apenas a URL publica em `food.products.image_url`. | Aprovada |
 | DEC-101 | A API do FP Food e responsavel pelo ciclo de vida das imagens de produto: ao substituir ou remover uma imagem, o objeto WEBP anterior deve ser removido do bucket somente quando a URL pertencer ao caminho esperado `food-products/{companyId}/{productId}`. Falhas de limpeza nao bloqueiam a edicao do produto, mas devem ser registradas em log para investigacao. | Aprovada |
+| DEC-102 | A vitrine publica do FP Food deve permitir filtro client-side por categoria e observacao opcional por item no carrinho. A observacao acompanha o item ate `food.order_items.item_note`, enquanto a revalidacao de compra continua baseada em produto, quantidade, disponibilidade e preco. | Aprovada |
 
 ---
 

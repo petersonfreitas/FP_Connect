@@ -248,6 +248,9 @@ export default async function PublicOrderPage({
               <div className="public-order-item" key={item.id}>
                 <span>
                   {item.quantity}x {item.productName}
+                  {item.itemNote ? (
+                    <small className="public-item-note">Obs.: {item.itemNote}</small>
+                  ) : null}
                 </span>
                 <strong>{formatMoney(item.totalPriceCents)}</strong>
               </div>

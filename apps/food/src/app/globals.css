@@ -1844,10 +1844,75 @@ textarea {
   margin-top: 8px;
 }
 
+.public-item-note {
+  color: var(--muted);
+  display: block;
+  font-size: 0.82rem;
+  font-weight: 750;
+  line-height: 1.35;
+  margin-top: 4px;
+}
+
 .public-product-grid {
   display: grid;
   gap: 16px;
   grid-template-columns: repeat(auto-fill, minmax(min(220px, 100%), 1fr));
+}
+
+.public-menu-with-categories {
+  align-items: start;
+  display: grid;
+  gap: 18px;
+  grid-template-columns: minmax(180px, 220px) minmax(0, 1fr);
+}
+
+.public-menu-catalog {
+  display: grid;
+  gap: 18px;
+}
+
+.public-category-filter {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  display: grid;
+  gap: 8px;
+  padding: 14px;
+  position: sticky;
+  top: 18px;
+}
+
+.public-category-filter > span {
+  color: var(--muted);
+  font-size: 0.78rem;
+  font-weight: 950;
+  text-transform: uppercase;
+}
+
+.public-category-filter button {
+  align-items: center;
+  background: #ffffff;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  color: var(--text);
+  cursor: pointer;
+  display: flex;
+  font-weight: 850;
+  gap: 10px;
+  justify-content: space-between;
+  padding: 10px 12px;
+  text-align: left;
+}
+
+.public-category-filter button.active {
+  background: #eef8f3;
+  border-color: #b7dfca;
+  color: #17643d;
+}
+
+.public-category-filter small {
+  color: var(--muted);
+  font-weight: 900;
 }
 
 .public-product-card {
@@ -2068,6 +2133,17 @@ textarea {
 .public-product-modal-total span {
   color: var(--muted);
   font-weight: 800;
+}
+
+.public-product-item-note {
+  border-top: 1px solid var(--line);
+  display: grid;
+  gap: 8px;
+  padding-top: 16px;
+}
+
+.public-product-item-note textarea {
+  min-height: 82px;
 }
 
 .public-product-modal-actions {
@@ -2971,6 +3047,14 @@ textarea {
   }
 
   .public-cart {
+    position: static;
+  }
+
+  .public-menu-with-categories {
+    grid-template-columns: 1fr;
+  }
+
+  .public-category-filter {
     position: static;
   }
 

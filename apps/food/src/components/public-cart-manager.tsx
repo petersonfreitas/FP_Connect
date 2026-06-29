@@ -123,6 +123,9 @@ export function PublicCartManager({
                     ) : (
                       <small>Remova este item para continuar.</small>
                     )}
+                    {item.itemNote ? (
+                      <small className="public-item-note">Obs.: {item.itemNote}</small>
+                    ) : null}
                   </div>
                   <div className="quantity-control">
                     <button

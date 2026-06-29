@@ -290,6 +290,7 @@ export type FoodOrderItemContract = {
   orderId: string;
   productId: string | null;
   productName: string;
+  itemNote: string | null;
   unitPriceCents: number;
   quantity: number;
   totalPriceCents: number;
@@ -350,6 +351,7 @@ export type FoodDashboardContract = {
 };
 
 export type CreateFoodOrderItemInput = {
+  itemNote?: string | null;
   productId: string;
   quantity: number;
 };

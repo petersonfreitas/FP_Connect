@@ -186,10 +186,13 @@ export function PublicCartReview({
       validation?.items
         .filter((item) => item.status === "available")
         .map((item) => ({
+          itemNote:
+            cartItems.find((cartItem) => cartItem.productId === item.productId)?.itemNote ??
+            null,
           productId: item.productId,
           quantity: item.quantity
         })) ?? [],
-    [validation?.items]
+    [cartItems, validation?.items]
   );
 
   function selectFulfillmentMethod(method: FoodOrderFulfillmentMethod) {
@@ -530,7 +533,19 @@ export function PublicCartReview({
                 </div>
                 {validation.items.map((item) => (
                   <div className="data-row public-review-row" role="row" key={item.productId}>
-                    <span>{item.productName ?? "Produto indisponivel"}</span>
+                    <span>
+                      {item.productName ?? "Produto indisponivel"}
+                      {cartItems.find((cartItem) => cartItem.productId === item.productId)
+                        ?.itemNote ? (
+                        <small className="public-item-note">
+                          Obs.:{" "}
+                          {
+                            cartItems.find((cartItem) => cartItem.productId === item.productId)
+                              ?.itemNote
+                          }
+                        </small>
+                      ) : null}
+                    </span>
                     <span>{item.quantity}</span>
                     <span>{formatMoney(item.unitPriceCents)}</span>
                     <span>{formatMoney(item.totalPriceCents)}</span>

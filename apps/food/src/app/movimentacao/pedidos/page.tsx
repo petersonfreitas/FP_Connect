@@ -258,6 +258,9 @@ export default async function OrdersPage({ searchParams }: OrdersPageProps) {
                           <div className="order-item-row" key={item.id}>
                             <span>
                               {item.quantity}x {item.productName}
+                              {item.itemNote ? (
+                                <small className="public-item-note">Obs.: {item.itemNote}</small>
+                              ) : null}
                             </span>
                             <strong>{formatMoney(item.totalPriceCents)}</strong>
                           </div>
