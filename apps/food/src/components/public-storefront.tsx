@@ -26,6 +26,8 @@ export function PublicStorefront({
 }: PublicStorefrontProps) {
   const products = useMemo(() => flattenProducts(menu), [menu]);
   const [cartItems, setCartItems] = useState(() => readPublicCart(menu.store.publicSlug));
+  const [selectedProduct, setSelectedProduct] = useState<FoodProductContract | null>(null);
+  const [selectedQuantity, setSelectedQuantity] = useState(1);
   const canOrderNow = menu.availability.isOrderingOpen;
   const cartHref = storeUrl(storeContext, "/carrinho");
   const cartItemsCount = getPublicCartItemCount(cartItems);
@@ -34,12 +36,44 @@ export function PublicStorefront({
     setCartItems(readPublicCart(menu.store.publicSlug));
   }, [menu.store.publicSlug]);
 
-  function changeQuantity(productId: string, delta: number) {
-    const product = products.find((currentProduct) => currentProduct.id === productId);
-    const currentQuantity = getPublicCartQuantity(cartItems, productId);
-    const maxQuantity = product?.stockControlEnabled ? product.stockQuantity : 99;
-    const nextQuantity = Math.min(Math.max(currentQuantity + delta, 0), maxQuantity);
-    setCartItems(setPublicCartProductQuantity(menu.store.publicSlug, productId, nextQuantity));
+  function openProductDetail(product: FoodProductContract) {
+    const currentQuantity = getPublicCartQuantity(cartItems, product.id);
+    const maxQuantity = getProductMaxQuantity(product);
+    const initialQuantity = currentQuantity > 0 ? currentQuantity : 1;
+
+    setSelectedProduct(product);
+    setSelectedQuantity(Math.min(initialQuantity, maxQuantity));
+  }
+
+  function closeProductDetail() {
+    setSelectedProduct(null);
+    setSelectedQuantity(1);
+  }
+
+  function changeSelectedQuantity(delta: number) {
+    if (!selectedProduct) {
+      return;
+    }
+
+    const maxQuantity = getProductMaxQuantity(selectedProduct);
+    const nextQuantity = Math.min(Math.max(selectedQuantity + delta, 1), maxQuantity);
+
+    setSelectedQuantity(nextQuantity);
+  }
+
+  function saveSelectedProductToCart() {
+    if (!selectedProduct) {
+      return;
+    }
+
+    setCartItems(
+      setPublicCartProductQuantity(
+        menu.store.publicSlug,
+        selectedProduct.id,
+        selectedQuantity
+      )
+    );
+    closeProductDetail();
   }
 
   return (
@@ -126,11 +160,10 @@ export function PublicStorefront({
               <div className="public-product-grid">
                 {category.products.map((product) => (
                   <PublicProductCard
+                    cartQuantity={getPublicCartQuantity(cartItems, product.id)}
                     key={product.id}
-                    onDecrease={() => changeQuantity(product.id, -1)}
-                    onIncrease={() => changeQuantity(product.id, 1)}
+                    onOpen={() => openProductDetail(product)}
                     product={product}
-                    quantity={getPublicCartQuantity(cartItems, product.id)}
                   />
                 ))}
               </div>
@@ -145,11 +178,10 @@ export function PublicStorefront({
               <div className="public-product-grid">
                 {menu.uncategorizedProducts.map((product) => (
                   <PublicProductCard
+                    cartQuantity={getPublicCartQuantity(cartItems, product.id)}
                     key={product.id}
-                    onDecrease={() => changeQuantity(product.id, -1)}
-                    onIncrease={() => changeQuantity(product.id, 1)}
+                    onOpen={() => openProductDetail(product)}
                     product={product}
-                    quantity={getPublicCartQuantity(cartItems, product.id)}
                   />
                 ))}
               </div>
@@ -157,27 +189,48 @@ export function PublicStorefront({
           ) : null}
         </div>
       </section>
+
+      {selectedProduct ? (
+        <ProductDetailModal
+          cartHref={cartHref}
+          cartQuantity={getPublicCartQuantity(cartItems, selectedProduct.id)}
+          onClose={closeProductDetail}
+          onDecrease={() => changeSelectedQuantity(-1)}
+          onIncrease={() => changeSelectedQuantity(1)}
+          onSave={saveSelectedProductToCart}
+          product={selectedProduct}
+          quantity={selectedQuantity}
+        />
+      ) : null}
     </main>
   );
 }
 
 function PublicProductCard({
-  onDecrease,
-  onIncrease,
+  cartQuantity,
+  onOpen,
   product,
-  quantity
 }: {
-  onDecrease: () => void;
-  onIncrease: () => void;
+  cartQuantity: number;
+  onOpen: () => void;
   product: FoodProductContract;
-  quantity: number;
 }) {
   const isStockControlled = product.stockControlEnabled;
   const isOutOfStock = isStockControlled && product.stockQuantity <= 0;
-  const reachedStockLimit = isStockControlled && quantity >= product.stockQuantity;
 
   return (
-    <article className="public-product-card">
+    <article
+      className="public-product-card"
+      onClick={onOpen}
+      onKeyDown={(event) => {
+        if (event.key === "Enter" || event.key === " ") {
+          event.preventDefault();
+          onOpen();
+        }
+      }}
+      role="button"
+      tabIndex={0}
+    >
       {product.imageUrl ? (
         <img alt={product.name} className="public-product-image" src={product.imageUrl} />
       ) : (
@@ -197,23 +250,147 @@ function PublicProductCard({
         </div>
         <div className="public-product-footer">
           <strong>{formatMoney(product.priceCents)}</strong>
-          <div className="quantity-control">
-            <button aria-label={`Remover ${product.name}`} onClick={onDecrease} type="button">
-              -
-            </button>
-            <span>{quantity}</span>
-            <button
-              aria-label={`Adicionar ${product.name}`}
-              disabled={isOutOfStock || reachedStockLimit}
-              onClick={onIncrease}
-              type="button"
-            >
-              +
-            </button>
+          <div className="public-product-card-actions">
+            {cartQuantity > 0 ? (
+              <span className="public-cart-badge">{cartQuantity} no carrinho</span>
+            ) : null}
+            <span className="secondary-action compact-action public-product-card-cta">
+              {isOutOfStock ? "Indisponivel" : "Ver detalhes"}
+            </span>
           </div>
         </div>
       </div>
     </article>
+  );
+}
+
+function ProductDetailModal({
+  cartHref,
+  cartQuantity,
+  onClose,
+  onDecrease,
+  onIncrease,
+  onSave,
+  product,
+  quantity
+}: {
+  cartHref: string;
+  cartQuantity: number;
+  onClose: () => void;
+  onDecrease: () => void;
+  onIncrease: () => void;
+  onSave: () => void;
+  product: FoodProductContract;
+  quantity: number;
+}) {
+  const isStockControlled = product.stockControlEnabled;
+  const isOutOfStock = isStockControlled && product.stockQuantity <= 0;
+  const maxQuantity = getProductMaxQuantity(product);
+  const subtotal = product.priceCents * quantity;
+
+  useEffect(() => {
+    function handleKeyDown(event: KeyboardEvent) {
+      if (event.key === "Escape") {
+        onClose();
+      }
+    }
+
+    window.addEventListener("keydown", handleKeyDown);
+
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [onClose]);
+
+  return (
+    <div className="public-product-modal-backdrop" onClick={onClose} role="presentation">
+      <section
+        aria-labelledby="public-product-modal-title"
+        aria-modal="true"
+        className="public-product-modal"
+        onClick={(event) => event.stopPropagation()}
+        role="dialog"
+      >
+        <button
+          aria-label="Fechar detalhe do produto"
+          className="public-product-modal-close"
+          onClick={onClose}
+          type="button"
+        >
+          x
+        </button>
+
+        <div className="public-product-modal-media">
+          {product.imageUrl ? (
+            <img alt={product.name} src={product.imageUrl} />
+          ) : (
+            <span>Sem imagem</span>
+          )}
+        </div>
+
+        <div className="public-product-modal-content">
+          <div>
+            <div className="eyebrow">Produto</div>
+            <h2 id="public-product-modal-title">{product.name}</h2>
+            {product.description ? <p>{product.description}</p> : null}
+          </div>
+
+          <div className="public-product-modal-meta">
+            <strong>{formatMoney(product.priceCents)}</strong>
+            {isStockControlled ? (
+              <span>{isOutOfStock ? "Sem estoque" : `${product.stockQuantity} em estoque`}</span>
+            ) : (
+              <span>Disponivel para pedido</span>
+            )}
+          </div>
+
+          <div className="public-product-modal-quantity">
+            <span>Quantidade</span>
+            <div className="quantity-control">
+              <button
+                aria-label="Diminuir quantidade"
+                disabled={quantity <= 1 || isOutOfStock}
+                onClick={onDecrease}
+                type="button"
+              >
+                -
+              </button>
+              <span>{isOutOfStock ? 0 : quantity}</span>
+              <button
+                aria-label="Aumentar quantidade"
+                disabled={isOutOfStock || quantity >= maxQuantity}
+                onClick={onIncrease}
+                type="button"
+              >
+                +
+              </button>
+            </div>
+          </div>
+
+          <div className="public-product-modal-total">
+            <span>Subtotal</span>
+            <strong>{formatMoney(isOutOfStock ? 0 : subtotal)}</strong>
+          </div>
+
+          <div className="public-product-modal-actions">
+            <button className="secondary-action" onClick={onClose} type="button">
+              Continuar vendo
+            </button>
+            <button
+              className="primary-action"
+              disabled={isOutOfStock}
+              onClick={onSave}
+              type="button"
+            >
+              {cartQuantity > 0 ? "Atualizar carrinho" : "Adicionar ao carrinho"}
+            </button>
+            {cartQuantity > 0 ? (
+              <a className="link-button" href={cartHref}>
+                Abrir carrinho
+              </a>
+            ) : null}
+          </div>
+        </div>
+      </section>
+    </div>
   );
 }
 
@@ -229,4 +406,8 @@ function formatMoney(value: number): string {
     currency: "BRL",
     style: "currency"
   }).format(value / 100);
+}
+
+function getProductMaxQuantity(product: FoodProductContract): number {
+  return product.stockControlEnabled ? Math.max(product.stockQuantity, 0) : 99;
 }
