@@ -31,6 +31,11 @@ const productStatusLabels = {
   unavailable: "Indisponivel"
 };
 
+const kitchenFlowLabels = {
+  false: "Produto pronto",
+  true: "Cozinha"
+};
+
 export default async function ProductsPage({ searchParams }: ProductsPageProps) {
   const params = await searchParams;
   const page = normalizePage(params?.page);
@@ -119,6 +124,7 @@ export default async function ProductsPage({ searchParams }: ProductsPageProps) 
                   <span>Categoria</span>
                   <span>Preco</span>
                   <span>Status</span>
+                  <span>Fluxo</span>
                   <span>Estoque</span>
                   <span />
                 </div>
@@ -142,6 +148,7 @@ export default async function ProductsPage({ searchParams }: ProductsPageProps) 
                     <span>{product.categoryId ? categoryNames.get(product.categoryId) ?? "Categoria removida" : "Sem categoria"}</span>
                     <span>{formatMoney(product.priceCents)}</span>
                     <span>{productStatusLabels[product.status]}</span>
+                    <span>{kitchenFlowLabels[String(product.kitchenRequired) as "false" | "true"]}</span>
                     <span>
                       {formatProductStock(product)}
                       {isProductAtOrBelowMinStock(product) ? (

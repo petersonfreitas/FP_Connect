@@ -52,7 +52,7 @@ export default async function ServicePage({ searchParams }: ServicePageProps) {
       {productsResult.error ? <Notice tone="danger" message={productsResult.error} /> : null}
       {params?.error ? <Notice tone="danger" message={params.error} /> : null}
       {params?.orderCreated ? (
-        <Notice tone="success" message="Pedido de balcao criado e enviado para a cozinha." />
+        <Notice tone="success" message="Pedido de balcao criado e enviado para a operacao." />
       ) : null}
 
       <CompanySwitcher

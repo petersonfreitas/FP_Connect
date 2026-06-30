@@ -99,6 +99,7 @@ export type FoodProductContract = {
   priceCents: number;
   status: FoodProductStatus;
   imageUrl: string | null;
+  kitchenRequired: boolean;
   stockControlEnabled: boolean;
   stockMinQuantity: number;
   stockQuantity: number;
@@ -115,6 +116,7 @@ export type UpsertFoodProductInput = {
   priceCents: number;
   status: FoodProductStatus;
   imageUrl?: string | null;
+  kitchenRequired?: boolean | null;
   stockControlEnabled?: boolean | null;
   stockMinQuantity?: number | null;
   sortOrder?: number | null;
@@ -291,6 +293,7 @@ export type FoodOrderItemContract = {
   productId: string | null;
   productName: string;
   itemNote: string | null;
+  kitchenRequired: boolean;
   unitPriceCents: number;
   quantity: number;
   totalPriceCents: number;

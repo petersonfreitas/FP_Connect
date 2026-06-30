@@ -249,7 +249,7 @@ export function CounterServiceOrderForm({
 
         <div className="form-footer">
           <span>
-            O pedido nasce aceito e entra na fila da cozinha mesmo sem pagamento online.
+            O pedido nasce na operacao; produtos prontos pulam a etapa de cozinha.
           </span>
           <PendingSubmitButton
             disabled={items.length === 0}

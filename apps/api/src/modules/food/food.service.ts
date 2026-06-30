@@ -120,6 +120,7 @@ type FoodProductRow = {
   price_cents: number;
   status: FoodProductStatus;
   image_url: string | null;
+  kitchen_required: boolean;
   stock_control_enabled: boolean;
   stock_min_quantity: number;
   stock_quantity: number;
@@ -178,6 +179,7 @@ type FoodOrderItemRow = {
   product_id: string | null;
   product_name: string;
   item_note: string | null;
+  kitchen_required: boolean;
   unit_price_cents: number;
   quantity: number;
   total_price_cents: number;
@@ -359,6 +361,7 @@ const productSelect = [
   "price_cents",
   "status",
   "image_url",
+  "kitchen_required",
   "stock_control_enabled",
   "stock_min_quantity",
   "stock_quantity",
@@ -421,6 +424,7 @@ const orderItemSelect = [
   "product_id",
   "product_name",
   "item_note",
+  "kitchen_required",
   "unit_price_cents",
   "quantity",
   "total_price_cents"
@@ -813,6 +817,7 @@ export class FoodService {
       company_id: companyId,
       description: normalized.description,
       image_url: normalized.imageUrl,
+      kitchen_required: normalized.kitchenRequired,
       name: normalized.name,
       price_cents: normalized.priceCents,
       slug: normalized.slug,
@@ -1850,7 +1855,7 @@ export class FoodService {
     const store = await this.getStore(companyId);
     const normalized = await this.normalizeCreateOrderInput(companyId, input);
     const subtotalCents = normalized.items.reduce((sum, item) => sum + item.totalPriceCents, 0);
-    const initialStatus = getInitialOrderStatus(options);
+    const initialStatus = getInitialOrderStatus(options, normalized.items);
     const orderNumber = buildOrderNumber();
     const { data: orderData, error: orderError } = await this.supabase.food
       .from("orders")
@@ -1889,6 +1894,7 @@ export class FoodService {
         normalized.items.map((item) => ({
           company_id: companyId,
           item_note: item.itemNote,
+          kitchen_required: item.kitchenRequired,
           order_id: orderRow.id,
           product_id: item.productId,
           product_name: item.productName,
@@ -1971,6 +1977,15 @@ export class FoodService {
   ): Promise<FoodOrderContract> {
     const normalized = normalizePaymentInput(input);
     const current = await this.getOrderRow(companyId, orderId);
+    const currentItems = await this.listOrderItemsByOrderIds(companyId, [current.id]);
+    const itemsBeforeUpdate = currentItems.get(current.id) ?? [];
+    const nextStatus = shouldMarkOrderReadyAfterPayment(
+      current,
+      itemsBeforeUpdate,
+      normalized.paymentStatus
+    )
+      ? "ready"
+      : current.status;
     const paidAt =
       normalized.paymentStatus === "paid"
         ? current.paid_at ?? new Date().toISOString()
@@ -1985,6 +2000,7 @@ export class FoodService {
         payment_method: normalized.paymentMethod,
         payment_note: normalized.paymentNote,
         payment_status: normalized.paymentStatus,
+        status: nextStatus,
         updated_by: actorUserId
       })
       .eq("id", orderId)
@@ -2003,6 +2019,11 @@ export class FoodService {
 
     if (current.payment_status !== "paid" && order.paymentStatus === "paid") {
       await this.emitPaymentMarkedAsPaid(companyId, actorUserId, order);
+    }
+
+    if (current.status !== order.status) {
+      await this.insertOrderStatusHistory(companyId, order.id, current.status, order.status, actorUserId);
+      await this.emitOrderStatusChanged(companyId, actorUserId, order, current.status);
     }
 
     return order;
@@ -2072,11 +2093,16 @@ export class FoodService {
     paymentNote: string
   ): Promise<FoodOrderContract> {
     const current = await this.getOrderRow(companyId, orderId);
+    const currentItems = await this.listOrderItemsByOrderIds(companyId, [current.id]);
+    const itemsBeforeUpdate = currentItems.get(current.id) ?? [];
 
     if (current.payment_status === "paid") {
-      const items = await this.listOrderItemsByOrderIds(companyId, [current.id]);
-      return mapOrder(current, items.get(current.id) ?? []);
+      return mapOrder(current, itemsBeforeUpdate);
     }
+
+    const nextStatus = shouldMarkOrderReadyAfterPayment(current, itemsBeforeUpdate, "paid")
+      ? "ready"
+      : current.status;
 
     const { data, error } = await this.supabase.food
       .from("orders")
@@ -2086,6 +2112,7 @@ export class FoodService {
         payment_method: paymentMethod,
         payment_note: paymentNote,
         payment_status: "paid",
+        status: nextStatus,
         updated_by: null
       })
       .eq("id", orderId)
@@ -2102,6 +2129,11 @@ export class FoodService {
     const items = await this.listOrderItemsByOrderIds(companyId, [orderRow.id]);
     const order = mapOrder(orderRow, items.get(orderRow.id) ?? []);
     await this.emitPaymentMarkedAsPaid(companyId, null, order);
+
+    if (current.status !== order.status) {
+      await this.insertOrderStatusHistory(companyId, order.id, current.status, order.status, null);
+      await this.emitOrderStatusChanged(companyId, null, order, current.status);
+    }
 
     return order;
   }
@@ -2858,6 +2890,7 @@ export class FoodService {
       categoryId,
       description: normalizeOptionalText(input.description, "description", 800),
       imageUrl: normalizeOptionalUrl(input.imageUrl, "imageUrl", 500),
+      kitchenRequired: normalizeKitchenRequired(input.kitchenRequired),
       name,
       priceCents: normalizePriceCents(input.priceCents),
       slug: normalizeOptionalSlug(input.slug, name),
@@ -2923,6 +2956,7 @@ export class FoodService {
         }
 
         return {
+          kitchenRequired: product.kitchenRequired,
           productId: product.id,
           productName: product.name,
           itemNote: item.itemNote,
@@ -3224,7 +3258,7 @@ export class FoodService {
 
   private async emitOrderStatusChanged(
     companyId: string,
-    actorUserId: string,
+    actorUserId: string | null,
     order: FoodOrderContract,
     previousStatus: FoodOrderStatus
   ): Promise<void> {
@@ -3796,8 +3830,15 @@ function isOperationalOrderStatus(status: FoodOrderStatus): boolean {
   );
 }
 
-function getInitialOrderStatus(options: CreateOrderOptions): FoodOrderStatus {
-  return options.eventSource === "internal-order-v0" ? "accepted" : "created";
+function getInitialOrderStatus(
+  options: CreateOrderOptions,
+  items: Array<{ kitchenRequired: boolean }>
+): FoodOrderStatus {
+  if (options.eventSource !== "internal-order-v0") {
+    return "created";
+  }
+
+  return orderRequiresKitchen(items) ? "accepted" : "ready";
 }
 
 function isInternalManualOrderRow(order: FoodOrderRow): boolean {
@@ -3805,6 +3846,22 @@ function isInternalManualOrderRow(order: FoodOrderRow): boolean {
     !order.customer_account_id &&
     !order.customer_id &&
     !order.customer_store_access_id
+  );
+}
+
+function orderRequiresKitchen(items: Array<{ kitchenRequired: boolean }>): boolean {
+  return items.some((item) => item.kitchenRequired);
+}
+
+function shouldMarkOrderReadyAfterPayment(
+  order: FoodOrderRow,
+  items: FoodOrderItemContract[],
+  nextPaymentStatus: FoodPaymentStatus
+): boolean {
+  return (
+    nextPaymentStatus === "paid" &&
+    (order.status === "created" || order.status === "accepted") &&
+    !orderRequiresKitchen(items)
   );
 }
 
@@ -4004,6 +4061,10 @@ function normalizeStockControlEnabled(value: unknown): boolean {
   return value === true;
 }
 
+function normalizeKitchenRequired(value: unknown): boolean {
+  return value !== false;
+}
+
 function normalizeStockQuantity(value: unknown): number {
   if (value === undefined || value === null || value === "") {
     return 0;
@@ -4182,6 +4243,7 @@ function mapProduct(row: FoodProductRow): FoodProductContract {
     description: row.description,
     id: row.id,
     imageUrl: row.image_url,
+    kitchenRequired: row.kitchen_required,
     name: row.name,
     priceCents: row.price_cents,
     slug: row.slug,
@@ -4254,6 +4316,7 @@ function mapOrderItem(row: FoodOrderItemRow): FoodOrderItemContract {
     companyId: row.company_id,
     id: row.id,
     itemNote: row.item_note,
+    kitchenRequired: row.kitchen_required,
     orderId: row.order_id,
     productId: row.product_id,
     productName: row.product_name,

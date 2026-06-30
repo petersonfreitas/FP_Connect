@@ -994,7 +994,7 @@ textarea {
 }
 
 .food-products-row {
-  grid-template-columns: 74px minmax(220px, 1.4fr) minmax(160px, 1fr) 120px 140px 120px 90px;
+  grid-template-columns: 74px minmax(220px, 1.4fr) minmax(150px, 0.9fr) 110px 120px 120px 120px 90px;
 }
 
 .stock-movements-row {

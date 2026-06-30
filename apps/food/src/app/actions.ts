@@ -145,6 +145,7 @@ export async function saveFoodProductAction(formData: FormData): Promise<void> {
     categoryId: optionalText(formData.get("categoryId")),
     description: optionalText(formData.get("description")),
     imageUrl: shouldRemoveImage ? null : optionalText(formData.get("imageUrl")),
+    kitchenRequired: formData.get("kitchenRequired") !== "false",
     name: String(formData.get("name") ?? ""),
     priceCents: parseMoneyToCents(formData.get("price")),
     slug: optionalText(formData.get("slug")),

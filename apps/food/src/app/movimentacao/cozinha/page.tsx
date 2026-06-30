@@ -1,4 +1,4 @@
-import type { FoodOrderContract, FoodOrderStatus } from "@fp/types";
+import type { FoodOrderContract, FoodOrderItemContract, FoodOrderStatus } from "@fp/types";
 import { CompanySwitcher } from "@/components/company-switcher";
 import { formatMoney } from "@/components/food-forms";
 import { FoodShell } from "@/components/food-shell";
@@ -138,40 +138,49 @@ function KitchenColumn({
 
       {orders.length > 0 ? (
         <div className="kitchen-order-list">
-          {orders.map((order) => (
-            <article className="order-card kitchen-order-card" key={order.id}>
-              <div className="order-card-heading">
-                <div>
-                  <strong>{order.orderNumber}</strong>
-                  <small>
-                    {order.customerName ?? "Cliente nao informado"} -{" "}
-                    {new Date(order.createdAt).toLocaleTimeString("pt-BR")}
-                  </small>
-                </div>
-                <span>{formatMoney(order.totalCents)}</span>
-              </div>
+          {orders.map((order) => {
+            const kitchenItems = getKitchenItems(order);
 
-              <div className="order-items">
-                {order.items.map((item) => (
-                  <div className="order-item-row" key={item.id}>
-                    <span>
-                      {item.quantity}x {item.productName}
-                      {item.itemNote ? (
-                        <small className="public-item-note">Obs.: {item.itemNote}</small>
-                      ) : null}
-                    </span>
-                    <strong>{formatMoney(item.totalPriceCents)}</strong>
+            return (
+              <article className="order-card kitchen-order-card" key={order.id}>
+                <div className="order-card-heading">
+                  <div>
+                    <strong>{order.orderNumber}</strong>
+                    <small>
+                      {order.customerName ?? "Cliente nao informado"} -{" "}
+                      {new Date(order.createdAt).toLocaleTimeString("pt-BR")}
+                    </small>
+                    <small>{kitchenItems.length} item(ns) para preparo</small>
                   </div>
-                ))}
-              </div>
+                  <span>{formatMoney(order.totalCents)}</span>
+                </div>
 
-              <OrderStatusActions actions={actions} companyId={companyId} orderId={order.id} />
-            </article>
-          ))}
+                <div className="order-items">
+                  {kitchenItems.map((item) => (
+                    <div className="order-item-row" key={item.id}>
+                      <span>
+                        {item.quantity}x {item.productName}
+                        {item.itemNote ? (
+                          <small className="public-item-note">Obs.: {item.itemNote}</small>
+                        ) : null}
+                      </span>
+                      <strong>{formatMoney(item.totalPriceCents)}</strong>
+                    </div>
+                  ))}
+                </div>
+
+                <OrderStatusActions actions={actions} companyId={companyId} orderId={order.id} />
+              </article>
+            );
+          })}
         </div>
       ) : (
         <div className="empty-state kitchen-empty">{emptyMessage}</div>
       )}
     </div>
   );
+}
+
+function getKitchenItems(order: FoodOrderContract): FoodOrderItemContract[] {
+  return order.items.filter((item) => item.kitchenRequired);
 }

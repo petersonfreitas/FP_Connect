@@ -37,6 +37,11 @@ const productStatusOptions = [
   ["hidden", "Oculto"]
 ] as const;
 
+const productKitchenFlowOptions = [
+  ["true", "Passa pela cozinha"],
+  ["false", "Produto pronto"]
+] as const;
+
 const weekdayOptions = [
   [0, "Domingo"],
   [1, "Segunda"],
@@ -431,6 +436,17 @@ export function ProductForm({
           <input defaultValue={product?.sortOrder ?? 100} min={0} name="sortOrder" type="number" />
         </label>
       </div>
+
+      <label>
+        Fluxo operacional
+        <select defaultValue={product?.kitchenRequired === false ? "false" : "true"} name="kitchenRequired">
+          {productKitchenFlowOptions.map(([value, label]) => (
+            <option key={value} value={value}>
+              {label}
+            </option>
+          ))}
+        </select>
+      </label>
 
       <div className="form-grid">
         <label className="checkbox-label">
