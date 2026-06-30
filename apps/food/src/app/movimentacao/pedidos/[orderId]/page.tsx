@@ -5,14 +5,14 @@ import type {
   FoodPaymentMethod,
   FoodPaymentStatus
 } from "@fp/types";
-import { updateFoodOrderPaymentAction, updateFoodOrderStatusAction } from "@/app/actions";
+import { finalizeCounterFoodOrderPaymentAction } from "@/app/actions";
 import { CompanySwitcher } from "@/components/company-switcher";
 import { formatMoney } from "@/components/food-forms";
 import { FoodShell } from "@/components/food-shell";
 import { EmptyFoodAccess, Notice } from "@/components/page-feedback";
 import { PendingSubmitButton } from "@/components/pending-submit-button";
 import { getFoodPageContext } from "@/lib/food-context";
-import { canAdvanceFoodOrderOperationally } from "@/lib/food-order-rules";
+import { isInternalManualFoodOrder } from "@/lib/food-order-rules";
 import { getFoodAccess, getFoodOrderDetail } from "@/lib/internal-api";
 
 type OrderDetailPageProps = {
@@ -21,6 +21,7 @@ type OrderDetailPageProps = {
   }>;
   searchParams?: Promise<{
     companyId?: string;
+    collect?: string;
     error?: string;
     orderUpdated?: string;
     paymentUpdated?: string;
@@ -39,16 +40,6 @@ const orderStatusLabels: Record<FoodOrderStatus, string> = {
   ready: "Pronto"
 };
 
-const orderStatusOptions = [
-  ["created", "Criado"],
-  ["accepted", "Aceito"],
-  ["preparing", "Em preparo"],
-  ["ready", "Pronto"],
-  ["out_for_delivery", "Saiu para entrega"],
-  ["delivered", "Entregue"],
-  ["cancelled", "Cancelado"]
-] as const;
-
 const paymentStatusLabels: Record<FoodPaymentStatus, string> = {
   cancelled: "Cancelado",
   paid: "Pago",
@@ -61,12 +52,6 @@ const paymentMethodLabels: Record<FoodPaymentMethod, string> = {
   other: "Outro",
   pix: "Pix"
 };
-
-const paymentStatusOptions = [
-  ["pending", "Pendente"],
-  ["paid", "Pago"],
-  ["cancelled", "Cancelado"]
-] as const;
 
 const paymentMethodOptions = [
   ["", "Selecione"],
@@ -95,8 +80,7 @@ export default async function OrderDetailPage({
   const ordersHref = selectedCompany
     ? `/movimentacao/pedidos?companyId=${selectedCompany.company.id}`
     : "/movimentacao/pedidos";
-  const paymentCleared = order ? isOrderPaymentCleared(order) : false;
-  const statusOptions = order ? getOrderStatusOptions(order) : orderStatusOptions;
+  const counterReadyToCollect = order ? isCounterOrderReadyToCollect(order) : false;
 
   return (
     <FoodShell activePath="/movimentacao/pedidos">
@@ -113,6 +97,12 @@ export default async function OrderDetailPage({
       {query?.error ? <Notice tone="danger" message={query.error} /> : null}
       {query?.orderUpdated ? <Notice tone="success" message="Status do pedido atualizado." /> : null}
       {query?.paymentUpdated ? <Notice tone="success" message="Pagamento do pedido atualizado." /> : null}
+      {query?.collect && counterReadyToCollect ? (
+        <Notice
+          tone="info"
+          message="Confirme a forma de pagamento para marcar o pedido como pago e finalizar a entrega."
+        />
+      ) : null}
 
       <CompanySwitcher
         basePath={detailPath}
@@ -184,55 +174,32 @@ export default async function OrderDetailPage({
                 <span>ID: {order.id}</span>
               </div>
             </div>
-
-            <form action={updateFoodOrderStatusAction} className="order-detail-status-form">
-              <input name="companyId" type="hidden" value={selectedCompany.company.id} />
-              <input name="orderId" type="hidden" value={order.id} />
-              <input name="returnTo" type="hidden" value={detailPath} />
-              <strong>Alterar status</strong>
-              {!paymentCleared ? (
-                <span>Fluxo operacional bloqueado ate confirmacao do pagamento.</span>
-              ) : null}
-              <select defaultValue={order.status} name="status">
-                {statusOptions.map(([value, label]) => (
-                  <option key={value} value={value}>
-                    {label}
-                  </option>
-                ))}
-              </select>
-              <PendingSubmitButton className="secondary-action compact-action" pendingLabel="Salvando...">
-                Atualizar
-              </PendingSubmitButton>
-            </form>
           </section>
 
-          <section className="content-panel stack-panel">
-            <div className="panel-heading">
-              <div>
-                <h1>Pagamento manual</h1>
-                <p>Registre a confirmacao manual do pagamento sem integrar Gateway neste MVP.</p>
+          {counterReadyToCollect ? (
+            <section className="content-panel stack-panel">
+              <div className="panel-heading">
+                <div>
+                  <h1>Cobranca do balcao</h1>
+                  <p>Registre o pagamento e finalize a entrega do pedido em uma unica etapa.</p>
+                </div>
+                <span>{paymentStatusLabels[order.paymentStatus]}</span>
               </div>
-              <span>{paymentStatusLabels[order.paymentStatus]}</span>
-            </div>
 
-            <form action={updateFoodOrderPaymentAction} className="store-form">
-              <input name="companyId" type="hidden" value={selectedCompany.company.id} />
-              <input name="orderId" type="hidden" value={order.id} />
-              <input name="returnTo" type="hidden" value={detailPath} />
-              <div className="form-grid">
-                <label>
-                  Status do pagamento
-                  <select defaultValue={order.paymentStatus} name="paymentStatus">
-                    {paymentStatusOptions.map(([value, label]) => (
-                      <option key={value} value={value}>
-                        {label}
-                      </option>
-                    ))}
-                  </select>
-                </label>
+              <form action={finalizeCounterFoodOrderPaymentAction} className="counter-payment-finalize">
+                <input name="companyId" type="hidden" value={selectedCompany.company.id} />
+                <input name="orderId" type="hidden" value={order.id} />
+                <input name="returnTo" type="hidden" value={detailPath} />
+                <div>
+                  <strong>Cobrar e finalizar</strong>
+                  <span>
+                    Use esta acao para pedidos de balcao: registra o pagamento e move o pedido para
+                    Entregue em uma unica etapa.
+                  </span>
+                </div>
                 <label>
                   Forma de pagamento
-                  <select defaultValue={order.paymentMethod ?? ""} name="paymentMethod">
+                  <select defaultValue={order.paymentMethod ?? ""} name="paymentMethod" required>
                     {paymentMethodOptions.map(([value, label]) => (
                       <option key={value || "empty"} value={value}>
                         {label}
@@ -240,24 +207,21 @@ export default async function OrderDetailPage({
                     ))}
                   </select>
                 </label>
-              </div>
-              <label>
-                Observacao do pagamento
-                <textarea
-                  defaultValue={order.paymentNote ?? ""}
-                  maxLength={600}
-                  name="paymentNote"
-                  rows={3}
-                />
-              </label>
-              <div className="form-footer">
-                <span>Marcar como pago emite food.payment.marked_as_paid para o FP Robots.</span>
-                <PendingSubmitButton pendingLabel="Salvando...">
-                  Salvar pagamento
+                <label>
+                  Observacao do pagamento
+                  <textarea
+                    defaultValue={order.paymentNote ?? ""}
+                    maxLength={600}
+                    name="paymentNote"
+                    rows={2}
+                  />
+                </label>
+                <PendingSubmitButton className="primary-action compact-action" pendingLabel="Finalizando...">
+                  Marcar pago e entregar
                 </PendingSubmitButton>
-              </div>
-            </form>
-          </section>
+              </form>
+            </section>
+          ) : null}
 
           <section className="content-panel stack-panel">
             <div className="panel-heading">
@@ -321,18 +285,13 @@ export default async function OrderDetailPage({
   );
 }
 
-function isOrderPaymentCleared(order: FoodOrderContract): boolean {
-  return canAdvanceFoodOrderOperationally(order);
+function isCounterOrderPendingPayment(order: FoodOrderContract): boolean {
+  return isInternalManualFoodOrder(order) && order.paymentStatus === "pending";
 }
 
-function getOrderStatusOptions(
-  order: FoodOrderContract
-): ReadonlyArray<readonly [FoodOrderStatus, string]> {
-  if (isOrderPaymentCleared(order)) {
-    return orderStatusOptions;
-  }
-
-  return orderStatusOptions.filter(
-    ([status]) => status === order.status || status === "created" || status === "cancelled"
+function isCounterOrderReadyToCollect(order: FoodOrderContract): boolean {
+  return (
+    isCounterOrderPendingPayment(order) &&
+    (order.status === "ready" || order.status === "out_for_delivery")
   );
 }

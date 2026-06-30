@@ -297,6 +297,8 @@ type PaginationOptions = {
 };
 
 type OrderListOptions = PaginationOptions & {
+  activeOnly?: boolean;
+  collectableOnly?: boolean;
   status?: FoodOrderStatus;
 };
 
@@ -526,6 +528,15 @@ const validOrderStatuses = new Set<FoodOrderStatus>([
   "preparing",
   "ready"
 ]);
+
+const activeOrderStatuses: FoodOrderStatus[] = [
+  "accepted",
+  "created",
+  "out_for_delivery",
+  "preparing",
+  "ready"
+];
+const collectableOrderStatuses: FoodOrderStatus[] = ["out_for_delivery", "ready"];
 const validPaymentMethods = new Set<FoodPaymentMethod>(["card", "cash", "other", "pix"]);
 const validPaymentStatuses = new Set<FoodPaymentStatus>([
   "cancelled",
@@ -1784,8 +1795,17 @@ export class FoodService {
       .is("deleted_at", null)
       .order("created_at", { ascending: false });
 
-    if (pagination.status) {
+    if (pagination.collectableOnly) {
+      query = query
+        .eq("payment_status", "pending")
+        .is("customer_account_id", null)
+        .is("customer_id", null)
+        .is("customer_store_access_id", null)
+        .in("status", collectableOrderStatuses);
+    } else if (pagination.status) {
       query = query.eq("status", pagination.status);
+    } else if (pagination.activeOnly) {
+      query = query.in("status", activeOrderStatuses);
     }
 
     const { count, data, error } = await query

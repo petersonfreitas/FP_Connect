@@ -54,6 +54,8 @@ type InternalApiResult<T> =
     };
 
 type PaginationParams = {
+  activeOnly?: boolean;
+  collectableOnly?: boolean;
   page?: number;
   pageSize?: number;
   status?: FoodOrderStatus;
@@ -688,7 +690,13 @@ function getInternalApiBaseUrl(): string {
   return baseUrl.endsWith("/api") ? baseUrl : `${baseUrl}/api`;
 }
 
-function formatPaginationSearch({ page, pageSize, status }: PaginationParams): string {
+function formatPaginationSearch({
+  activeOnly,
+  collectableOnly,
+  page,
+  pageSize,
+  status
+}: PaginationParams): string {
   const params = new URLSearchParams();
 
   if (page) {
@@ -701,6 +709,14 @@ function formatPaginationSearch({ page, pageSize, status }: PaginationParams): s
 
   if (status) {
     params.set("status", status);
+  }
+
+  if (activeOnly) {
+    params.set("activeOnly", "true");
+  }
+
+  if (collectableOnly) {
+    params.set("collectableOnly", "true");
   }
 
   const search = params.toString();

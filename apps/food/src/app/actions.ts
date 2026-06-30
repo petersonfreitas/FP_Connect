@@ -418,6 +418,32 @@ export async function updateFoodOrderPaymentAction(formData: FormData): Promise<
   redirectWithResult(returnTo, companyId, result.error, "paymentUpdated");
 }
 
+export async function finalizeCounterFoodOrderPaymentAction(formData: FormData): Promise<void> {
+  const companyId = requireCompanyId(formData);
+  const orderId = String(formData.get("orderId") ?? "").trim();
+  const returnTo = normalizeFoodReturnPath(formData.get("returnTo"));
+
+  if (!orderId) {
+    redirectWithResult(returnTo, companyId, "Pedido nao informado.", "paymentUpdated");
+  }
+
+  const paymentResult = await updateFoodOrderPayment(companyId, orderId, {
+    paymentMethod: optionalPaymentMethod(formData.get("paymentMethod")),
+    paymentNote: optionalText(formData.get("paymentNote")),
+    paymentStatus: "paid"
+  });
+
+  if (paymentResult.error) {
+    redirectWithResult(returnTo, companyId, paymentResult.error, "paymentUpdated");
+  }
+
+  const statusResult = await updateFoodOrderStatus(companyId, orderId, {
+    status: "delivered"
+  });
+
+  redirectWithResult(returnTo, companyId, statusResult.error, "paymentUpdated");
+}
+
 export async function createPublicFoodOrderAction(formData: FormData): Promise<void> {
   const publicSlug = normalizePublicSlug(formData.get("publicSlug"));
   const storeContext = createFallbackPublicStoreContext(publicSlug);

@@ -3,7 +3,7 @@ export function Notice({
   tone
 }: {
   message: string;
-  tone: "danger" | "success" | "warning";
+  tone: "danger" | "info" | "success" | "warning";
 }) {
   return (
     <div className={`notice ${tone}`} role="status">
