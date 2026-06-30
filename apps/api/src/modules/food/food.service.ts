@@ -30,6 +30,7 @@ import type {
   FoodOrderContract,
   FoodOrderFulfillmentMethod,
   FoodOrderItemContract,
+  FoodOrderItemStatus,
   FoodOrderStatusHistoryContract,
   FoodOrderStatus,
   FoodPaymentMethod,
@@ -57,6 +58,7 @@ import type {
   PaginatedContract,
   RetryPublicFoodPaymentInput,
   SetFoodPublicCustomerPrimaryAddressInput,
+  UpdateFoodOrderItemsInput,
   UpdateFoodOrderPaymentInput,
   UpdateFoodOrderStatusInput,
   UpdateFoodPublicCustomerProfileInput,
@@ -179,6 +181,7 @@ type FoodOrderItemRow = {
   product_id: string | null;
   product_name: string;
   item_note: string | null;
+  item_status: FoodOrderItemStatus;
   kitchen_required: boolean;
   unit_price_cents: number;
   quantity: number;
@@ -424,6 +427,7 @@ const orderItemSelect = [
   "product_id",
   "product_name",
   "item_note",
+  "item_status",
   "kitchen_required",
   "unit_price_cents",
   "quantity",
@@ -1683,7 +1687,7 @@ export class FoodService {
     fulfillmentMethod: FoodOrderFulfillmentMethod,
     deliveryAddressId: string | null | undefined
   ): FoodPublicCustomerAddressContract | null {
-    if (fulfillmentMethod === "pickup") {
+    if (fulfillmentMethod !== "delivery") {
       return null;
     }
 
@@ -1872,7 +1876,9 @@ export class FoodService {
         delivery_address_snapshot: options.deliveryAddress
           ? buildDeliveryAddressSnapshot(options.deliveryAddress)
           : null,
-        fulfillment_method: options.fulfillmentMethod ?? "delivery",
+        fulfillment_method:
+          options.fulfillmentMethod ??
+          (options.eventSource === "internal-order-v0" ? "dine_in" : "delivery"),
         order_number: orderNumber,
         status: initialStatus,
         store_id: store.id,
@@ -1894,6 +1900,7 @@ export class FoodService {
         normalized.items.map((item) => ({
           company_id: companyId,
           item_note: item.itemNote,
+          item_status: getInitialOrderItemStatus(item.kitchenRequired),
           kitchen_required: item.kitchenRequired,
           order_id: orderRow.id,
           product_id: item.productId,
@@ -1917,6 +1924,98 @@ export class FoodService {
     await this.emitOrderCreated(companyId, actorUserId, order, options.eventSource);
 
     return order;
+  }
+
+  async updateOrderItems(
+    companyId: string,
+    actorUserId: string,
+    orderId: string,
+    input: UpdateFoodOrderItemsInput
+  ): Promise<FoodOrderContract> {
+    const current = await this.getOrderRow(companyId, orderId);
+
+    if (!isInternalManualOrderRow(current)) {
+      throw new BadRequestException("Apenas pedidos de balcao podem ser editados neste fluxo.");
+    }
+
+    if (current.payment_status !== "pending") {
+      throw new BadRequestException("Pedido ja pago nao pode ser editado.");
+    }
+
+    if (current.status === "cancelled" || current.status === "delivered") {
+      throw new BadRequestException("Pedido finalizado ou cancelado nao pode ser editado.");
+    }
+
+    const normalized = await this.normalizeCreateOrderInput(companyId, input);
+    const existingItemsById = new Map(
+      (await this.listOrderItemsByOrderIds(companyId, [current.id]))
+        .get(current.id)
+        ?.map((item) => [item.id, item]) ?? []
+    );
+    const fulfillmentMethod = normalizeFulfillmentMethod(input.fulfillmentMethod);
+    const nextItems = buildEditedOrderItems(normalized.items, current.status, existingItemsById);
+    const subtotalCents = nextItems.reduce((sum, item) => sum + item.totalPriceCents, 0);
+    const nextStatus = getOrderStatusAfterItemsEdit(current.status, nextItems);
+
+    const { data: orderData, error: orderError } = await this.supabase.food
+      .from("orders")
+      .update({
+        customer_name: normalized.customerName,
+        customer_note: normalized.customerNote,
+        customer_phone: normalized.customerPhone,
+        delivery_address_snapshot: null,
+        fulfillment_method: fulfillmentMethod,
+        status: nextStatus,
+        subtotal_cents: subtotalCents,
+        total_cents: subtotalCents,
+        updated_by: actorUserId
+      })
+      .eq("id", orderId)
+      .eq("company_id", companyId)
+      .is("deleted_at", null)
+      .select(orderSelect)
+      .single();
+
+    if (orderError) {
+      throwSupabaseError(orderError);
+    }
+
+    const { error: deleteError } = await this.supabase.food
+      .from("order_items")
+      .delete()
+      .eq("company_id", companyId)
+      .eq("order_id", orderId);
+
+    if (deleteError) {
+      throwSupabaseError(deleteError);
+    }
+
+    const { data: itemData, error: itemError } = await this.supabase.food
+      .from("order_items")
+      .insert(
+        nextItems.map((item) => ({
+          company_id: companyId,
+          item_note: item.itemNote,
+          item_status: item.itemStatus,
+          kitchen_required: item.kitchenRequired,
+          order_id: orderId,
+          product_id: item.productId,
+          product_name: item.productName,
+          quantity: item.quantity,
+          total_price_cents: item.totalPriceCents,
+          unit_price_cents: item.unitPriceCents
+        }))
+      )
+      .select(orderItemSelect);
+
+    if (itemError) {
+      throwSupabaseError(itemError);
+    }
+
+    return mapOrder(
+      orderData as unknown as FoodOrderRow,
+      ((itemData ?? []) as unknown as FoodOrderItemRow[]).map(mapOrderItem)
+    );
   }
 
   async updateOrderStatus(
@@ -1958,6 +2057,8 @@ export class FoodService {
     if (error) {
       throwSupabaseError(error);
     }
+
+    await this.updateOrderItemStatusesForOrderStatus(companyId, orderId, status);
 
     const orderRow = data as unknown as FoodOrderRow;
     const items = await this.listOrderItemsByOrderIds(companyId, [orderRow.id]);
@@ -2027,6 +2128,56 @@ export class FoodService {
     }
 
     return order;
+  }
+
+  private async updateOrderItemStatusesForOrderStatus(
+    companyId: string,
+    orderId: string,
+    status: FoodOrderStatus
+  ): Promise<void> {
+    if (status === "preparing") {
+      const { error } = await this.supabase.food
+        .from("order_items")
+        .update({ item_status: "preparing" })
+        .eq("company_id", companyId)
+        .eq("order_id", orderId)
+        .eq("kitchen_required", true)
+        .eq("item_status", "pending");
+
+      if (error) {
+        throwSupabaseError(error);
+      }
+
+      return;
+    }
+
+    if (status === "ready") {
+      const { error } = await this.supabase.food
+        .from("order_items")
+        .update({ item_status: "ready" })
+        .eq("company_id", companyId)
+        .eq("order_id", orderId)
+        .eq("kitchen_required", true)
+        .in("item_status", ["pending", "preparing"]);
+
+      if (error) {
+        throwSupabaseError(error);
+      }
+
+      return;
+    }
+
+    if (status === "cancelled") {
+      const { error } = await this.supabase.food
+        .from("order_items")
+        .update({ item_status: "cancelled" })
+        .eq("company_id", companyId)
+        .eq("order_id", orderId);
+
+      if (error) {
+        throwSupabaseError(error);
+      }
+    }
   }
 
   private async getPublicCheckoutForCompany(
@@ -2736,7 +2887,7 @@ export class FoodService {
     store: FoodStoreRow,
     fulfillmentMethod: FoodOrderFulfillmentMethod
   ): Promise<void> {
-    if (fulfillmentMethod === "pickup") {
+    if (fulfillmentMethod !== "delivery") {
       return;
     }
 
@@ -2930,6 +3081,7 @@ export class FoodService {
 
     const normalizedItems = input.items.map((item) => ({
       itemNote: normalizeOptionalText(item.itemNote, "itemNote", 300),
+      orderItemId: normalizeOptionalText(item.orderItemId, "orderItemId", 80),
       productId: normalizeRequiredText(item.productId, "productId", 80),
       quantity: normalizeQuantity(item.quantity)
     }));
@@ -2957,6 +3109,7 @@ export class FoodService {
 
         return {
           kitchenRequired: product.kitchenRequired,
+          orderItemId: item.orderItemId,
           productId: product.id,
           productName: product.name,
           itemNote: item.itemNote,
@@ -3626,7 +3779,11 @@ function getFoodPaymentMethodFromGateway(
 function normalizeFulfillmentMethod(
   value: CreateFoodOrderInput["fulfillmentMethod"]
 ): FoodOrderFulfillmentMethod {
-  return value === "pickup" ? "pickup" : "delivery";
+  if (value === "dine_in" || value === "pickup") {
+    return value;
+  }
+
+  return "delivery";
 }
 
 function buildPublicOrderInput(
@@ -3839,6 +3996,106 @@ function getInitialOrderStatus(
   }
 
   return orderRequiresKitchen(items) ? "accepted" : "ready";
+}
+
+function getInitialOrderItemStatus(kitchenRequired: boolean): FoodOrderItemStatus {
+  return kitchenRequired ? "pending" : "ready";
+}
+
+function getEditedOrderItemStatus(
+  item: { kitchenRequired: boolean },
+  currentOrderStatus: FoodOrderStatus,
+  existingItem: FoodOrderItemContract | undefined
+): FoodOrderItemStatus {
+  if (!item.kitchenRequired) {
+    return "ready";
+  }
+
+  if (existingItem?.kitchenRequired && existingItem.itemStatus !== "cancelled") {
+    return existingItem.itemStatus;
+  }
+
+  return currentOrderStatus === "preparing" ? "preparing" : "pending";
+}
+
+function buildEditedOrderItems<
+  T extends {
+    itemNote: string | null;
+    kitchenRequired: boolean;
+    orderItemId: string | null;
+    productId: string;
+    productName: string;
+    quantity: number;
+    totalPriceCents: number;
+    unitPriceCents: number;
+  }
+>(
+  items: T[],
+  currentOrderStatus: FoodOrderStatus,
+  existingItemsById: Map<string, FoodOrderItemContract>
+): Array<T & { itemStatus: FoodOrderItemStatus }> {
+  return items.flatMap((item) => {
+    const existingItem = item.orderItemId ? existingItemsById.get(item.orderItemId) : undefined;
+    const itemStatus = getEditedOrderItemStatus(item, currentOrderStatus, existingItem);
+
+    if (
+      !existingItem ||
+      !item.kitchenRequired ||
+      existingItem.itemStatus !== "ready" ||
+      item.productId !== existingItem.productId ||
+      item.itemNote !== existingItem.itemNote ||
+      item.quantity <= existingItem.quantity
+    ) {
+      return [{ ...item, itemStatus }];
+    }
+
+    const readyQuantity = existingItem.quantity;
+    const pendingQuantity = item.quantity - existingItem.quantity;
+
+    return [
+      {
+        ...item,
+        quantity: readyQuantity,
+        totalPriceCents: item.unitPriceCents * readyQuantity,
+        itemStatus: "ready" as const
+      },
+      {
+        ...item,
+        orderItemId: null,
+        quantity: pendingQuantity,
+        totalPriceCents: item.unitPriceCents * pendingQuantity,
+        itemStatus: "pending" as const
+      }
+    ];
+  });
+}
+
+function getOrderStatusAfterItemsEdit(
+  currentStatus: FoodOrderStatus,
+  items: Array<{ itemStatus: FoodOrderItemStatus; kitchenRequired: boolean }>
+): FoodOrderStatus {
+  if (currentStatus === "cancelled" || currentStatus === "delivered") {
+    return currentStatus;
+  }
+
+  const hasPendingKitchenItems = items.some(
+    (item) =>
+      item.kitchenRequired &&
+      (item.itemStatus === "pending" || item.itemStatus === "preparing")
+  );
+
+  if (!hasPendingKitchenItems && (currentStatus === "accepted" || currentStatus === "preparing")) {
+    return "ready";
+  }
+
+  if (
+    hasPendingKitchenItems &&
+    (currentStatus === "ready" || currentStatus === "out_for_delivery")
+  ) {
+    return "accepted";
+  }
+
+  return currentStatus;
 }
 
 function isInternalManualOrderRow(order: FoodOrderRow): boolean {
@@ -4316,6 +4573,7 @@ function mapOrderItem(row: FoodOrderItemRow): FoodOrderItemContract {
     companyId: row.company_id,
     id: row.id,
     itemNote: row.item_note,
+    itemStatus: row.item_status,
     kitchenRequired: row.kitchen_required,
     orderId: row.order_id,
     productId: row.product_id,

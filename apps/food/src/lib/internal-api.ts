@@ -25,6 +25,7 @@ import type {
   PaginatedContract,
   RetryPublicFoodPaymentInput,
   SetFoodPublicCustomerPrimaryAddressInput,
+  UpdateFoodOrderItemsInput,
   UpdateFoodOrderPaymentInput,
   UpdateFoodOrderStatusInput,
   UpdateFoodPublicCustomerProfileInput,
@@ -485,6 +486,20 @@ export async function getFoodOrderDetail(
     headers: {
       "X-FP-Company-Id": companyId
     }
+  });
+}
+
+export async function updateFoodOrderItems(
+  companyId: string,
+  orderId: string,
+  input: UpdateFoodOrderItemsInput
+): Promise<InternalApiResult<FoodOrderContract>> {
+  return fetchInternal<FoodOrderContract>(`food/orders/${orderId}/items`, {
+    body: JSON.stringify(input),
+    headers: {
+      "X-FP-Company-Id": companyId
+    },
+    method: "PATCH"
   });
 }
 

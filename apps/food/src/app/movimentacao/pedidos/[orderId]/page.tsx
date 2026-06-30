@@ -1,19 +1,28 @@
 import Link from "next/link";
 import type {
   FoodOrderContract,
+  FoodOrderFulfillmentMethod,
   FoodOrderStatus,
   FoodPaymentMethod,
   FoodPaymentStatus
 } from "@fp/types";
-import { finalizeCounterFoodOrderPaymentAction } from "@/app/actions";
+import {
+  finalizeCounterFoodOrderPaymentAction,
+  updateInternalFoodOrderItemsAction
+} from "@/app/actions";
 import { CompanySwitcher } from "@/components/company-switcher";
+import { CounterServiceOrderForm } from "@/components/counter-service-order-form";
 import { formatMoney } from "@/components/food-forms";
 import { FoodShell } from "@/components/food-shell";
 import { EmptyFoodAccess, Notice } from "@/components/page-feedback";
 import { PendingSubmitButton } from "@/components/pending-submit-button";
 import { getFoodPageContext } from "@/lib/food-context";
 import { isInternalManualFoodOrder } from "@/lib/food-order-rules";
-import { getFoodAccess, getFoodOrderDetail } from "@/lib/internal-api";
+import {
+  getFoodAccess,
+  getFoodOrderDetail,
+  listAllFoodProducts
+} from "@/lib/internal-api";
 
 type OrderDetailPageProps = {
   params: Promise<{
@@ -44,6 +53,12 @@ const paymentStatusLabels: Record<FoodPaymentStatus, string> = {
   cancelled: "Cancelado",
   paid: "Pago",
   pending: "Pendente"
+};
+
+const fulfillmentLabels: Record<FoodOrderFulfillmentMethod, string> = {
+  delivery: "Entrega",
+  dine_in: "Local",
+  pickup: "Retirada"
 };
 
 const paymentMethodLabels: Record<FoodPaymentMethod, string> = {
@@ -80,7 +95,13 @@ export default async function OrderDetailPage({
   const ordersHref = selectedCompany
     ? `/movimentacao/pedidos?companyId=${selectedCompany.company.id}`
     : "/movimentacao/pedidos";
+  const canEditCounterOrder = order ? isCounterOrderEditable(order) : false;
+  const productsResult =
+    selectedCompany && canEditCounterOrder
+      ? await listAllFoodProducts(selectedCompany.company.id)
+      : { data: null, error: null };
   const counterReadyToCollect = order ? isCounterOrderReadyToCollect(order) : false;
+  const counterCollectText = getCounterCollectText(order?.fulfillmentMethod ?? "dine_in");
 
   return (
     <FoodShell activePath="/movimentacao/pedidos">
@@ -94,13 +115,14 @@ export default async function OrderDetailPage({
       {context.accessError ? <Notice tone="danger" message={context.accessError} /> : null}
       {foodAccessResult.error ? <Notice tone="danger" message={foodAccessResult.error} /> : null}
       {orderResult.error ? <Notice tone="danger" message={orderResult.error} /> : null}
+      {productsResult.error ? <Notice tone="danger" message={productsResult.error} /> : null}
       {query?.error ? <Notice tone="danger" message={query.error} /> : null}
-      {query?.orderUpdated ? <Notice tone="success" message="Status do pedido atualizado." /> : null}
+      {query?.orderUpdated ? <Notice tone="success" message="Pedido atualizado." /> : null}
       {query?.paymentUpdated ? <Notice tone="success" message="Pagamento do pedido atualizado." /> : null}
       {query?.collect && counterReadyToCollect ? (
         <Notice
           tone="info"
-          message="Confirme a forma de pagamento para marcar o pedido como pago e finalizar a entrega."
+          message={`Confirme a forma de pagamento para marcar o pedido como pago e ${counterCollectText.verb}.`}
         />
       ) : null}
 
@@ -138,6 +160,7 @@ export default async function OrderDetailPage({
               </div>
               <div className="panel-heading-actions">
                 <span className="status-chip">{orderStatusLabels[order.status]}</span>
+                <span className="status-chip">{fulfillmentLabels[order.fulfillmentMethod]}</span>
                 <span className="status-chip">{paymentStatusLabels[order.paymentStatus]}</span>
                 <Link className="secondary-action compact-action" href={ordersHref}>
                   Voltar para pedidos
@@ -169,6 +192,11 @@ export default async function OrderDetailPage({
                 ) : null}
               </div>
               <div className="order-detail-block">
+                <div className="eyebrow">Atendimento</div>
+                <strong>{fulfillmentLabels[order.fulfillmentMethod]}</strong>
+                <span>{getFulfillmentDescription(order.fulfillmentMethod)}</span>
+              </div>
+              <div className="order-detail-block">
                 <div className="eyebrow">Atualizacao</div>
                 <strong>{new Date(order.updatedAt).toLocaleString("pt-BR")}</strong>
                 <span>ID: {order.id}</span>
@@ -176,12 +204,51 @@ export default async function OrderDetailPage({
             </div>
           </section>
 
+          {canEditCounterOrder && productsResult.data ? (
+            <section className="content-panel stack-panel">
+              <div className="panel-heading">
+                <div>
+                  <h1>Editar pedido antes do pagamento</h1>
+                  <p>
+                    Corrija itens, quantidades, observacoes e tipo de atendimento antes de
+                    registrar a cobranca.
+                  </p>
+                </div>
+                <span>{productsResult.data?.length ?? 0} produto(s)</span>
+              </div>
+
+              <CounterServiceOrderForm
+                action={updateInternalFoodOrderItemsAction}
+                companyId={selectedCompany.company.id}
+                customerName={order.customerName}
+                customerNote={order.customerNote}
+                customerPhone={order.customerPhone}
+                fulfillmentMethod={order.fulfillmentMethod}
+                initialItems={order.items
+                  .filter((item) => item.productId)
+                  .map((item) => ({
+                    itemNote: item.itemNote,
+                    lineId: item.id,
+                    orderItemId: item.id,
+                    productId: item.productId ?? "",
+                    quantity: item.quantity
+                  }))}
+                orderId={order.id}
+                pendingLabel="Salvando..."
+                products={productsResult.data ?? []}
+                returnTo={detailPath}
+                submitLabel="Salvar correcoes"
+                title="Correcoes do pedido"
+              />
+            </section>
+          ) : null}
+
           {counterReadyToCollect ? (
             <section className="content-panel stack-panel">
               <div className="panel-heading">
                 <div>
                   <h1>Cobranca do balcao</h1>
-                  <p>Registre o pagamento e finalize a entrega do pedido em uma unica etapa.</p>
+                  <p>{counterCollectText.description}</p>
                 </div>
                 <span>{paymentStatusLabels[order.paymentStatus]}</span>
               </div>
@@ -192,10 +259,7 @@ export default async function OrderDetailPage({
                 <input name="returnTo" type="hidden" value={detailPath} />
                 <div>
                   <strong>Cobrar e finalizar</strong>
-                  <span>
-                    Use esta acao para pedidos de balcao: registra o pagamento e move o pedido para
-                    Entregue em uma unica etapa.
-                  </span>
+                  <span>{counterCollectText.help}</span>
                 </div>
                 <label>
                   Forma de pagamento
@@ -217,7 +281,7 @@ export default async function OrderDetailPage({
                   />
                 </label>
                 <PendingSubmitButton className="primary-action compact-action" pendingLabel="Finalizando...">
-                  Marcar pago e entregar
+                  {counterCollectText.buttonLabel}
                 </PendingSubmitButton>
               </form>
             </section>
@@ -289,9 +353,52 @@ function isCounterOrderPendingPayment(order: FoodOrderContract): boolean {
   return isInternalManualFoodOrder(order) && order.paymentStatus === "pending";
 }
 
+function isCounterOrderEditable(order: FoodOrderContract): boolean {
+  return (
+    isCounterOrderPendingPayment(order) &&
+    order.status !== "cancelled" &&
+    order.status !== "delivered"
+  );
+}
+
 function isCounterOrderReadyToCollect(order: FoodOrderContract): boolean {
   return (
     isCounterOrderPendingPayment(order) &&
     (order.status === "ready" || order.status === "out_for_delivery")
   );
+}
+
+function getFulfillmentDescription(fulfillmentMethod: FoodOrderFulfillmentMethod): string {
+  if (fulfillmentMethod === "delivery") {
+    return "Pedido de balcao com entrega.";
+  }
+
+  if (fulfillmentMethod === "pickup") {
+    return "Pedido para retirada no balcao.";
+  }
+
+  return "Pedido para consumo no local.";
+}
+
+function getCounterCollectText(fulfillmentMethod: FoodOrderFulfillmentMethod): {
+  buttonLabel: string;
+  description: string;
+  help: string;
+  verb: string;
+} {
+  if (fulfillmentMethod === "delivery") {
+    return {
+      buttonLabel: "Marcar pago e entregar",
+      description: "Registre o pagamento e finalize a entrega do pedido em uma unica etapa.",
+      help: "Use esta acao para pedidos de balcao: registra o pagamento e move o pedido para Entregue em uma unica etapa.",
+      verb: "finalizar a entrega"
+    };
+  }
+
+  return {
+    buttonLabel: "Marcar pago e finalizar",
+    description: "Registre o pagamento e finalize o atendimento em uma unica etapa.",
+    help: "Use esta acao para pedidos de balcao: registra o pagamento e conclui o atendimento em uma unica etapa.",
+    verb: "finalizar o atendimento"
+  };
 }

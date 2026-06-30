@@ -1,18 +1,40 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import type { FoodProductContract } from "@fp/types";
+import type {
+  FoodOrderFulfillmentMethod,
+  FoodProductContract
+} from "@fp/types";
 import { PendingSubmitButton } from "@/components/pending-submit-button";
 
 type CounterServiceOrderFormProps = {
   action: (formData: FormData) => void | Promise<void>;
   companyId: string;
+  customerName?: string | null;
+  customerNote?: string | null;
+  customerPhone?: string | null;
+  fulfillmentMethod?: FoodOrderFulfillmentMethod;
+  initialItems?: CounterInitialCartItem[];
+  orderId?: string;
+  pendingLabel?: string;
   products: FoodProductContract[];
+  returnTo?: string;
+  submitLabel?: string;
+  title?: string;
+};
+
+type CounterInitialCartItem = {
+  itemNote?: string | null;
+  lineId?: string;
+  orderItemId?: string | null;
+  productId: string;
+  quantity: number;
 };
 
 type CounterCartItem = {
   itemNote: string;
   lineId: string;
+  orderItemId: string | null;
   productId: string;
   quantity: number;
 };
@@ -20,9 +42,27 @@ type CounterCartItem = {
 export function CounterServiceOrderForm({
   action,
   companyId,
-  products
+  customerName,
+  customerNote,
+  customerPhone,
+  fulfillmentMethod = "dine_in",
+  initialItems = [],
+  orderId,
+  pendingLabel = "Criando...",
+  products,
+  returnTo = "/movimentacao/atendimento",
+  submitLabel = "Criar pedido de balcao",
+  title = "Pedido de balcao"
 }: CounterServiceOrderFormProps) {
-  const [items, setItems] = useState<CounterCartItem[]>([]);
+  const [items, setItems] = useState<CounterCartItem[]>(() =>
+    initialItems.map((item, index) => ({
+      itemNote: item.itemNote ?? "",
+      lineId: item.lineId ?? createCartLineId(`${item.productId}:${index}`),
+      orderItemId: item.orderItemId ?? null,
+      productId: item.productId,
+      quantity: item.quantity
+    }))
+  );
   const cartRows = useMemo(
     () =>
       items.map((item) => ({
@@ -51,6 +91,7 @@ export function CounterServiceOrderForm({
         {
           itemNote: "",
           lineId: createCartLineId(product.id),
+          orderItemId: null,
           productId: product.id,
           quantity: 1
         }
@@ -97,10 +138,14 @@ export function CounterServiceOrderForm({
   return (
     <form action={action} className="counter-service-layout">
       <input name="companyId" type="hidden" value={companyId} />
-      <input name="returnTo" type="hidden" value="/movimentacao/atendimento" />
+      <input name="returnTo" type="hidden" value={returnTo} />
+      {orderId ? <input name="orderId" type="hidden" value={orderId} /> : null}
       {items.map((item) => (
         <span hidden key={item.lineId}>
           <input name="cartLineId" type="hidden" value={item.lineId} />
+          {item.orderItemId ? (
+            <input name={`orderItemId:${item.lineId}`} type="hidden" value={item.orderItemId} />
+          ) : null}
           <input name={`productId:${item.lineId}`} type="hidden" value={item.productId} />
           <input
             name={`quantity:${item.lineId}`}
@@ -125,11 +170,12 @@ export function CounterServiceOrderForm({
               const maxQuantity = getMaxQuantity(product);
               const cartQuantity = getProductQuantity(items, product.id);
               const isUnavailable = maxQuantity <= 0;
+              const isDisabled = product.status !== "available" || isUnavailable;
 
               return (
                 <button
                   className="counter-product-card"
-                  disabled={isUnavailable || cartQuantity >= maxQuantity}
+                  disabled={isDisabled || cartQuantity >= maxQuantity}
                   key={product.id}
                   onClick={() => addProduct(product)}
                   type="button"
@@ -143,6 +189,9 @@ export function CounterServiceOrderForm({
                     <strong>{product.name}</strong>
                     {product.description ? <small>{product.description}</small> : null}
                     <b>{formatMoney(product.priceCents)}</b>
+                    {product.status !== "available" ? (
+                      <small>Produto indisponivel</small>
+                    ) : null}
                     {product.stockControlEnabled ? (
                       <small>
                         {isUnavailable ? "Sem estoque" : `${product.stockQuantity} em estoque`}
@@ -164,7 +213,7 @@ export function CounterServiceOrderForm({
       <aside className="counter-service-cart" aria-label="Carrinho do atendimento">
         <div className="counter-service-panel-heading">
           <div>
-            <strong>Pedido de balcao</strong>
+            <strong>{title}</strong>
             <span>{itemCount} item(ns)</span>
           </div>
           {items.length > 0 ? (
@@ -174,19 +223,38 @@ export function CounterServiceOrderForm({
           ) : null}
         </div>
 
+        <label>
+          Tipo de atendimento
+          <select defaultValue={fulfillmentMethod} name="fulfillmentMethod">
+            <option value="dine_in">Comer no local</option>
+            <option value="delivery">Entrega</option>
+          </select>
+        </label>
+
         <div className="form-grid">
           <label>
             Cliente opcional
-            <input maxLength={120} name="customerName" placeholder="Cliente balcao" />
+            <input
+              defaultValue={customerName ?? ""}
+              maxLength={120}
+              name="customerName"
+              placeholder="Cliente balcao"
+            />
           </label>
           <label>
             Telefone opcional
-            <input maxLength={40} name="customerPhone" placeholder="(00) 00000-0000" />
+            <input
+              defaultValue={customerPhone ?? ""}
+              maxLength={40}
+              name="customerPhone"
+              placeholder="(00) 00000-0000"
+            />
           </label>
         </div>
         <label>
           Observacao do atendimento
           <textarea
+            defaultValue={customerNote ?? ""}
             maxLength={600}
             name="customerNote"
             placeholder="Ex.: retirar no balcao, pedido de telefone, sem pressa"
@@ -253,9 +321,9 @@ export function CounterServiceOrderForm({
           </span>
           <PendingSubmitButton
             disabled={items.length === 0}
-            pendingLabel="Criando..."
+            pendingLabel={pendingLabel}
           >
-            Criar pedido de balcao
+            {submitLabel}
           </PendingSubmitButton>
         </div>
       </aside>

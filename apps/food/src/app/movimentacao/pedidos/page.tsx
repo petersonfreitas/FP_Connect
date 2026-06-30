@@ -1,5 +1,10 @@
 import Link from "next/link";
-import type { FoodOrderContract, FoodOrderStatus, FoodPaymentStatus } from "@fp/types";
+import type {
+  FoodOrderContract,
+  FoodOrderFulfillmentMethod,
+  FoodOrderStatus,
+  FoodPaymentStatus
+} from "@fp/types";
 import { CompanySwitcher } from "@/components/company-switcher";
 import { formatMoney } from "@/components/food-forms";
 import { FoodShell } from "@/components/food-shell";
@@ -52,6 +57,12 @@ const paymentStatusLabels: Record<FoodPaymentStatus, string> = {
   cancelled: "Pagamento cancelado",
   paid: "Pago",
   pending: "Pagamento pendente"
+};
+
+const fulfillmentLabels: Record<FoodOrderFulfillmentMethod, string> = {
+  delivery: "Entrega",
+  dine_in: "Local",
+  pickup: "Retirada"
 };
 
 const orderFilterOptions: OrderFilterOption[] = [
@@ -201,6 +212,9 @@ export default async function OrdersPage({ searchParams }: OrdersPageProps) {
                           <span className={getOriginBadgeClass(origin)}>
                             {origin === "counter" ? "Balcao" : "Online"}
                           </span>
+                          <span className={getFulfillmentBadgeClass(order.fulfillmentMethod)}>
+                            {fulfillmentLabels[order.fulfillmentMethod]}
+                          </span>
                           <span className={getStatusBadgeClass(order.status)}>
                             {orderStatusLabels[order.status]}
                           </span>
@@ -308,9 +322,17 @@ function isOrderPaymentCleared(order: FoodOrderContract): boolean {
 function getQuickStatusOptions(order: FoodOrderContract): Array<[FoodOrderStatus, string]> {
   if (isOrderPaymentCleared(order)) {
     const options = quickStatusOptions[order.status];
-    return isCounterOrderPendingPayment(order)
+    const filteredOptions = isCounterOrderPendingPayment(order)
       ? options.filter(([status]) => status !== "delivered")
       : options;
+
+    if (order.fulfillmentMethod !== "delivery") {
+      return filteredOptions
+        .filter(([status]) => status !== "out_for_delivery")
+        .map(([status, label]) => [status, status === "delivered" ? "Finalizar" : label]);
+    }
+
+    return filteredOptions;
   }
 
   return order.status === "cancelled" ? [] : [["cancelled", "Cancelar"]];
@@ -330,6 +352,10 @@ function getOriginBadgeClass(origin: FoodOrderOrigin): string {
 
 function getPaymentBadgeClass(status: FoodPaymentStatus): string {
   return `status-chip payment-${status}`;
+}
+
+function getFulfillmentBadgeClass(method: FoodOrderFulfillmentMethod): string {
+  return `status-chip fulfillment-${method.replaceAll("_", "-")}`;
 }
 
 function getStatusBadgeClass(status: FoodOrderStatus): string {

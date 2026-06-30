@@ -18,6 +18,7 @@ import type {
   CreateFoodOrderInput,
   CreateFoodStockEntryInput,
   FoodOrderStatus,
+  UpdateFoodOrderItemsInput,
   UpdateFoodOrderPaymentInput,
   UpdateFoodOrderStatusInput,
   UploadFoodProductImageInput,
@@ -310,6 +311,21 @@ export class FoodController {
     @Param("orderId") orderId: string
   ) {
     return this.foodService.getOrderDetail(companyId, orderId);
+  }
+
+  @Patch("orders/:orderId/items")
+  @ModuleAccessPolicy({
+    applicationKey: "food",
+    companyHeader: "x-fp-company-id",
+    permissionKey: "food.access"
+  })
+  updateOrderItems(
+    @Body() input: UpdateFoodOrderItemsInput,
+    @Headers("x-fp-company-id") companyId: string,
+    @Headers("x-fp-actor-user-id") actorUserId: string,
+    @Param("orderId") orderId: string
+  ) {
+    return this.foodService.updateOrderItems(companyId, actorUserId, orderId, input);
   }
 
   @Patch("orders/:orderId/payment")

@@ -212,7 +212,8 @@ export type FoodProductStatus = "available" | "hidden" | "unavailable";
 export type FoodStockMovementType = "entry";
 export type FoodPaymentMethod = "card" | "cash" | "other" | "pix";
 export type FoodPaymentStatus = "cancelled" | "paid" | "pending";
-export type FoodOrderFulfillmentMethod = "delivery" | "pickup";
+export type FoodOrderFulfillmentMethod = "delivery" | "dine_in" | "pickup";
+export type FoodOrderItemStatus = "cancelled" | "pending" | "preparing" | "ready";
 export type FoodCustomerStatus = "active" | "blocked" | "inactive";
 export type FoodCustomerOrigin = "counter" | "online" | "phone";
 export type FoodCustomerPreferredContactMethod =
@@ -501,6 +502,7 @@ export type FoodOrderItemContract = {
   productId: string | null;
   productName: string;
   itemNote: string | null;
+  itemStatus: FoodOrderItemStatus;
   kitchenRequired: boolean;
   unitPriceCents: number;
   quantity: number;
@@ -563,6 +565,7 @@ export type FoodDashboardContract = {
 
 export type CreateFoodOrderItemInput = {
   itemNote?: string | null;
+  orderItemId?: string | null;
   productId: string;
   quantity: number;
 };
@@ -575,6 +578,8 @@ export type CreateFoodOrderInput = {
   customerNote?: string | null;
   items: CreateFoodOrderItemInput[];
 };
+
+export type UpdateFoodOrderItemsInput = CreateFoodOrderInput;
 
 export type EnsureFoodPublicCustomerInput = {
   authUserId: string;

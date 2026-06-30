@@ -6,6 +6,7 @@ import type {
   CreateFoodStockEntryInput,
   CreatePublicFoodOrderInput,
   FoodCategoryStatus,
+  FoodOrderFulfillmentMethod,
   FoodOrderStatus,
   FoodPaymentMethod,
   FoodPaymentStatus,
@@ -34,6 +35,7 @@ import {
   setPrimaryPublicFoodCustomerPaymentMethod,
   saveFoodStoreHours,
   updateFoodCategory,
+  updateFoodOrderItems,
   updateFoodOrderPayment,
   updateFoodOrderStatus,
   updateFoodProduct,
@@ -309,28 +311,12 @@ export async function createInternalFoodOrderAction(formData: FormData): Promise
   const companyId = requireCompanyId(formData);
   const statusFilter = optionalOrderStatusFilter(formData.get("statusFilter"));
   const returnTo = normalizeFoodReturnPath(formData.get("returnTo"));
-  const lineIds = formData.getAll("cartLineId").map((value) => String(value));
-  const productIds =
-    lineIds.length > 0 ? lineIds : formData.getAll("productId").map((value) => String(value));
-  const items = productIds
-    .map((id) => {
-      const productId = String(
-        lineIds.length > 0 ? formData.get(`productId:${id}`) : id
-      ).trim();
-
-      return {
-        itemNote: optionalText(formData.get(`itemNote:${id}`)),
-        productId,
-        quantity: optionalInteger(formData.get(`quantity:${id}`)) ?? 0
-      };
-    })
-    .filter((item) => item.productId)
-    .filter((item) => item.quantity > 0);
   const input: CreateFoodOrderInput = {
     customerName: optionalText(formData.get("customerName")),
     customerNote: optionalText(formData.get("customerNote")),
     customerPhone: optionalText(formData.get("customerPhone")),
-    items
+    fulfillmentMethod: normalizeCounterFulfillmentMethod(formData.get("fulfillmentMethod")),
+    items: parseCounterOrderItems(formData)
   };
   const result = await createFoodOrder(companyId, input);
 
@@ -341,6 +327,27 @@ export async function createInternalFoodOrderAction(formData: FormData): Promise
     "orderCreated",
     { status: statusFilter }
   );
+}
+
+export async function updateInternalFoodOrderItemsAction(formData: FormData): Promise<void> {
+  const companyId = requireCompanyId(formData);
+  const orderId = String(formData.get("orderId") ?? "").trim();
+  const returnTo = normalizeFoodReturnPath(formData.get("returnTo"));
+
+  if (!orderId) {
+    redirectWithResult(returnTo, companyId, "Pedido nao informado.", "orderUpdated");
+  }
+
+  const input: CreateFoodOrderInput = {
+    customerName: optionalText(formData.get("customerName")),
+    customerNote: optionalText(formData.get("customerNote")),
+    customerPhone: optionalText(formData.get("customerPhone")),
+    fulfillmentMethod: normalizeCounterFulfillmentMethod(formData.get("fulfillmentMethod")),
+    items: parseCounterOrderItems(formData)
+  };
+  const result = await updateFoodOrderItems(companyId, orderId, input);
+
+  redirectWithResult(returnTo, companyId, result.error, "orderUpdated");
 }
 
 export async function updateFoodOrderStatusAction(formData: FormData): Promise<void> {
@@ -893,6 +900,34 @@ function optionalOrderStatusFilter(value: FormDataEntryValue | null): FoodOrderS
   }
 
   return status as FoodOrderStatus;
+}
+
+function parseCounterOrderItems(formData: FormData): CreateFoodOrderInput["items"] {
+  const lineIds = formData.getAll("cartLineId").map((value) => String(value));
+  const productIds =
+    lineIds.length > 0 ? lineIds : formData.getAll("productId").map((value) => String(value));
+
+  return productIds
+    .map((id) => {
+      const productId = String(
+        lineIds.length > 0 ? formData.get(`productId:${id}`) : id
+      ).trim();
+
+      return {
+        itemNote: optionalText(formData.get(`itemNote:${id}`)),
+        orderItemId: optionalText(formData.get(`orderItemId:${id}`)),
+        productId,
+        quantity: optionalInteger(formData.get(`quantity:${id}`)) ?? 0
+      };
+    })
+    .filter((item) => item.productId)
+    .filter((item) => item.quantity > 0);
+}
+
+function normalizeCounterFulfillmentMethod(
+  value: FormDataEntryValue | null
+): FoodOrderFulfillmentMethod {
+  return String(value ?? "") === "delivery" ? "delivery" : "dine_in";
 }
 
 function normalizePaymentStatus(value: FormDataEntryValue | null): FoodPaymentStatus {

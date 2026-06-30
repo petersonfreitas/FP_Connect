@@ -114,7 +114,7 @@ export default async function DeliveryPage({ searchParams }: DeliveryPageProps) 
 }
 
 function isPaidOrder(order: FoodOrderContract): boolean {
-  return canAdvanceFoodOrderOperationally(order);
+  return order.fulfillmentMethod === "delivery" && canAdvanceFoodOrderOperationally(order);
 }
 
 function DeliveryColumn({

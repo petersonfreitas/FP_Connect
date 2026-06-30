@@ -1,4 +1,9 @@
-import type { FoodOrderContract, FoodOrderItemContract, FoodOrderStatus } from "@fp/types";
+import type {
+  FoodOrderContract,
+  FoodOrderItemContract,
+  FoodOrderItemStatus,
+  FoodOrderStatus
+} from "@fp/types";
 import { CompanySwitcher } from "@/components/company-switcher";
 import { formatMoney } from "@/components/food-forms";
 import { FoodShell } from "@/components/food-shell";
@@ -42,8 +47,12 @@ export default async function KitchenPage({ searchParams }: KitchenPageProps) {
           })
         ])
       : [{ data: null, error: null }, { data: null, error: null }];
-  const acceptedOrders = (acceptedResult.data?.items ?? []).filter(isPaidOrder);
-  const preparingOrders = (preparingResult.data?.items ?? []).filter(isPaidOrder);
+  const acceptedOrders = (acceptedResult.data?.items ?? []).filter((order) =>
+    isKitchenOrderVisible(order, "pending")
+  );
+  const preparingOrders = (preparingResult.data?.items ?? []).filter((order) =>
+    isKitchenOrderVisible(order, "preparing")
+  );
 
   return (
     <FoodShell activePath="/movimentacao/cozinha">
@@ -94,6 +103,7 @@ export default async function KitchenPage({ searchParams }: KitchenPageProps) {
                 ["preparing", "Iniciar preparo"],
                 ["cancelled", "Cancelar"]
               ]}
+              itemStatus="pending"
             />
             <KitchenColumn
               companyId={selectedCompany.company.id}
@@ -104,6 +114,7 @@ export default async function KitchenPage({ searchParams }: KitchenPageProps) {
                 ["ready", "Marcar pronto"],
                 ["cancelled", "Cancelar"]
               ]}
+              itemStatus="preparing"
             />
           </div>
         </section>
@@ -112,20 +123,25 @@ export default async function KitchenPage({ searchParams }: KitchenPageProps) {
   );
 }
 
-function isPaidOrder(order: FoodOrderContract): boolean {
-  return canAdvanceFoodOrderOperationally(order);
+function isKitchenOrderVisible(
+  order: FoodOrderContract,
+  itemStatus: FoodOrderItemStatus
+): boolean {
+  return canAdvanceFoodOrderOperationally(order) && getKitchenItems(order, itemStatus).length > 0;
 }
 
 function KitchenColumn({
   actions,
   companyId,
   emptyMessage,
+  itemStatus,
   orders,
   title
 }: {
   actions: Array<[FoodOrderStatus, string]>;
   companyId: string;
   emptyMessage: string;
+  itemStatus: FoodOrderItemStatus;
   orders: FoodOrderContract[];
   title: string;
 }) {
@@ -139,7 +155,7 @@ function KitchenColumn({
       {orders.length > 0 ? (
         <div className="kitchen-order-list">
           {orders.map((order) => {
-            const kitchenItems = getKitchenItems(order);
+            const kitchenItems = getKitchenItems(order, itemStatus);
 
             return (
               <article className="order-card kitchen-order-card" key={order.id}>
@@ -181,6 +197,11 @@ function KitchenColumn({
   );
 }
 
-function getKitchenItems(order: FoodOrderContract): FoodOrderItemContract[] {
-  return order.items.filter((item) => item.kitchenRequired);
+function getKitchenItems(
+  order: FoodOrderContract,
+  itemStatus: FoodOrderItemStatus
+): FoodOrderItemContract[] {
+  return order.items.filter(
+    (item) => item.kitchenRequired && item.itemStatus === itemStatus
+  );
 }
