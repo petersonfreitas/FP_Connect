@@ -1124,6 +1124,34 @@ textarea {
   color: var(--muted);
 }
 
+.service-mode-grid {
+  display: grid;
+  gap: 12px;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+}
+
+.service-mode-card {
+  background: #f8fbfa;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  display: grid;
+  gap: 8px;
+  padding: 16px;
+}
+
+.service-mode-card span {
+  color: var(--muted);
+  font-size: 0.78rem;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+.service-mode-card p {
+  color: var(--muted);
+  line-height: 1.5;
+  margin: 0;
+}
+
 .order-card {
   background: #f8fbfa;
   border: 1px solid var(--line);

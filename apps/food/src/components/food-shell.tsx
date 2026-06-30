@@ -46,6 +46,7 @@ const navigation = {
       icon: "MV",
       label: "Movimentacao",
       items: [
+        { href: "/movimentacao/atendimento", label: "Atendimento" },
         { href: "/movimentacao/pedidos", label: "Pedidos" },
         { href: "/movimentacao/cozinha", label: "Cozinha" },
         { href: "/movimentacao/entregas", label: "Entregas" },

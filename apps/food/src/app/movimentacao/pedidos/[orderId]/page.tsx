@@ -12,6 +12,7 @@ import { FoodShell } from "@/components/food-shell";
 import { EmptyFoodAccess, Notice } from "@/components/page-feedback";
 import { PendingSubmitButton } from "@/components/pending-submit-button";
 import { getFoodPageContext } from "@/lib/food-context";
+import { canAdvanceFoodOrderOperationally } from "@/lib/food-order-rules";
 import { getFoodAccess, getFoodOrderDetail } from "@/lib/internal-api";
 
 type OrderDetailPageProps = {
@@ -321,7 +322,7 @@ export default async function OrderDetailPage({
 }
 
 function isOrderPaymentCleared(order: FoodOrderContract): boolean {
-  return order.paymentStatus === "paid";
+  return canAdvanceFoodOrderOperationally(order);
 }
 
 function getOrderStatusOptions(

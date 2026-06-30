@@ -6,23 +6,16 @@ import { FoodShell } from "@/components/food-shell";
 import { OrderAutoRefresh } from "@/components/order-auto-refresh";
 import { PaginationControls } from "@/components/pagination-controls";
 import { EmptyFoodAccess, Notice } from "@/components/page-feedback";
-import {
-  createInternalFoodOrderAction,
-  updateFoodOrderStatusAction
-} from "@/app/actions";
+import { updateFoodOrderStatusAction } from "@/app/actions";
 import { getFoodPageContext } from "@/lib/food-context";
-import {
-  getFoodAccess,
-  listAllFoodProducts,
-  listFoodOrders
-} from "@/lib/internal-api";
+import { getFoodAccess, listFoodOrders } from "@/lib/internal-api";
 import { PendingSubmitButton } from "@/components/pending-submit-button";
+import { canAdvanceFoodOrderOperationally } from "@/lib/food-order-rules";
 
 type OrdersPageProps = {
   searchParams?: Promise<{
     companyId?: string;
     error?: string;
-    orderCreated?: string;
     orderUpdated?: string;
     page?: string;
     status?: string;
@@ -106,18 +99,15 @@ export default async function OrdersPage({ searchParams }: OrdersPageProps) {
   const foodAccessResult = selectedCompany
     ? await getFoodAccess(selectedCompany.company.id)
     : { data: null, error: null };
-  const [productsResult, ordersResult] =
+  const ordersResult =
     selectedCompany && !foodAccessResult.error
-      ? await Promise.all([
-          listAllFoodProducts(selectedCompany.company.id),
-          listFoodOrders(selectedCompany.company.id, { page, pageSize, status: statusFilter })
-        ])
-      : [{ data: null, error: null }, { data: null, error: null }];
-  const availableProducts = (productsResult.data ?? []).filter(
-    (product) => product.status === "available"
-  );
+      ? await listFoodOrders(selectedCompany.company.id, { page, pageSize, status: statusFilter })
+      : { data: null, error: null };
   const pagination = ordersResult.data;
   const orders = pagination?.items ?? [];
+  const serviceHref = selectedCompany
+    ? `/movimentacao/atendimento?companyId=${selectedCompany.company.id}`
+    : "/movimentacao/atendimento";
 
   return (
     <FoodShell activePath="/movimentacao/pedidos">
@@ -130,10 +120,8 @@ export default async function OrdersPage({ searchParams }: OrdersPageProps) {
 
       {context.accessError ? <Notice tone="danger" message={context.accessError} /> : null}
       {foodAccessResult.error ? <Notice tone="danger" message={foodAccessResult.error} /> : null}
-      {productsResult.error ? <Notice tone="danger" message={productsResult.error} /> : null}
       {ordersResult.error ? <Notice tone="danger" message={ordersResult.error} /> : null}
       {params?.error ? <Notice tone="danger" message={params.error} /> : null}
-      {params?.orderCreated ? <Notice tone="success" message="Pedido interno criado com sucesso." /> : null}
       {params?.orderUpdated ? <Notice tone="success" message="Status do pedido atualizado." /> : null}
 
       <CompanySwitcher
@@ -146,74 +134,18 @@ export default async function OrdersPage({ searchParams }: OrdersPageProps) {
         <EmptyFoodAccess />
       ) : (
         <>
-          <section className="content-panel">
-            <div className="panel-heading">
-              <div>
-                <h1>Novo pedido interno</h1>
-                <p>Crie um pedido manual para validar produtos, eventos e status operacionais.</p>
-              </div>
-              <span>{availableProducts.length} produto(s) disponivel(is)</span>
-            </div>
-
-            <form action={createInternalFoodOrderAction} className="store-form">
-              <input name="companyId" type="hidden" value={selectedCompany.company.id} />
-              <input name="statusFilter" type="hidden" value={statusFilter ?? ""} />
-              <div className="form-grid">
-                <label>
-                  Cliente
-                  <input maxLength={120} name="customerName" placeholder="Cliente teste" />
-                </label>
-                <label>
-                  Telefone
-                  <input maxLength={40} name="customerPhone" placeholder="(00) 00000-0000" />
-                </label>
-              </div>
-              <label>
-                Observacao
-                <textarea maxLength={600} name="customerNote" rows={3} />
-              </label>
-
-              {availableProducts.length > 0 ? (
-                <div className="order-product-list">
-                  {availableProducts.map((product) => (
-                    <label className="order-product-row" key={product.id}>
-                      <input name="productId" type="hidden" value={product.id} />
-                      <span>
-                        <strong>{product.name}</strong>
-                        <small>{formatMoney(product.priceCents)}</small>
-                      </span>
-                      <input
-                        min={0}
-                        max={99}
-                        name={`quantity:${product.id}`}
-                        placeholder="0"
-                        type="number"
-                      />
-                    </label>
-                  ))}
-                </div>
-              ) : (
-                <div className="empty-state">Cadastre produtos disponiveis antes de criar pedidos.</div>
-              )}
-
-              <div className="form-footer">
-                <span>Criar pedido emite food.order.created para o FP Robots.</span>
-                <PendingSubmitButton disabled={availableProducts.length === 0} pendingLabel="Criando...">
-                  Criar pedido
-                </PendingSubmitButton>
-              </div>
-            </form>
-          </section>
-
           <section className="content-panel stack-panel">
             <div className="panel-heading">
               <div>
                 <h1>Pedidos criados</h1>
-                <p>Lista operacional com filtro por status e atualizacao leve a cada 30 segundos.</p>
+                <p>Acompanhe pedidos existentes, filtre por status e avance o fluxo operacional.</p>
               </div>
               <div className="panel-heading-actions">
                 <OrderAutoRefresh intervalSeconds={30} />
                 <span>{pagination?.total ?? 0} registro(s)</span>
+                <Link className="primary-action compact-action" href={serviceHref}>
+                  Novo atendimento
+                </Link>
               </div>
             </div>
 
@@ -349,7 +281,7 @@ function normalizePage(value: string | undefined): number {
 }
 
 function isOrderPaymentCleared(order: FoodOrderContract): boolean {
-  return order.paymentStatus === "paid";
+  return canAdvanceFoodOrderOperationally(order);
 }
 
 function getOrderStatusOptions(

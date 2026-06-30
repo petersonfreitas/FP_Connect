@@ -6,6 +6,7 @@ import { OrderStatusActions } from "@/components/order-status-actions";
 import { OrderAutoRefresh } from "@/components/order-auto-refresh";
 import { EmptyFoodAccess, Notice } from "@/components/page-feedback";
 import { getFoodPageContext } from "@/lib/food-context";
+import { canAdvanceFoodOrderOperationally } from "@/lib/food-order-rules";
 import { getFoodAccess, listFoodOrders } from "@/lib/internal-api";
 
 type KitchenPageProps = {
@@ -112,7 +113,7 @@ export default async function KitchenPage({ searchParams }: KitchenPageProps) {
 }
 
 function isPaidOrder(order: FoodOrderContract): boolean {
-  return order.paymentStatus === "paid";
+  return canAdvanceFoodOrderOperationally(order);
 }
 
 function KitchenColumn({

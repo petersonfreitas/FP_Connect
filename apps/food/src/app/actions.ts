@@ -307,6 +307,7 @@ export async function saveFoodStoreHoursAction(formData: FormData): Promise<void
 export async function createInternalFoodOrderAction(formData: FormData): Promise<void> {
   const companyId = requireCompanyId(formData);
   const statusFilter = optionalOrderStatusFilter(formData.get("statusFilter"));
+  const returnTo = normalizeFoodReturnPath(formData.get("returnTo"));
   const productIds = formData.getAll("productId").map((value) => String(value));
   const items = productIds
     .map((productId) => ({
@@ -323,7 +324,7 @@ export async function createInternalFoodOrderAction(formData: FormData): Promise
   const result = await createFoodOrder(companyId, input);
 
   redirectWithResult(
-    "/movimentacao/pedidos",
+    returnTo,
     companyId,
     result.error,
     "orderCreated",
@@ -910,7 +911,11 @@ function optionalPaymentMethod(value: FormDataEntryValue | null): FoodPaymentMet
 function normalizeFoodReturnPath(value: FormDataEntryValue | null): string {
   const path = String(value ?? "").trim();
 
-  if (path === "/movimentacao/cozinha" || path === "/movimentacao/entregas") {
+  if (
+    path === "/movimentacao/atendimento" ||
+    path === "/movimentacao/cozinha" ||
+    path === "/movimentacao/entregas"
+  ) {
     return path;
   }
 

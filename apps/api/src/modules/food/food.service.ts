@@ -1906,7 +1906,11 @@ export class FoodService {
       return mapOrder(current, items.get(current.id) ?? []);
     }
 
-    if (current.payment_status !== "paid" && isOperationalOrderStatus(status)) {
+    if (
+      current.payment_status !== "paid" &&
+      !isInternalManualOrderRow(current) &&
+      isOperationalOrderStatus(status)
+    ) {
       throw new BadRequestException(
         "Pedido com pagamento pendente nao pode avancar para cozinha ou entrega."
       );
@@ -3768,6 +3772,14 @@ function isOperationalOrderStatus(status: FoodOrderStatus): boolean {
     status === "ready" ||
     status === "out_for_delivery" ||
     status === "delivered"
+  );
+}
+
+function isInternalManualOrderRow(order: FoodOrderRow): boolean {
+  return (
+    !order.customer_account_id &&
+    !order.customer_id &&
+    !order.customer_store_access_id
   );
 }
 

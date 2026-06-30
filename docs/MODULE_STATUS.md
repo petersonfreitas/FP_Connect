@@ -149,6 +149,8 @@ Este arquivo controla o avanco dos modulos do ecossistema.
 - [x] Pedido publico vinculado ao consumidor autenticado
 - [x] Criacao de pedido interno V0
 - [x] Painel interno de pedidos
+- [x] Atendimento interno separado para criacao de pedidos de balcao
+- [ ] Controle de mesa/comanda
 - [x] Detalhe interno do pedido
 - [x] Historico simples de status do pedido
 - [x] Filtro por status no painel de pedidos
