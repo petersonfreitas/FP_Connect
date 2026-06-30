@@ -1281,6 +1281,17 @@ textarea {
   min-width: 0;
 }
 
+.counter-cart-row-note {
+  display: grid;
+  gap: 6px;
+  grid-column: 1 / -1;
+}
+
+.counter-cart-row-note textarea {
+  min-height: 70px;
+  resize: vertical;
+}
+
 .counter-empty-cart {
   min-height: 120px;
 }

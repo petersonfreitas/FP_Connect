@@ -308,12 +308,22 @@ export async function createInternalFoodOrderAction(formData: FormData): Promise
   const companyId = requireCompanyId(formData);
   const statusFilter = optionalOrderStatusFilter(formData.get("statusFilter"));
   const returnTo = normalizeFoodReturnPath(formData.get("returnTo"));
-  const productIds = formData.getAll("productId").map((value) => String(value));
+  const lineIds = formData.getAll("cartLineId").map((value) => String(value));
+  const productIds =
+    lineIds.length > 0 ? lineIds : formData.getAll("productId").map((value) => String(value));
   const items = productIds
-    .map((productId) => ({
-      productId,
-      quantity: optionalInteger(formData.get(`quantity:${productId}`)) ?? 0
-    }))
+    .map((id) => {
+      const productId = String(
+        lineIds.length > 0 ? formData.get(`productId:${id}`) : id
+      ).trim();
+
+      return {
+        itemNote: optionalText(formData.get(`itemNote:${id}`)),
+        productId,
+        quantity: optionalInteger(formData.get(`quantity:${id}`)) ?? 0
+      };
+    })
+    .filter((item) => item.productId)
     .filter((item) => item.quantity > 0);
   const input: CreateFoodOrderInput = {
     customerName: optionalText(formData.get("customerName")),

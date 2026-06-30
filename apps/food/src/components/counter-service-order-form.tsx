@@ -11,6 +11,8 @@ type CounterServiceOrderFormProps = {
 };
 
 type CounterCartItem = {
+  itemNote: string;
+  lineId: string;
   productId: string;
   quantity: number;
 };
@@ -37,39 +39,55 @@ export function CounterServiceOrderForm({
 
   function addProduct(product: FoodProductContract) {
     setItems((currentItems) => {
-      const existingItem = currentItems.find((item) => item.productId === product.id);
       const maxQuantity = getMaxQuantity(product);
+      const currentProductQuantity = getProductQuantity(currentItems, product.id);
 
-      if (existingItem) {
-        return currentItems.map((item) =>
-          item.productId === product.id
-            ? { ...item, quantity: Math.min(item.quantity + 1, maxQuantity) }
-            : item
-        );
+      if (currentProductQuantity >= maxQuantity) {
+        return currentItems;
       }
 
-      return [...currentItems, { productId: product.id, quantity: 1 }];
+      return [
+        ...currentItems,
+        {
+          itemNote: "",
+          lineId: createCartLineId(product.id),
+          productId: product.id,
+          quantity: 1
+        }
+      ];
     });
   }
 
-  function updateQuantity(product: FoodProductContract, quantity: number) {
-    const nextQuantity = Math.min(Math.max(Math.trunc(quantity), 0), getMaxQuantity(product));
-
+  function updateQuantity(lineId: string, product: FoodProductContract, quantity: number) {
     setItems((currentItems) => {
-      if (nextQuantity <= 0) {
-        return currentItems.filter((item) => item.productId !== product.id);
+      const currentItem = currentItems.find((item) => item.lineId === lineId);
+
+      if (!currentItem) {
+        return currentItems;
       }
 
-      const existingItem = currentItems.find((item) => item.productId === product.id);
+      const otherProductQuantity = currentItems
+        .filter((item) => item.productId === product.id && item.lineId !== lineId)
+        .reduce((sum, item) => sum + item.quantity, 0);
+      const lineMaxQuantity = Math.max(getMaxQuantity(product) - otherProductQuantity, 0);
+      const nextQuantity = Math.min(Math.max(Math.trunc(quantity), 0), lineMaxQuantity);
 
-      if (!existingItem) {
-        return [...currentItems, { productId: product.id, quantity: nextQuantity }];
+      if (nextQuantity <= 0) {
+        return currentItems.filter((item) => item.lineId !== lineId);
       }
 
       return currentItems.map((item) =>
-        item.productId === product.id ? { ...item, quantity: nextQuantity } : item
+        item.lineId === lineId ? { ...item, quantity: nextQuantity } : item
       );
     });
+  }
+
+  function updateItemNote(lineId: string, itemNote: string) {
+    setItems((currentItems) =>
+      currentItems.map((item) =>
+        item.lineId === lineId ? { ...item, itemNote: itemNote.slice(0, 300) } : item
+      )
+    );
   }
 
   function clearCart() {
@@ -81,13 +99,15 @@ export function CounterServiceOrderForm({
       <input name="companyId" type="hidden" value={companyId} />
       <input name="returnTo" type="hidden" value="/movimentacao/atendimento" />
       {items.map((item) => (
-        <span hidden key={item.productId}>
-          <input name="productId" type="hidden" value={item.productId} />
+        <span hidden key={item.lineId}>
+          <input name="cartLineId" type="hidden" value={item.lineId} />
+          <input name={`productId:${item.lineId}`} type="hidden" value={item.productId} />
           <input
-            name={`quantity:${item.productId}`}
+            name={`quantity:${item.lineId}`}
             type="hidden"
             value={String(item.quantity)}
           />
+          <input name={`itemNote:${item.lineId}`} type="hidden" value={item.itemNote} />
         </span>
       ))}
 
@@ -102,14 +122,14 @@ export function CounterServiceOrderForm({
         {products.length > 0 ? (
           <div className="counter-product-grid">
             {products.map((product) => {
-              const cartItem = items.find((item) => item.productId === product.id);
               const maxQuantity = getMaxQuantity(product);
+              const cartQuantity = getProductQuantity(items, product.id);
               const isUnavailable = maxQuantity <= 0;
 
               return (
                 <button
                   className="counter-product-card"
-                  disabled={isUnavailable || Boolean(cartItem && cartItem.quantity >= maxQuantity)}
+                  disabled={isUnavailable || cartQuantity >= maxQuantity}
                   key={product.id}
                   onClick={() => addProduct(product)}
                   type="button"
@@ -128,7 +148,7 @@ export function CounterServiceOrderForm({
                         {isUnavailable ? "Sem estoque" : `${product.stockQuantity} em estoque`}
                       </small>
                     ) : null}
-                    {cartItem ? <em>{cartItem.quantity} no pedido</em> : null}
+                    {cartQuantity > 0 ? <em>{cartQuantity} no pedido</em> : null}
                   </span>
                 </button>
               );
@@ -178,7 +198,7 @@ export function CounterServiceOrderForm({
           <div className="counter-cart-list">
             {cartRows.map(({ item, product }) =>
               product ? (
-                <article className="counter-cart-row" key={item.productId}>
+                <article className="counter-cart-row" key={item.lineId}>
                   <div>
                     <strong>{product.name}</strong>
                     <small>{formatMoney(product.priceCents)} cada</small>
@@ -186,7 +206,7 @@ export function CounterServiceOrderForm({
                   <div className="quantity-control">
                     <button
                       aria-label="Diminuir quantidade"
-                      onClick={() => updateQuantity(product, item.quantity - 1)}
+                      onClick={() => updateQuantity(item.lineId, product, item.quantity - 1)}
                       type="button"
                     >
                       -
@@ -194,14 +214,24 @@ export function CounterServiceOrderForm({
                     <span>{item.quantity}</span>
                     <button
                       aria-label="Aumentar quantidade"
-                      disabled={item.quantity >= getMaxQuantity(product)}
-                      onClick={() => updateQuantity(product, item.quantity + 1)}
+                      disabled={item.quantity >= getLineMaxQuantity(item, product, items)}
+                      onClick={() => updateQuantity(item.lineId, product, item.quantity + 1)}
                       type="button"
                     >
                       +
                     </button>
                   </div>
                   <strong>{formatMoney(product.priceCents * item.quantity)}</strong>
+                  <label className="counter-cart-row-note">
+                    Observacao do item
+                    <textarea
+                      maxLength={300}
+                      onChange={(event) => updateItemNote(item.lineId, event.target.value)}
+                      placeholder="Ex.: sem cebola, cortar ao meio, sem gelo"
+                      rows={2}
+                      value={item.itemNote}
+                    />
+                  </label>
                 </article>
               ) : null
             )}
@@ -235,6 +265,32 @@ export function CounterServiceOrderForm({
 
 function getMaxQuantity(product: FoodProductContract): number {
   return product.stockControlEnabled ? Math.max(product.stockQuantity, 0) : 99;
+}
+
+function getProductQuantity(items: CounterCartItem[], productId: string): number {
+  return items
+    .filter((item) => item.productId === productId)
+    .reduce((sum, item) => sum + item.quantity, 0);
+}
+
+function getLineMaxQuantity(
+  item: CounterCartItem,
+  product: FoodProductContract,
+  items: CounterCartItem[]
+): number {
+  const otherProductQuantity = items
+    .filter((cartItem) => cartItem.productId === item.productId && cartItem.lineId !== item.lineId)
+    .reduce((sum, cartItem) => sum + cartItem.quantity, 0);
+
+  return Math.max(getMaxQuantity(product) - otherProductQuantity, 0);
+}
+
+function createCartLineId(productId: string): string {
+  if (typeof crypto !== "undefined" && "randomUUID" in crypto) {
+    return crypto.randomUUID();
+  }
+
+  return `${productId}:${Date.now()}:${Math.random().toString(36).slice(2)}`;
 }
 
 function formatMoney(value: number): string {
