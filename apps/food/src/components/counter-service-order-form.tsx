@@ -219,8 +219,7 @@ export function CounterServiceOrderForm({
 
         <div className="form-footer">
           <span>
-            O pedido nasce como atendimento interno e pode seguir para cozinha mesmo sem
-            pagamento online.
+            O pedido nasce aceito e entra na fila da cozinha mesmo sem pagamento online.
           </span>
           <PendingSubmitButton
             disabled={items.length === 0}

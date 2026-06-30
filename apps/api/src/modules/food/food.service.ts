@@ -1830,6 +1830,7 @@ export class FoodService {
     const store = await this.getStore(companyId);
     const normalized = await this.normalizeCreateOrderInput(companyId, input);
     const subtotalCents = normalized.items.reduce((sum, item) => sum + item.totalPriceCents, 0);
+    const initialStatus = getInitialOrderStatus(options);
     const orderNumber = buildOrderNumber();
     const { data: orderData, error: orderError } = await this.supabase.food
       .from("orders")
@@ -1848,7 +1849,7 @@ export class FoodService {
           : null,
         fulfillment_method: options.fulfillmentMethod ?? "delivery",
         order_number: orderNumber,
-        status: "created",
+        status: initialStatus,
         store_id: store.id,
         subtotal_cents: subtotalCents,
         total_cents: subtotalCents,
@@ -3773,6 +3774,10 @@ function isOperationalOrderStatus(status: FoodOrderStatus): boolean {
     status === "out_for_delivery" ||
     status === "delivered"
   );
+}
+
+function getInitialOrderStatus(options: CreateOrderOptions): FoodOrderStatus {
+  return options.eventSource === "internal-order-v0" ? "accepted" : "created";
 }
 
 function isInternalManualOrderRow(order: FoodOrderRow): boolean {
