@@ -1,10 +1,9 @@
 import Link from "next/link";
 import { createInternalFoodOrderAction } from "@/app/actions";
 import { CompanySwitcher } from "@/components/company-switcher";
-import { formatMoney } from "@/components/food-forms";
+import { CounterServiceOrderForm } from "@/components/counter-service-order-form";
 import { FoodShell } from "@/components/food-shell";
 import { EmptyFoodAccess, Notice } from "@/components/page-feedback";
-import { PendingSubmitButton } from "@/components/pending-submit-button";
 import { getFoodPageContext } from "@/lib/food-context";
 import {
   getFoodAccess,
@@ -84,67 +83,11 @@ export default async function ServicePage({ searchParams }: ServicePageProps) {
               </div>
             </div>
 
-            <form action={createInternalFoodOrderAction} className="store-form">
-              <input name="companyId" type="hidden" value={selectedCompany.company.id} />
-              <input name="returnTo" type="hidden" value="/movimentacao/atendimento" />
-              <div className="form-grid">
-                <label>
-                  Cliente opcional
-                  <input maxLength={120} name="customerName" placeholder="Cliente balcao" />
-                </label>
-                <label>
-                  Telefone opcional
-                  <input maxLength={40} name="customerPhone" placeholder="(00) 00000-0000" />
-                </label>
-              </div>
-              <label>
-                Observacao do atendimento
-                <textarea
-                  maxLength={600}
-                  name="customerNote"
-                  placeholder="Ex.: retirar no balcao, pedido de telefone, sem pressa"
-                  rows={3}
-                />
-              </label>
-
-              {availableProducts.length > 0 ? (
-                <div className="order-product-list">
-                  {availableProducts.map((product) => (
-                    <label className="order-product-row" key={product.id}>
-                      <input name="productId" type="hidden" value={product.id} />
-                      <span>
-                        <strong>{product.name}</strong>
-                        <small>{formatMoney(product.priceCents)}</small>
-                      </span>
-                      <input
-                        min={0}
-                        max={99}
-                        name={`quantity:${product.id}`}
-                        placeholder="0"
-                        type="number"
-                      />
-                    </label>
-                  ))}
-                </div>
-              ) : (
-                <div className="empty-state">
-                  Cadastre produtos disponiveis antes de criar pedidos de balcao.
-                </div>
-              )}
-
-              <div className="form-footer">
-                <span>
-                  O pedido nasce como atendimento interno e pode seguir para cozinha mesmo sem
-                  pagamento online.
-                </span>
-                <PendingSubmitButton
-                  disabled={availableProducts.length === 0}
-                  pendingLabel="Criando..."
-                >
-                  Criar pedido de balcao
-                </PendingSubmitButton>
-              </div>
-            </form>
+            <CounterServiceOrderForm
+              action={createInternalFoodOrderAction}
+              companyId={selectedCompany.company.id}
+              products={availableProducts}
+            />
           </section>
 
           <section className="content-panel stack-panel">
