@@ -1039,45 +1039,53 @@ function PaymentRequestsTable({
         <span>Status</span>
         <span>Acao</span>
       </div>
-      {paymentRequests.map((paymentRequest) => (
-        <div className="data-row payment-request-row" role="row" key={paymentRequest.id}>
-          <span>
-            <strong>{paymentRequest.description}</strong>
-            <small>
-              {paymentRequest.sourceApplicationKey}.{paymentRequest.sourceReferenceType} /{" "}
-              {paymentRequest.sourceReferenceId}
-            </small>
-          </span>
-          <span>
-            {formatCurrency(paymentRequest.amountCents, paymentRequest.currency)}
-            <small>{paymentRequest.providerName}</small>
-          </span>
-          <span>
-            {getPaymentRequestStatusLabel(paymentRequest.status)}
-            {paymentRequest.errorMessage ? <small>{paymentRequest.errorMessage}</small> : null}
-            {paymentRequest.paymentUrl ? (
+      {paymentRequests.map((paymentRequest) => {
+        const isPaid = paymentRequest.status === "paid";
+
+        return (
+          <div className="data-row payment-request-row" role="row" key={paymentRequest.id}>
+            <span>
+              <strong>{paymentRequest.description}</strong>
               <small>
-                <a href={paymentRequest.paymentUrl} rel="noreferrer" target="_blank">
-                  Abrir pagamento
-                </a>
+                {paymentRequest.sourceApplicationKey}.{paymentRequest.sourceReferenceType} /{" "}
+                {paymentRequest.sourceReferenceId}
               </small>
-            ) : null}
-          </span>
-          <span>
-            {paymentRequest.providerReference ? (
-              <form action={syncGatewayPaymentRequestStatusAction} className="inline-form">
-                <input name="companyId" type="hidden" value={companyId} />
-                <input name="paymentRequestId" type="hidden" value={paymentRequest.id} />
-                <PendingSubmitButton className="secondary-action" pendingLabel="Consultando...">
-                  Consultar status
-                </PendingSubmitButton>
-              </form>
-            ) : (
-              <small>Aguardando provedor</small>
-            )}
-          </span>
-        </div>
-      ))}
+            </span>
+            <span>
+              {formatCurrency(paymentRequest.amountCents, paymentRequest.currency)}
+              <small>{paymentRequest.providerName}</small>
+            </span>
+            <span>
+              {getPaymentRequestStatusLabel(paymentRequest.status)}
+              {paymentRequest.errorMessage ? <small>{paymentRequest.errorMessage}</small> : null}
+              {paymentRequest.paymentUrl ? (
+                <small>
+                  <a href={paymentRequest.paymentUrl} rel="noreferrer" target="_blank">
+                    Abrir pagamento
+                  </a>
+                </small>
+              ) : null}
+            </span>
+            <span>
+              {paymentRequest.providerReference ? (
+                <form action={syncGatewayPaymentRequestStatusAction} className="inline-form">
+                  <input name="companyId" type="hidden" value={companyId} />
+                  <input name="paymentRequestId" type="hidden" value={paymentRequest.id} />
+                  <PendingSubmitButton
+                    className="secondary-action"
+                    disabled={isPaid}
+                    pendingLabel="Consultando..."
+                  >
+                    {isPaid ? "Pagamento confirmado" : "Consultar status"}
+                  </PendingSubmitButton>
+                </form>
+              ) : (
+                <small>Aguardando provedor</small>
+              )}
+            </span>
+          </div>
+        );
+      })}
     </div>
   );
 }

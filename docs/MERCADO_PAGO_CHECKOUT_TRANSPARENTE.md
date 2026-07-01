@@ -32,6 +32,7 @@ Referencia operacional para a evolucao do FP Gateway com Mercado Pago Orders API
 - Evento Mercado Pago a configurar: `Order (Mercado Pago)`.
 - A assinatura `x-signature` deve ser validada com HMAC SHA256 conforme a documentacao oficial.
 - Apos receber notificacao `order`, a API consulta `/v1/orders/{id}` pelo SDK, atualiza `gateway.payment_requests` e publica o evento correspondente no Robots.
+- A conciliacao automatica por webhook e a consulta manual do Gateway usam a mesma rotina server-side. A consulta manual permanece como fallback operacional, mas fica bloqueada na interface quando a solicitacao ja esta com status `paid`.
 
 ## Evolucao sugerida
 
@@ -46,3 +47,4 @@ Referencia operacional para a evolucao do FP Gateway com Mercado Pago Orders API
 
 - 2026-06-22: smoke test online do checkout publico com cartao de credito validado no sandbox Mercado Pago usando os cenarios APRO, OTHE e CONT.
 - Cartao de debito permanece pendente de validacao por falta de cartao de teste no momento.
+- Para validar webhook: criar uma cobranca pendente, aprovar no sandbox, confirmar que `gateway.payment_requests.status` virou `paid`, que o pedido Food de origem virou `payment_status = paid`, que o evento de transicao foi publicado no FP Robots e que o botao manual aparece desabilitado como `Pagamento confirmado`.
