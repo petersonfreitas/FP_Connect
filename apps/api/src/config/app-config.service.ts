@@ -25,7 +25,9 @@ export class AppConfigService {
     this.webUrl = readRequiredUrl(env, "FP_WEB_URL").replace(/\/$/, "");
     this.mercadoPagoClientId = readOptional(env, "MERCADO_PAGO_CLIENT_ID");
     this.mercadoPagoClientSecret = readOptional(env, "MERCADO_PAGO_CLIENT_SECRET");
-    this.mercadoPagoWebhookSecret = readOptional(env, "MERCADO_PAGO_WEBHOOK_SECRET");
+    this.mercadoPagoWebhookSecret = stripWrappingQuotes(
+      readOptional(env, "MERCADO_PAGO_WEBHOOK_SECRET")
+    );
   }
 }
 
@@ -54,6 +56,19 @@ function readRequired(env: NodeJS.ProcessEnv, key: string): string {
 function readOptional(env: NodeJS.ProcessEnv, key: string): string | undefined {
   const value = env[key]?.trim();
   return value || undefined;
+}
+
+function stripWrappingQuotes(value: string | undefined): string | undefined {
+  if (!value || value.length < 2) {
+    return value;
+  }
+
+  const first = value[0];
+  const last = value[value.length - 1];
+
+  return (first === "\"" && last === "\"") || (first === "'" && last === "'")
+    ? value.slice(1, -1).trim()
+    : value;
 }
 
 function readRequiredUrl(env: NodeJS.ProcessEnv, key: string): string {
