@@ -517,8 +517,9 @@ export class GatewayService {
     this.validateMercadoPagoWebhookSignature(input);
 
     const resourceId = normalizeMercadoPagoWebhookResourceId(input);
+    const notificationType = normalizeMercadoPagoWebhookType(input);
 
-    if (!resourceId || input.type !== "order") {
+    if (!resourceId || notificationType !== "order") {
       return {
         ignored: true,
         paymentRequestId: null,
@@ -1060,10 +1061,17 @@ export class GatewayService {
   private async getPaymentRequestRowByProviderReference(
     providerReference: string
   ): Promise<PaymentRequestRow | null> {
+    const providerReferenceVariants = Array.from(
+      new Set([
+        providerReference,
+        providerReference.toUpperCase(),
+        providerReference.toLowerCase()
+      ])
+    );
     const { data, error } = await this.supabase.gateway
       .from("payment_requests")
       .select(paymentRequestSelect)
-      .eq("provider_reference", providerReference)
+      .in("provider_reference", providerReferenceVariants)
       .is("deleted_at", null)
       .maybeSingle();
 
@@ -1949,6 +1957,16 @@ function normalizeMercadoPagoWebhookResourceId(
   }
 
   return null;
+}
+
+function normalizeMercadoPagoWebhookType(input: GatewayMercadoPagoWebhookInput): string | null {
+  const queryType = parseOptionalString(input.type);
+
+  if (queryType) {
+    return queryType.toLowerCase();
+  }
+
+  return parseOptionalString(input.body.type)?.toLowerCase() ?? null;
 }
 
 function parseMercadoPagoSignature(signature: string | null): {
