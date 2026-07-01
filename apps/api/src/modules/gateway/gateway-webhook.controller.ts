@@ -10,6 +10,7 @@ export class GatewayWebhookController {
   handleMercadoPagoWebhook(
     @Body() body: Record<string, unknown>,
     @Query() query: Record<string, unknown>,
+    @Headers() headers: Record<string, string | string[] | undefined>,
     @Headers("x-request-id") xRequestId: string | undefined,
     @Headers("x-signature") signature: string | undefined,
     @Query("data.id") dataId: string | undefined,
@@ -18,6 +19,7 @@ export class GatewayWebhookController {
     return this.gatewayService.handleMercadoPagoWebhook({
       body,
       dataId: dataId ?? readMercadoPagoQueryDataId(query),
+      headers,
       signature: signature ?? null,
       type: type ?? readMercadoPagoQueryType(query),
       xRequestId: xRequestId ?? null

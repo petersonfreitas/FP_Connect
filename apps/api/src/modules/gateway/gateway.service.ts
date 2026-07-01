@@ -106,6 +106,7 @@ type PaymentRequestRow = {
 type GatewayMercadoPagoWebhookInput = {
   body: Record<string, unknown>;
   dataId: string | null;
+  headers: Record<string, string | string[] | undefined>;
   signature: string | null;
   type: string | null;
   xRequestId: string | null;
@@ -1490,6 +1491,7 @@ export class GatewayService {
           hasDataId: Boolean(normalizeMercadoPagoWebhookResourceId(input)),
           hasRequestId: Boolean(parseOptionalString(input.xRequestId)),
           queryBodyDataIdMatch: getMercadoPagoWebhookQueryBodyDataIdMatch(input),
+          requestIdCandidateFingerprints: getMercadoPagoWebhookRequestIdDiagnostics(input),
           requestIdFingerprint: fingerprintForLog(parseOptionalString(input.xRequestId)),
           sdkFailureReasons: sdkValidation.failureReasons,
           secretFingerprint: fingerprintForLog(secret),
@@ -2158,12 +2160,50 @@ function getMercadoPagoWebhookSignatureRequestIdCandidates(
 ): Array<string | null> {
   const candidates = [
     parseOptionalString(input.xRequestId),
+    ...getMercadoPagoWebhookRequestIdHeaderCandidates(input).map((candidate) => candidate.value),
     null
   ];
 
   return candidates.filter(
     (candidate, index) => candidates.findIndex((item) => item === candidate) === index
   );
+}
+
+function getMercadoPagoWebhookRequestIdDiagnostics(
+  input: GatewayMercadoPagoWebhookInput
+): Array<{ fingerprint: string | null; source: string }> {
+  return getMercadoPagoWebhookRequestIdHeaderCandidates(input).map((candidate) => ({
+    fingerprint: fingerprintForLog(candidate.value),
+    source: candidate.source
+  }));
+}
+
+function getMercadoPagoWebhookRequestIdHeaderCandidates(
+  input: GatewayMercadoPagoWebhookInput
+): Array<{ source: string; value: string }> {
+  const headerNames = [
+    "x-request-id",
+    "x-original-request-id",
+    "x-forwarded-request-id",
+    "x-meli-request-id",
+    "x-mp-request-id",
+    "x-correlation-id",
+    "x-render-request-id"
+  ];
+  const candidates: Array<{ source: string; value: string }> = [];
+
+  for (const headerName of headerNames) {
+    for (const value of readHeaderStringCandidates(input.headers, headerName)) {
+      if (!candidates.some((candidate) => candidate.value === value)) {
+        candidates.push({
+          source: headerName,
+          value
+        });
+      }
+    }
+  }
+
+  return candidates;
 }
 
 function normalizeMercadoPagoWebhookType(input: GatewayMercadoPagoWebhookInput): string | null {
@@ -2213,6 +2253,19 @@ function parseMercadoPagoSignature(signature: string | null): {
   }
 
   return parsed;
+}
+
+function readHeaderStringCandidates(
+  headers: Record<string, string | string[] | undefined>,
+  key: string
+): string[] {
+  const value = headers[key] ?? headers[key.toLowerCase()];
+  const values = Array.isArray(value) ? value : value ? [value] : [];
+
+  return values
+    .flatMap((item) => item.split(","))
+    .map((item) => item.trim())
+    .filter(Boolean);
 }
 
 function fingerprintForLog(value: string | null | undefined): string | null {
