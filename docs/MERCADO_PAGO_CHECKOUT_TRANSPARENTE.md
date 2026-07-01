@@ -38,6 +38,7 @@ Referencia operacional para a evolucao do FP Gateway com Mercado Pago Orders API
 - Em sandbox (`live_mode=false`), o Mercado Pago pode enviar eventos reais com `application_id` das credenciais de teste, enquanto o simulador usa o numero da aplicacao geral. Se a assinatura falhar nesse caso, o Gateway aceita a notificacao apenas como gatilho, consulta `/v1/orders/{id}` com o Access Token da empresa e concilia somente com a resposta oficial do Mercado Pago. Em producao (`live_mode=true`), assinatura invalida continua bloqueando o webhook.
 - Apos receber notificacao `order`, a API consulta `/v1/orders/{id}` pelo SDK usando o ID `ORD...`, atualiza `gateway.payment_requests` e publica o evento correspondente no Robots.
 - A conciliacao automatica por webhook e a consulta manual do Gateway usam a mesma rotina server-side. A consulta manual permanece como fallback operacional, mas fica bloqueada na interface quando a solicitacao ja esta com status `paid`.
+- Decisao futura: manter `sandbox_signature_fallback` como trilha auditavel, mas reduzir/rebaixar o log diagnostico de `signature_invalid` quando `live_mode=false` e a conciliacao por consulta oficial da Order terminar com sucesso.
 
 ## Evolucao sugerida
 
@@ -51,5 +52,6 @@ Referencia operacional para a evolucao do FP Gateway com Mercado Pago Orders API
 ## Validacoes
 
 - 2026-06-22: smoke test online do checkout publico com cartao de credito validado no sandbox Mercado Pago usando os cenarios APRO, OTHE e CONT.
+- 2026-07-01: smoke test online do webhook Mercado Pago sandbox validado com retorno `200` no painel do Mercado Pago. O evento real sandbox veio com `application_id` das credenciais de teste, diferente do simulador; o Gateway usou fallback defensivo, consultou a Order no Mercado Pago e conciliou sem confiar no payload bruto.
 - Cartao de debito permanece pendente de validacao por falta de cartao de teste no momento.
-- Para validar webhook: criar uma cobranca pendente, aprovar no sandbox, confirmar que `gateway.payment_requests.status` virou `paid`, que o pedido Food de origem virou `payment_status = paid`, que o evento de transicao foi publicado no FP Robots e que o botao manual aparece desabilitado como `Pagamento confirmado`.
+- Para validar webhook: criar uma cobranca pendente, aprovar no sandbox, confirmar retorno `200` no Mercado Pago, `gateway.payment_requests.status = paid`, pedido Food de origem com `payment_status = paid`, evento de transicao publicado no FP Robots e botao manual desabilitado como `Pagamento confirmado`.

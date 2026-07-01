@@ -174,11 +174,13 @@ FP Food:
 - opera como produto transacional separado do Console;
 - usa o schema `food`;
 - consulta identidade, empresa, modulos e permissoes no `core` via API;
+- mantem vitrine publica aberta e checkout autenticado, com pedidos, cozinha, estoque e entrega simples como responsabilidade propria;
 - publica eventos `food.*` para o FP Robots quando houver mudanca operacional relevante.
 
 FP Gateway:
 
 - modulo iniciado no Console para credenciais, OAuth, pagamentos e provedores externos;
+- processa pagamentos Mercado Pago via Orders API e concentra webhooks/conciliacao oficial;
 - deve encapsular WhatsApp, Instagram, Facebook, Ads, Mercado Pago, PagSeguro e canais equivalentes;
 - deve ser a fronteira entre o ecossistema e APIs externas.
 - integracoes Mercado Pago devem seguir a referencia em `docs/MERCADO_PAGO_CHECKOUT_TRANSPARENTE.md`.
@@ -224,7 +226,7 @@ Prioridade atual:
 2. FP Robots.
 3. FP Food.
 4. FP Gateway.
-5. FP Tracking.
+5. FP Tracking como ciclo futuro apos estabilizacao de Food, Gateway, Robots e Console.
 
 Futuros modulos:
 

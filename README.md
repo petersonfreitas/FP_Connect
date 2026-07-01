@@ -11,7 +11,7 @@ Monorepo do ecossistema SaaS FP WebTech.
 
 ## Estagio atual
 
-O projeto esta na fundacao do **FP Connect Admin Console**.
+O projeto esta em amadurecimento produtivo do ecossistema **FP Connect**, com Console, Robots, Gateway e Food ja funcionais em V0/V1 operacional.
 
 Ja existe base funcional para:
 
@@ -55,12 +55,12 @@ Ja existe base funcional para:
 
 O foco atual deixou de ser criacao de shells e passou a ser amadurecimento produtivo dos fluxos ja implementados:
 
-- smoke tests manuais dos fluxos principais, pendentes enquanto o acesso ao Supabase estiver instavel;
+- smoke tests manuais recorrentes dos fluxos principais;
 - estabilizacao de UX, validacoes, observabilidade e processos reais em Console, Food, Gateway e Robots;
-- smoke tests e conciliacao online do Mercado Pago, especialmente webhook e cartao de debito;
+- smoke tests e conciliacao online do Mercado Pago, com webhook sandbox ja validado e cartao de debito ainda pendente;
 - preparacao gradual para Tracking completo somente depois que pedido, pagamento, eventos e operacao base estiverem maduros.
 
-O FP Robots ja possui base funcional com catalogo de eventos, event log, regras simples, execucoes e reprocessamento basico. O FP Gateway ja concentra provedores, Mercado Pago, pagamentos, webhook V0, SMTP laboratorio/fallback e eventos `gateway.*`. O FP Food ja opera em frontend separado com loja, cardapio, pedidos, cozinha, entrega simples, vitrine publica, login/cadastro de consumidor e checkout Mercado Pago via Gateway.
+O FP Robots ja possui base funcional com catalogo de eventos, event log, regras simples, execucoes e reprocessamento basico. O FP Gateway ja concentra provedores, Mercado Pago, pagamentos Pix/cartao via Orders API, webhook V0, SMTP laboratorio/fallback e eventos `gateway.*`. O FP Food ja opera em frontend separado com loja, cardapio, imagens de produtos, carrinho editavel, pedidos, atendimento de balcao, cozinha por item, estoque direto, entrega simples, vitrine publica, login/cadastro de consumidor, enderecos, Meus pedidos e checkout Mercado Pago via Gateway.
 
 Nota de arquitetura: o FP Robots orquestra eventos, regras, acoes, execucoes, falhas e reprocessamentos. O FP Gateway encapsula provedores externos como Mercado Pago, SMTP e futuros canais como WhatsApp, Instagram, Facebook, Ads, PagSeguro e equivalentes, sem transferir para ele a decisao de negocio dos modulos consumidores.
 
@@ -120,6 +120,7 @@ No estado atual do projeto:
 - `FP_API_INTERNAL_URL` e usada pelo Next server-side para chamar a API interna. Prefira informar a URL com `/api`.
 - `FP_WEB_URL` define a URL base usada em links server-side, como recuperacao de senha e convite de usuarios.
 - `MERCADO_PAGO_CLIENT_ID` e `MERCADO_PAGO_CLIENT_SECRET` ficam somente na API e habilitam o OAuth do FP Gateway.
+- `MERCADO_PAGO_WEBHOOK_SECRET` fica somente na API e valida notificacoes Mercado Pago. Em sandbox, o Gateway pode usar fallback defensivo quando `live_mode=false` e a assinatura divergir entre aplicacao geral e credenciais de teste, conciliando sempre por consulta oficial da Order.
 - No app Mercado Pago, cadastre o redirect como `${FP_WEB_URL}/gateway/mercado-pago/callback`.
 - `FP_CNPJ_LOOKUP_USER_AGENT` identifica a chamada server-side para provedores de CNPJ, como BrasilAPI.
 
@@ -265,11 +266,15 @@ Endpoints internos atuais do FP Food operacional:
 - `GET /api/food/products?page=1&pageSize=20`
 - `POST /api/food/products`
 - `PATCH /api/food/products/:productId`
+- `POST /api/food/products/:productId/image`
+- `GET /api/food/stock/movements?page=1&pageSize=20`
+- `POST /api/food/stock/entries`
 - `GET /api/food/menu`
 - `GET /api/food/dashboard`
 - `GET /api/food/orders?page=1&pageSize=20`
 - `POST /api/food/orders`
 - `GET /api/food/orders/:orderId`
+- `PATCH /api/food/orders/:orderId/items`
 - `PATCH /api/food/orders/:orderId/payment`
 - `PATCH /api/food/orders/:orderId/status`
 
@@ -282,6 +287,11 @@ Endpoints internos publicos do FP Food, consumidos server-side pelo `apps/food`:
 - `PATCH /api/food/public/stores/:publicSlug/customers/me/profile`
 - `POST /api/food/public/stores/:publicSlug/customers/me/addresses`
 - `PATCH /api/food/public/stores/:publicSlug/customers/me/addresses/:addressId/primary`
+- `PATCH /api/food/public/stores/:publicSlug/customers/me/addresses/:addressId`
+- `DELETE /api/food/public/stores/:publicSlug/customers/me/addresses/:addressId`
+- `PATCH /api/food/public/stores/:publicSlug/customers/me/payment-methods/:paymentMethodId/primary`
+- `DELETE /api/food/public/stores/:publicSlug/customers/me/payment-methods/:paymentMethodId`
+- `POST /api/food/public/stores/:publicSlug/customers/me/orders`
 - `GET /api/food/public/stores/:publicSlug/orders/:orderNumber`
 - `POST /api/food/public/stores/:publicSlug/orders`
 - `POST /api/food/public/stores/:publicSlug/checkout`

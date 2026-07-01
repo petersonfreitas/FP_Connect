@@ -20,13 +20,13 @@ Este arquivo controla o avanco dos modulos do ecossistema.
 |---|---:|---:|---|---|
 | FP Connect Admin Console | Alta | 2 | Base funcional estabilizada | Empresas, usuarios, papel de plataforma, permissoes, modulos contratados, suporte por carteira, catalogo, auditoria, guards, bloqueios, paginacao inicial e inativacao operacional ja possuem API e telas principais. |
 | FP Robots | Alta | 2 | Base funcional em evolucao | Schema `robots`, catalogo de eventos, event log, regras simples `evento -> acao`, execucoes, reprocessamento basico, API interna e painel operacional inicial no Console criados. |
-| FP Food | Alta | 2 | Base funcional em evolucao produtiva | Frontend separado `apps/food`, dashboard operacional V0 com acesso rapido da loja, menu lateral reorganizado no padrao do Console por Gestao da loja/Cadastro/Movimentacao, configuracao da loja com link publico, categorias/produtos paginados, cardapio derivado, pedido interno V0, vitrine publica V0 por slug com blocos de loja, acompanhamento, cardapio e checkout, login contextual de consumidor, Minha conta publica, enderecos de entrega V0 com padrao por loja, validacao server-side de carrinho, pedido publico vinculado ao consumidor autenticado, checkout publico com cartao Mercado Pago via Gateway V0, painel de pedidos com filtro/status, detalhe de pedido com historico simples, pagamento manual V0, Cozinha V0 com preparo por item, estoque direto com baixa automatica em pedidos, Entrega simples V0 e eventos `food.*` iniciais criados. Proximas melhorias devem priorizar experiencia, validacoes e processos reais. |
+| FP Food | Alta | 2 | Base funcional em evolucao produtiva | Frontend separado `apps/food`, dashboard operacional V0 com acesso rapido da loja, menu lateral reorganizado no padrao do Console por Gestao da loja/Cadastro/Movimentacao, configuracao da loja com link publico, categorias/produtos paginados, produtos com imagem WEBP via Supabase Storage, cardapio derivado, pedido interno/balcao V0, atendimento separado de acompanhamento de pedidos, vitrine publica V0 por slug com cardapio em grade, filtro por categoria, modal de produto, carrinho editavel, acompanhamento, Meus pedidos, checkout em acordeao, login contextual de consumidor, Minha conta publica, CRUD de enderecos V0, enderecos de entrega com padrao por loja, validacao server-side de carrinho e estoque, pedido publico vinculado ao consumidor autenticado, checkout publico com Pix/cartao Mercado Pago via Gateway V0, painel de pedidos com filtro/status, detalhe de pedido com historico simples, pagamento manual V0, Cozinha V0 com preparo por item, estoque direto com baixa/devolucao automatica em pedidos, Entrega simples V0 e eventos `food.*` iniciais criados. Proximas melhorias devem priorizar complementos, mesa/comanda, experiencia e processos reais. |
 | FP Tracking | Alta | 0 | Preparado para ciclo futuro | Endpoint interno `/api/tracking/access` ja valida empresa, modulo contratado e permissao; deve nascer como frontend separado e assumir entrega/rastreio real do Food depois da estabilizacao produtiva de Food, Gateway, Robots e Console. |
 | FP Billing | Futura | 0 | Fundacao de acesso preparada | Endpoint interno `/api/billing/access` ja valida empresa, modulo contratado e permissao; entrara apos base operacional. |
 | FP Tickets | Futura | 0 | Fundacao de acesso preparada | Endpoint interno `/api/tickets/access` ja valida empresa, modulo contratado e permissao; entrara apos base operacional. |
 | FP Sales | Futura | 0 | Fundacao de acesso preparada | Endpoint interno `/api/sales/access` ja valida empresa, modulo contratado e permissao; entrara apos base operacional. |
 | FP Marketing | Futura | 0 | Fundacao de acesso preparada | Endpoint interno `/api/marketing/access` ja valida empresa, modulo contratado e permissao; entrara apos base operacional. |
-| FP Gateway | Alta | 2 | Base funcional em evolucao produtiva | Painel operacional em `/gateway`, subareas internas para pagamentos, Mercado Pago, e-mail, provedores e eventos, schema `gateway`, catalogo de provedores, configuracao SMTP por empresa como laboratorio/fallback, tela de e-mail orientada ao futuro provedor por API HTTPS, OAuth Mercado Pago por empresa iniciado, sandbox manual Mercado Pago, contrato interno de solicitacao de pagamento, PIX e cartao tokenizado via Orders API, webhook Mercado Pago V0 e eventos `gateway.*` para Robots. SMTP por socket fica obsoleto para producao; e-mail transacional deve priorizar API HTTPS de provedor dedicado. |
+| FP Gateway | Alta | 2 | Base funcional em evolucao produtiva | Painel operacional em `/gateway`, subareas internas para pagamentos, Mercado Pago, e-mail, provedores e eventos, schema `gateway`, catalogo de provedores, configuracao SMTP por empresa como laboratorio/fallback, tela de e-mail orientada ao futuro provedor por API HTTPS, OAuth Mercado Pago por empresa iniciado, sandbox manual Mercado Pago, contrato interno de solicitacao de pagamento, PIX e cartao tokenizado via Orders API, webhook Mercado Pago V0 validado em sandbox com fallback defensivo para divergencia de aplicacao de teste, conciliacao automatica por consulta oficial da Order e eventos `gateway.*` para Robots. SMTP por socket fica obsoleto para producao; e-mail transacional deve priorizar API HTTPS de provedor dedicado. |
 | FP Fiscal | Alta/Media | 0 | Backlog criado | Modulo fiscal proprio, com foco inicial na evolucao fiscal do FP Food. |
 | FP Sign | Media | 0 | Backlog criado | Aceite simples, contratos, propostas e arquivamento documental; sem assinatura digital avancada no MVP. |
 | FP BI | Media/Baixa | 0 | Backlog criado | Indicadores e dashboards; evoluir apos maturidade dos modulos transacionais. |
@@ -140,6 +140,7 @@ Este arquivo controla o avanco dos modulos do ecossistema.
 - [x] Smoke test de isolamento de sessao entre Console, Food operacional e vitrines publicas por loja
 - [x] Minha conta publica do consumidor
 - [x] Enderecos de entrega V0 com multiplos cadastros e endereco padrao por loja
+- [x] CRUD publico de enderecos do consumidor por loja
 - [x] Selecao de endereco de entrega no checkout publico
 - [x] Fotografia do endereco de entrega no pedido publico
 - [x] Logout publico da vitrine por loja
@@ -160,11 +161,12 @@ Este arquivo controla o avanco dos modulos do ecossistema.
 - [x] Entrega simples V0 com pedidos prontos e em rota
 - [x] Status simples do pedido
 - [x] Pagamento manual V0
-- [x] Checkout publico com cartao Mercado Pago via FP Gateway V0
+- [x] Checkout publico com Pix/cartao Mercado Pago via FP Gateway V0
 - [x] Smoke test publico com cartao Mercado Pago sandbox
 - [ ] Smoke test publico com cartao de debito Mercado Pago sandbox
 - [x] Retentativa publica de pagamento com cartao sem duplicar pedido
 - [x] Baixa automatica de estoque em pedidos e devolucao em cancelamento/correcao
+- [x] Validacao de saldo de estoque no carrinho/checkout e em correcoes de pedido
 - [ ] Grupos de complementos por produto com ingredientes inclusos removiveis
 - [ ] Snapshot de complementos no carrinho e nos itens do pedido
 - [ ] Realtime futuro para pedidos, cozinha e acompanhamento publico
@@ -218,7 +220,9 @@ Este arquivo controla o avanco dos modulos do ecossistema.
 - [x] Smoke test com cartao Mercado Pago sandbox
 - [x] Smoke test com PIX Mercado Pago sandbox
 - [x] Webhook Mercado Pago V0 para conciliacao assincrona de orders
-- [ ] Smoke test webhook Mercado Pago sandbox
+- [x] Smoke test webhook Mercado Pago sandbox com retorno 200 no Mercado Pago
+- [ ] Limpeza futura de logs diagnosticos do fallback sandbox
+- [ ] Validacao/alerta de App ID Mercado Pago por ambiente/credencial
 - [ ] Envio transacional SMTP solicitado pelo FP Robots
 
 ---
@@ -245,11 +249,11 @@ Este arquivo controla o avanco dos modulos do ecossistema.
 
 Estabilizar os fluxos ja implementados com mentalidade de producao, usando o FP Food como primeiro consumidor real do ecossistema:
 
-1. validar webhook Mercado Pago online em fluxo real de pedido;
+1. reduzir ruido de logs do webhook Mercado Pago sandbox sem perder rastreabilidade;
 2. melhorar UX, menus, mensagens de erro, estados de carregamento e validacoes do Food e Gateway;
-3. revisar regras e processos reais de pedido, pagamento, cozinha e entrega simples;
+3. revisar regras e processos reais de pedido, pagamento, cozinha, estoque e entrega simples;
 4. manter FP Robots como trilha de eventos e automacoes dos fluxos integrados;
-5. modelar configuracoes avancadas do Food somente quando o contrato real exigir;
+5. modelar complementos, mesa/comanda e cofre Mercado Pago conforme os contratos reais exigirem;
 6. preservar pagamento manual, entrega simples e SMTP por socket como fallback/laboratorio do MVP;
 7. iniciar FP Tracking completo somente depois que Food, Gateway, Robots e Console estiverem maduros para operacao.
 

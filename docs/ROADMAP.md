@@ -30,8 +30,8 @@ Resumo executivo:
 
 - Admin Console: base funcional estabilizada, ainda com smoke test manual amplo pendente.
 - FP Robots: base funcional de eventos, regras simples, execucoes e reprocessamento basico.
-- FP Food: primeiro produto operacional em evolucao produtiva, com loja, cardapio, pedidos, cozinha, entrega simples, vitrine publica e checkout Mercado Pago via Gateway.
-- FP Gateway: base funcional em evolucao produtiva, com provedores, Mercado Pago, pagamentos, webhook V0, SMTP laboratorio/fallback e direcao de e-mail por API HTTPS.
+- FP Food: primeiro produto operacional em evolucao produtiva, com loja, cardapio, imagens de produtos, carrinho/editavel, pedidos, cozinha por item, estoque direto, entrega simples, vitrine publica e checkout Mercado Pago via Gateway.
+- FP Gateway: base funcional em evolucao produtiva, com provedores, Mercado Pago, pagamentos Pix/cartao via Orders API, webhook V0 validado em sandbox, SMTP laboratorio/fallback e direcao de e-mail por API HTTPS.
 - FP Tracking: preparado para ciclo futuro, mas ainda nao iniciado como modulo operacional.
 
 ## Diretriz Atual
@@ -67,9 +67,10 @@ Objetivo: fortalecer o Gateway como camada oficial de integracoes externas.
 
 Prioridades:
 
-- validar webhook Mercado Pago online em fluxo real de pedido;
+- limpar ruido operacional do fallback sandbox do webhook Mercado Pago e manter validacao rigida em producao;
 - amadurecer OAuth Mercado Pago por empresa;
 - manter sandbox manual somente como apoio de teste;
+- validar App ID/ambiente das credenciais Mercado Pago na configuracao;
 - evoluir e-mail transacional por API HTTPS;
 - preparar contratos futuros para WhatsApp/Meta sem acoplar Food ou Robots aos provedores.
 
@@ -83,8 +84,9 @@ Objetivo: amadurecer o FP Food como primeiro produto vendavel.
 
 Prioridades:
 
-- refinar vitrine publica, carrinho e checkout;
-- melhorar painel interno de pedidos, cozinha e entrega;
+- refinar vitrine publica, carrinho, checkout e Meus pedidos;
+- melhorar painel interno de atendimento, pedidos, cozinha, estoque e entrega;
+- implementar grupos de complementos e preparar mesa/comanda;
 - revisar configuracoes da loja conforme processos reais;
 - manter integrações com Gateway e Robots limpas;
 - adiar configuracoes avancadas ate haver contrato real que justifique.
