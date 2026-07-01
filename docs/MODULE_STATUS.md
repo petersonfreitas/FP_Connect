@@ -152,6 +152,10 @@ Este arquivo controla o avanco dos modulos do ecossistema.
 - [x] Painel interno de pedidos
 - [x] Atendimento interno separado para criacao de pedidos de balcao
 - [ ] Controle de mesa/comanda
+- [ ] Cadastro simples de mesas por loja
+- [ ] Sessao/comanda aberta com itens incrementais
+- [ ] Fechamento de comanda com pagamento unico
+- [ ] Lotes de cozinha para envios incrementais/impressao
 - [x] Detalhe interno do pedido
 - [x] Historico simples de status do pedido
 - [x] Filtro por status no painel de pedidos
