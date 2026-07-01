@@ -9,7 +9,14 @@ import { createHmac, randomBytes, timingSafeEqual } from "node:crypto";
 import net from "node:net";
 import readline from "node:readline";
 import tls from "node:tls";
-import { Customer, CustomerCard, MercadoPagoConfig, Order } from "mercadopago";
+import {
+  Customer,
+  CustomerCard,
+  InvalidWebhookSignatureError,
+  MercadoPagoConfig,
+  Order,
+  WebhookSignatureValidator
+} from "mercadopago";
 import { RobotsService } from "../robots/robots.service";
 import { AppConfigService } from "../../config/app-config.service";
 import { SupabaseService } from "../../supabase/supabase.service";
@@ -1452,6 +1459,12 @@ export class GatewayService {
 
     const dataIdCandidates = getMercadoPagoWebhookSignatureDataIdCandidates(input);
     const requestIdCandidates = getMercadoPagoWebhookSignatureRequestIdCandidates(input);
+    const sdkValidation = validateMercadoPagoWebhookSignatureWithSdk({
+      dataIdCandidates,
+      input,
+      requestIdCandidates,
+      secret
+    });
     const signatureHash = signature.v1.toLowerCase();
     const isValidSignature = dataIdCandidates.some((dataId) =>
       requestIdCandidates.some((xRequestId) => {
@@ -1466,14 +1479,18 @@ export class GatewayService {
       })
     );
 
-    if (!isValidSignature) {
+    if (!sdkValidation.isValid && !isValidSignature) {
       this.logger.warn(
         JSON.stringify({
           event: "gateway.webhook.signature_invalid",
           action: parseOptionalString(input.body.action),
           dataIdCandidateCount: dataIdCandidates.length,
+          dataIdSources: getMercadoPagoWebhookDataIdSources(input),
           hasDataId: Boolean(normalizeMercadoPagoWebhookResourceId(input)),
           hasRequestId: Boolean(parseOptionalString(input.xRequestId)),
+          sdkFailureReasons: sdkValidation.failureReasons,
+          secretLength: secret.length,
+          signatureVersions: parseMercadoPagoSignatureVersions(input.signature),
           notificationType: normalizeMercadoPagoWebhookType(input),
           requestIdCandidateCount: requestIdCandidates.length
         })
@@ -1498,6 +1515,54 @@ export class GatewayService {
       redirectUri: `${this.config.webUrl}/gateway/mercado-pago/callback`
     };
   }
+}
+
+function validateMercadoPagoWebhookSignatureWithSdk({
+  dataIdCandidates,
+  input,
+  requestIdCandidates,
+  secret
+}: {
+  dataIdCandidates: Array<string | null>;
+  input: GatewayMercadoPagoWebhookInput;
+  requestIdCandidates: Array<string | null>;
+  secret: string;
+}): {
+  failureReasons: string[];
+  isValid: boolean;
+} {
+  const failureReasons = new Set<string>();
+
+  for (const dataId of dataIdCandidates) {
+    for (const xRequestId of requestIdCandidates) {
+      try {
+        WebhookSignatureValidator.validate({
+          dataId,
+          secret,
+          xRequestId,
+          xSignature: input.signature
+        });
+
+        return {
+          failureReasons: [],
+          isValid: true
+        };
+      } catch (error) {
+        failureReasons.add(
+          error instanceof InvalidWebhookSignatureError
+            ? error.reason
+            : error instanceof Error
+              ? error.name
+              : "unknown"
+        );
+      }
+    }
+  }
+
+  return {
+    failureReasons: Array.from(failureReasons),
+    isValid: false
+  };
 }
 
 function mapProvider(row: ProviderRow): GatewayProviderContract {
@@ -2002,6 +2067,26 @@ function normalizeMercadoPagoWebhookResourceId(
   return null;
 }
 
+function getMercadoPagoWebhookDataIdSources(input: GatewayMercadoPagoWebhookInput): string[] {
+  const sources: string[] = [];
+
+  if (parseOptionalString(input.dataId)) {
+    sources.push("query");
+  }
+
+  const bodyData = input.body.data;
+
+  if (
+    typeof bodyData === "object" &&
+    bodyData &&
+    parseOptionalString((bodyData as { id?: unknown }).id)
+  ) {
+    sources.push("body");
+  }
+
+  return sources;
+}
+
 function getMercadoPagoWebhookSignatureDataIdCandidates(
   input: GatewayMercadoPagoWebhookInput
 ): Array<string | null> {
@@ -2037,6 +2122,17 @@ function normalizeMercadoPagoWebhookType(input: GatewayMercadoPagoWebhookInput):
   }
 
   return parseOptionalString(input.body.type)?.toLowerCase() ?? null;
+}
+
+function parseMercadoPagoSignatureVersions(signature: string | null): string[] {
+  if (!signature) {
+    return [];
+  }
+
+  return signature
+    .split(",")
+    .map((part) => part.split("=", 2)[0]?.trim())
+    .filter((key): key is string => Boolean(key && /^v\d+$/i.test(key)));
 }
 
 function parseMercadoPagoSignature(signature: string | null): {

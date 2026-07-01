@@ -31,6 +31,7 @@ Referencia operacional para a evolucao do FP Gateway com Mercado Pago Orders API
 - Variavel obrigatoria em producao: `MERCADO_PAGO_WEBHOOK_SECRET`, gerada em Mercado Pago > Webhooks > Configure notifications.
 - Evento Mercado Pago a configurar: `Order (Mercado Pago)`. Este fluxo usa Checkout Transparente com API Orders; o topico `Payment` pertence ao fluxo legado de API Payments e nao deve ser usado para esta conciliacao.
 - A assinatura `x-signature` deve ser validada com HMAC SHA256 conforme a documentacao oficial.
+- A validacao principal usa `WebhookSignatureValidator` do SDK oficial `mercadopago`; a validacao manual permanece como fallback compatível e como apoio de diagnostico.
 - A validacao da assinatura deve considerar que `data.id` pode chegar como query plana (`data.id`), query aninhada (`data[id]`) ou apenas no corpo em simulacoes/logs. A API aceita essas variacoes mantendo a comparacao HMAC com o `x-signature`.
 - Em hospedagem com proxy, `x-request-id` pode ser inserido/alterado pela infraestrutura. A validacao testa o manifesto com o header recebido e tambem sem `request-id`, conforme a regra do Mercado Pago para campos ausentes.
 - `MERCADO_PAGO_WEBHOOK_SECRET` deve ser exatamente a chave revelada em Mercado Pago > Webhooks > Configure notifications para a aplicacao configurada, sem aspas manuais no valor da env.
