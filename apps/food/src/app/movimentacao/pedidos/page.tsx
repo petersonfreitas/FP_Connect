@@ -325,17 +325,51 @@ function getQuickStatusOptions(order: FoodOrderContract): Array<[FoodOrderStatus
     const filteredOptions = isCounterOrderPendingPayment(order)
       ? options.filter(([status]) => status !== "delivered")
       : options;
+    const kitchenAwareOptions = orderRequiresKitchen(order)
+      ? filteredOptions
+      : getNonKitchenQuickStatusOptions(order.status, filteredOptions);
 
     if (order.fulfillmentMethod !== "delivery") {
-      return filteredOptions
+      return kitchenAwareOptions
         .filter(([status]) => status !== "out_for_delivery")
         .map(([status, label]) => [status, status === "delivered" ? "Finalizar" : label]);
     }
 
-    return filteredOptions;
+    return kitchenAwareOptions;
   }
 
   return order.status === "cancelled" ? [] : [["cancelled", "Cancelar"]];
+}
+
+function orderRequiresKitchen(order: FoodOrderContract): boolean {
+  return order.items.some((item) => item.kitchenRequired);
+}
+
+function getNonKitchenQuickStatusOptions(
+  currentStatus: FoodOrderStatus,
+  options: Array<[FoodOrderStatus, string]>
+): Array<[FoodOrderStatus, string]> {
+  const nextOptions: Array<[FoodOrderStatus, string]> = [];
+
+  for (const [status, label] of options) {
+    if (status === "preparing") {
+      continue;
+    }
+
+    if (status === "ready") {
+      nextOptions.push(["ready", "Liberar pedido"]);
+      continue;
+    }
+
+    if (currentStatus === "created" && status === "accepted") {
+      nextOptions.push(["ready", "Liberar pedido"]);
+      continue;
+    }
+
+    nextOptions.push([status, label]);
+  }
+
+  return nextOptions;
 }
 
 function isCounterOrderPendingPayment(order: FoodOrderContract): boolean {

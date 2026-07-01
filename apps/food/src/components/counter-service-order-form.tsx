@@ -54,6 +54,10 @@ export function CounterServiceOrderForm({
   submitLabel = "Criar pedido de balcao",
   title = "Pedido de balcao"
 }: CounterServiceOrderFormProps) {
+  const stockCreditsByProductId = useMemo(
+    () => aggregateInitialItemQuantities(initialItems),
+    [initialItems]
+  );
   const [items, setItems] = useState<CounterCartItem[]>(() =>
     initialItems.map((item, index) => ({
       itemNote: item.itemNote ?? "",
@@ -79,7 +83,7 @@ export function CounterServiceOrderForm({
 
   function addProduct(product: FoodProductContract) {
     setItems((currentItems) => {
-      const maxQuantity = getMaxQuantity(product);
+      const maxQuantity = getMaxQuantity(product, getStockCredit(product.id));
       const currentProductQuantity = getProductQuantity(currentItems, product.id);
 
       if (currentProductQuantity >= maxQuantity) {
@@ -110,7 +114,10 @@ export function CounterServiceOrderForm({
       const otherProductQuantity = currentItems
         .filter((item) => item.productId === product.id && item.lineId !== lineId)
         .reduce((sum, item) => sum + item.quantity, 0);
-      const lineMaxQuantity = Math.max(getMaxQuantity(product) - otherProductQuantity, 0);
+      const lineMaxQuantity = Math.max(
+        getMaxQuantity(product, getStockCredit(product.id)) - otherProductQuantity,
+        0
+      );
       const nextQuantity = Math.min(Math.max(Math.trunc(quantity), 0), lineMaxQuantity);
 
       if (nextQuantity <= 0) {
@@ -133,6 +140,10 @@ export function CounterServiceOrderForm({
 
   function clearCart() {
     setItems([]);
+  }
+
+  function getStockCredit(productId: string): number {
+    return stockCreditsByProductId.get(productId) ?? 0;
   }
 
   return (
@@ -167,7 +178,8 @@ export function CounterServiceOrderForm({
         {products.length > 0 ? (
           <div className="counter-product-grid">
             {products.map((product) => {
-              const maxQuantity = getMaxQuantity(product);
+              const stockCredit = getStockCredit(product.id);
+              const maxQuantity = getMaxQuantity(product, stockCredit);
               const cartQuantity = getProductQuantity(items, product.id);
               const isUnavailable = maxQuantity <= 0;
               const isDisabled = product.status !== "available" || isUnavailable;
@@ -194,7 +206,7 @@ export function CounterServiceOrderForm({
                     ) : null}
                     {product.stockControlEnabled ? (
                       <small>
-                        {isUnavailable ? "Sem estoque" : `${product.stockQuantity} em estoque`}
+                        {formatStockAvailability(product, stockCredit, isUnavailable)}
                       </small>
                     ) : null}
                     {cartQuantity > 0 ? <em>{cartQuantity} no pedido</em> : null}
@@ -282,7 +294,10 @@ export function CounterServiceOrderForm({
                     <span>{item.quantity}</span>
                     <button
                       aria-label="Aumentar quantidade"
-                      disabled={item.quantity >= getLineMaxQuantity(item, product, items)}
+                      disabled={
+                        item.quantity >=
+                        getLineMaxQuantity(item, product, items, getStockCredit(product.id))
+                      }
                       onClick={() => updateQuantity(item.lineId, product, item.quantity + 1)}
                       type="button"
                     >
@@ -331,8 +346,20 @@ export function CounterServiceOrderForm({
   );
 }
 
-function getMaxQuantity(product: FoodProductContract): number {
-  return product.stockControlEnabled ? Math.max(product.stockQuantity, 0) : 99;
+function aggregateInitialItemQuantities(
+  items: CounterInitialCartItem[]
+): Map<string, number> {
+  const quantities = new Map<string, number>();
+
+  for (const item of items) {
+    quantities.set(item.productId, (quantities.get(item.productId) ?? 0) + item.quantity);
+  }
+
+  return quantities;
+}
+
+function getMaxQuantity(product: FoodProductContract, stockCredit = 0): number {
+  return product.stockControlEnabled ? Math.max(product.stockQuantity + stockCredit, 0) : 99;
 }
 
 function getProductQuantity(items: CounterCartItem[], productId: string): number {
@@ -344,13 +371,30 @@ function getProductQuantity(items: CounterCartItem[], productId: string): number
 function getLineMaxQuantity(
   item: CounterCartItem,
   product: FoodProductContract,
-  items: CounterCartItem[]
+  items: CounterCartItem[],
+  stockCredit = 0
 ): number {
   const otherProductQuantity = items
     .filter((cartItem) => cartItem.productId === item.productId && cartItem.lineId !== item.lineId)
     .reduce((sum, cartItem) => sum + cartItem.quantity, 0);
 
-  return Math.max(getMaxQuantity(product) - otherProductQuantity, 0);
+  return Math.max(getMaxQuantity(product, stockCredit) - otherProductQuantity, 0);
+}
+
+function formatStockAvailability(
+  product: FoodProductContract,
+  stockCredit: number,
+  isUnavailable: boolean
+): string {
+  if (isUnavailable) {
+    return "Sem estoque";
+  }
+
+  if (stockCredit > 0) {
+    return `${product.stockQuantity + stockCredit} disponivel para ajuste`;
+  }
+
+  return `${product.stockQuantity} em estoque`;
 }
 
 function createCartLineId(productId: string): string {

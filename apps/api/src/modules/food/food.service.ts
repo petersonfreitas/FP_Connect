@@ -314,6 +314,16 @@ type CreateOrderOptions = {
   fulfillmentMethod?: FoodOrderFulfillmentMethod;
 };
 
+type NormalizeOrderInputOptions = {
+  stockCreditsByProductId?: Map<string, number>;
+};
+
+type StockDeltaInput = {
+  notes: string;
+  productId: string;
+  quantityDelta: number;
+};
+
 const storeSelect = [
   "id",
   "company_id",
@@ -1027,6 +1037,67 @@ export class FoodService {
     const productsById = await this.listProductsByIds(companyId, [row.product_id]);
 
     return mapStockMovement(row, productsById.get(row.product_id) ?? null);
+  }
+
+  private async applyOrderStockDeltas(
+    companyId: string,
+    orderId: string,
+    actorUserId: string | null,
+    deltas: StockDeltaInput[]
+  ): Promise<void> {
+    if (deltas.length === 0) {
+      return;
+    }
+
+    const { error } = await this.supabase.food.rpc("apply_order_stock_deltas", {
+      deltas,
+      target_actor_user_id: actorUserId,
+      target_company_id: companyId,
+      target_order_id: orderId
+    });
+
+    if (error) {
+      throwSupabaseError(error);
+    }
+  }
+
+  private async deleteFailedOrder(companyId: string, orderId: string): Promise<void> {
+    const { error } = await this.supabase.food
+      .from("orders")
+      .delete()
+      .eq("company_id", companyId)
+      .eq("id", orderId);
+
+    if (error) {
+      this.logger.warn(
+        `Nao foi possivel remover pedido Food ${orderId} apos falha de estoque: ${error.message}`
+      );
+    }
+  }
+
+  private async revertOrderStockDeltas(
+    companyId: string,
+    orderId: string,
+    actorUserId: string | null,
+    deltas: StockDeltaInput[],
+    orderNumber: string
+  ): Promise<void> {
+    if (deltas.length === 0) {
+      return;
+    }
+
+    try {
+      await this.applyOrderStockDeltas(
+        companyId,
+        orderId,
+        actorUserId,
+        reverseStockDeltas(deltas, orderNumber)
+      );
+    } catch (error) {
+      this.logger.warn(
+        `Nao foi possivel estornar movimento de estoque do pedido Food ${orderId}: ${getErrorMessage(error)}`
+      );
+    }
   }
 
   async getMenu(companyId: string): Promise<FoodMenuContract> {
@@ -1913,6 +1984,7 @@ export class FoodService {
       .select(orderItemSelect);
 
     if (itemError) {
+      await this.deleteFailedOrder(companyId, orderRow.id);
       throwSupabaseError(itemError);
     }
 
@@ -1920,6 +1992,19 @@ export class FoodService {
       orderRow,
       ((itemData ?? []) as unknown as FoodOrderItemRow[]).map(mapOrderItem)
     );
+
+    try {
+      await this.applyOrderStockDeltas(
+        companyId,
+        order.id,
+        actorUserId,
+        buildStockDeltas([], order.items, order.orderNumber)
+      );
+    } catch (error) {
+      await this.deleteFailedOrder(companyId, order.id);
+      throw error;
+    }
+
     await this.insertOrderStatusHistory(companyId, order.id, null, order.status, actorUserId);
     await this.emitOrderCreated(companyId, actorUserId, order, options.eventSource);
 
@@ -1946,76 +2031,91 @@ export class FoodService {
       throw new BadRequestException("Pedido finalizado ou cancelado nao pode ser editado.");
     }
 
-    const normalized = await this.normalizeCreateOrderInput(companyId, input);
-    const existingItemsById = new Map(
-      (await this.listOrderItemsByOrderIds(companyId, [current.id]))
-        .get(current.id)
-        ?.map((item) => [item.id, item]) ?? []
-    );
+    const currentItems =
+      (await this.listOrderItemsByOrderIds(companyId, [current.id])).get(current.id) ?? [];
+    const stockCreditsByProductId = aggregateItemQuantitiesByProductId(currentItems);
+    const normalized = await this.normalizeCreateOrderInput(companyId, input, {
+      stockCreditsByProductId
+    });
+    const existingItemsById = new Map(currentItems.map((item) => [item.id, item]));
     const fulfillmentMethod = normalizeFulfillmentMethod(input.fulfillmentMethod);
     const nextItems = buildEditedOrderItems(normalized.items, current.status, existingItemsById);
     const subtotalCents = nextItems.reduce((sum, item) => sum + item.totalPriceCents, 0);
     const nextStatus = getOrderStatusAfterItemsEdit(current.status, nextItems);
+    const stockDeltas = buildStockDeltas(currentItems, nextItems, current.order_number);
 
-    const { data: orderData, error: orderError } = await this.supabase.food
-      .from("orders")
-      .update({
-        customer_name: normalized.customerName,
-        customer_note: normalized.customerNote,
-        customer_phone: normalized.customerPhone,
-        delivery_address_snapshot: null,
-        fulfillment_method: fulfillmentMethod,
-        status: nextStatus,
-        subtotal_cents: subtotalCents,
-        total_cents: subtotalCents,
-        updated_by: actorUserId
-      })
-      .eq("id", orderId)
-      .eq("company_id", companyId)
-      .is("deleted_at", null)
-      .select(orderSelect)
-      .single();
+    await this.applyOrderStockDeltas(companyId, orderId, actorUserId, stockDeltas);
 
-    if (orderError) {
-      throwSupabaseError(orderError);
+    try {
+      const { data: orderData, error: orderError } = await this.supabase.food
+        .from("orders")
+        .update({
+          customer_name: normalized.customerName,
+          customer_note: normalized.customerNote,
+          customer_phone: normalized.customerPhone,
+          delivery_address_snapshot: null,
+          fulfillment_method: fulfillmentMethod,
+          status: nextStatus,
+          subtotal_cents: subtotalCents,
+          total_cents: subtotalCents,
+          updated_by: actorUserId
+        })
+        .eq("id", orderId)
+        .eq("company_id", companyId)
+        .is("deleted_at", null)
+        .select(orderSelect)
+        .single();
+
+      if (orderError) {
+        throwSupabaseError(orderError);
+      }
+
+      const { error: deleteError } = await this.supabase.food
+        .from("order_items")
+        .delete()
+        .eq("company_id", companyId)
+        .eq("order_id", orderId);
+
+      if (deleteError) {
+        throwSupabaseError(deleteError);
+      }
+
+      const { data: itemData, error: itemError } = await this.supabase.food
+        .from("order_items")
+        .insert(
+          nextItems.map((item) => ({
+            company_id: companyId,
+            item_note: item.itemNote,
+            item_status: item.itemStatus,
+            kitchen_required: item.kitchenRequired,
+            order_id: orderId,
+            product_id: item.productId,
+            product_name: item.productName,
+            quantity: item.quantity,
+            total_price_cents: item.totalPriceCents,
+            unit_price_cents: item.unitPriceCents
+          }))
+        )
+        .select(orderItemSelect);
+
+      if (itemError) {
+        throwSupabaseError(itemError);
+      }
+
+      return mapOrder(
+        orderData as unknown as FoodOrderRow,
+        ((itemData ?? []) as unknown as FoodOrderItemRow[]).map(mapOrderItem)
+      );
+    } catch (error) {
+      await this.revertOrderStockDeltas(
+        companyId,
+        orderId,
+        actorUserId,
+        stockDeltas,
+        current.order_number
+      );
+      throw error;
     }
-
-    const { error: deleteError } = await this.supabase.food
-      .from("order_items")
-      .delete()
-      .eq("company_id", companyId)
-      .eq("order_id", orderId);
-
-    if (deleteError) {
-      throwSupabaseError(deleteError);
-    }
-
-    const { data: itemData, error: itemError } = await this.supabase.food
-      .from("order_items")
-      .insert(
-        nextItems.map((item) => ({
-          company_id: companyId,
-          item_note: item.itemNote,
-          item_status: item.itemStatus,
-          kitchen_required: item.kitchenRequired,
-          order_id: orderId,
-          product_id: item.productId,
-          product_name: item.productName,
-          quantity: item.quantity,
-          total_price_cents: item.totalPriceCents,
-          unit_price_cents: item.unitPriceCents
-        }))
-      )
-      .select(orderItemSelect);
-
-    if (itemError) {
-      throwSupabaseError(itemError);
-    }
-
-    return mapOrder(
-      orderData as unknown as FoodOrderRow,
-      ((itemData ?? []) as unknown as FoodOrderItemRow[]).map(mapOrderItem)
-    );
   }
 
   async updateOrderStatus(
@@ -2042,23 +2142,47 @@ export class FoodService {
       );
     }
 
-    const { data, error } = await this.supabase.food
-      .from("orders")
-      .update({
-        status,
-        updated_by: actorUserId
-      })
-      .eq("id", orderId)
-      .eq("company_id", companyId)
-      .is("deleted_at", null)
-      .select(orderSelect)
-      .single();
+    const currentItems =
+      status === "cancelled"
+        ? (await this.listOrderItemsByOrderIds(companyId, [current.id])).get(current.id) ?? []
+        : [];
+    const cancellationStockDeltas =
+      status === "cancelled"
+        ? buildStockDeltas(currentItems, [], current.order_number)
+        : [];
 
-    if (error) {
-      throwSupabaseError(error);
+    await this.applyOrderStockDeltas(companyId, orderId, actorUserId, cancellationStockDeltas);
+
+    let data: unknown;
+    try {
+      const result = await this.supabase.food
+        .from("orders")
+        .update({
+          status,
+          updated_by: actorUserId
+        })
+        .eq("id", orderId)
+        .eq("company_id", companyId)
+        .is("deleted_at", null)
+        .select(orderSelect)
+        .single();
+
+      if (result.error) {
+        throwSupabaseError(result.error);
+      }
+
+      data = result.data;
+      await this.updateOrderItemStatusesForOrderStatus(companyId, orderId, status);
+    } catch (error) {
+      await this.revertOrderStockDeltas(
+        companyId,
+        orderId,
+        actorUserId,
+        cancellationStockDeltas,
+        current.order_number
+      );
+      throw error;
     }
-
-    await this.updateOrderItemStatusesForOrderStatus(companyId, orderId, status);
 
     const orderRow = data as unknown as FoodOrderRow;
     const items = await this.listOrderItemsByOrderIds(companyId, [orderRow.id]);
@@ -3070,7 +3194,11 @@ export class FoodService {
     }
   }
 
-  private async normalizeCreateOrderInput(companyId: string, input: CreateFoodOrderInput) {
+  private async normalizeCreateOrderInput(
+    companyId: string,
+    input: CreateFoodOrderInput,
+    options: NormalizeOrderInputOptions = {}
+  ) {
     if (!Array.isArray(input.items) || input.items.length === 0) {
       throw new BadRequestException("Pedido precisa ter ao menos um item");
     }
@@ -3103,7 +3231,9 @@ export class FoodService {
           throw new BadRequestException(`Produto indisponivel: ${product.name}`);
         }
 
-        if (!hasEnoughStock(product, item.quantity)) {
+        const stockCredit = options.stockCreditsByProductId?.get(product.id) ?? 0;
+
+        if (!hasEnoughStock(product, item.quantity, stockCredit)) {
           throw new BadRequestException(buildInsufficientStockMessage(product));
         }
 
@@ -3998,6 +4128,65 @@ function getInitialOrderStatus(
   return orderRequiresKitchen(items) ? "accepted" : "ready";
 }
 
+function aggregateItemQuantitiesByProductId(
+  items: Array<{ productId: string | null; quantity: number }>
+): Map<string, number> {
+  const quantities = new Map<string, number>();
+
+  for (const item of items) {
+    if (!item.productId) {
+      continue;
+    }
+
+    quantities.set(item.productId, (quantities.get(item.productId) ?? 0) + item.quantity);
+  }
+
+  return quantities;
+}
+
+function buildStockDeltas(
+  previousItems: Array<{ productId: string | null; quantity: number }>,
+  nextItems: Array<{ productId: string | null; quantity: number }>,
+  orderNumber: string
+): StockDeltaInput[] {
+  const previousByProductId = aggregateItemQuantitiesByProductId(previousItems);
+  const nextByProductId = aggregateItemQuantitiesByProductId(nextItems);
+  const productIds = new Set([
+    ...previousByProductId.keys(),
+    ...nextByProductId.keys()
+  ]);
+  const deltas: StockDeltaInput[] = [];
+
+  for (const productId of productIds) {
+    const previousQuantity = previousByProductId.get(productId) ?? 0;
+    const nextQuantity = nextByProductId.get(productId) ?? 0;
+    const quantityDelta = previousQuantity - nextQuantity;
+
+    if (quantityDelta === 0) {
+      continue;
+    }
+
+    deltas.push({
+      notes:
+        quantityDelta < 0
+          ? `Baixa automatica do pedido ${orderNumber}`
+          : `Ajuste automatico do pedido ${orderNumber}`,
+      productId,
+      quantityDelta
+    });
+  }
+
+  return deltas;
+}
+
+function reverseStockDeltas(deltas: StockDeltaInput[], orderNumber: string): StockDeltaInput[] {
+  return deltas.map((delta) => ({
+    ...delta,
+    notes: `Estorno automatico do pedido ${orderNumber}`,
+    quantityDelta: -delta.quantityDelta
+  }));
+}
+
 function getInitialOrderItemStatus(kitchenRequired: boolean): FoodOrderItemStatus {
   return kitchenRequired ? "pending" : "ready";
 }
@@ -4387,8 +4576,12 @@ function normalizeOptionalDate(value: unknown, field: string): string | null {
   return normalized;
 }
 
-function hasEnoughStock(product: FoodProductContract, quantity: number): boolean {
-  return !product.stockControlEnabled || quantity <= product.stockQuantity;
+function hasEnoughStock(
+  product: FoodProductContract,
+  quantity: number,
+  stockCredit = 0
+): boolean {
+  return !product.stockControlEnabled || quantity <= product.stockQuantity + stockCredit;
 }
 
 function buildInsufficientStockMessage(product: FoodProductContract): string {
@@ -4745,4 +4938,8 @@ function buildOrderNumber(): string {
 
 function throwSupabaseError(error: { message?: string }): never {
   throw new BadRequestException(error.message ?? "Erro ao consultar FP Food");
+}
+
+function getErrorMessage(error: unknown): string {
+  return error instanceof Error ? error.message : "Erro desconhecido";
 }

@@ -1,7 +1,7 @@
 export type FoodStoreStatus = "closed" | "implementation" | "open" | "suspended";
 export type FoodCategoryStatus = "active" | "inactive";
 export type FoodProductStatus = "available" | "hidden" | "unavailable";
-export type FoodStockMovementType = "entry";
+export type FoodStockMovementType = "adjustment" | "entry" | "sale";
 export type FoodPaymentMethod = "card" | "cash" | "other" | "pix";
 export type FoodPaymentStatus = "cancelled" | "paid" | "pending";
 export type FoodOrderFulfillmentMethod = "delivery" | "dine_in" | "pickup";
