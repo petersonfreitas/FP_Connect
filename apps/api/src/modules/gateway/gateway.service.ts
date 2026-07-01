@@ -1427,14 +1427,19 @@ export class GatewayService {
       throw new UnauthorizedException("Assinatura Mercado Pago ausente ou invalida.");
     }
 
-    const manifest = buildMercadoPagoWebhookSignatureManifest({
-      dataId: input.dataId,
-      timestamp: signature.ts,
-      xRequestId: input.xRequestId
-    });
-    const expected = createHmac("sha256", secret).update(manifest).digest("hex");
+    const dataIdCandidates = getMercadoPagoWebhookSignatureDataIdCandidates(input);
+    const isValidSignature = dataIdCandidates.some((dataId) => {
+      const manifest = buildMercadoPagoWebhookSignatureManifest({
+        dataId,
+        timestamp: signature.ts as string,
+        xRequestId: input.xRequestId
+      });
+      const expected = createHmac("sha256", secret).update(manifest).digest("hex");
 
-    if (!safeEqual(expected, signature.v1)) {
+      return safeEqual(expected, signature.v1 as string);
+    });
+
+    if (!isValidSignature) {
       throw new UnauthorizedException("Assinatura Mercado Pago invalida.");
     }
   }
@@ -1957,6 +1962,20 @@ function normalizeMercadoPagoWebhookResourceId(
   }
 
   return null;
+}
+
+function getMercadoPagoWebhookSignatureDataIdCandidates(
+  input: GatewayMercadoPagoWebhookInput
+): Array<string | null> {
+  const candidates = [
+    parseOptionalString(input.dataId),
+    normalizeMercadoPagoWebhookResourceId(input),
+    null
+  ];
+
+  return candidates.filter(
+    (candidate, index) => candidates.findIndex((item) => item === candidate) === index
+  );
 }
 
 function normalizeMercadoPagoWebhookType(input: GatewayMercadoPagoWebhookInput): string | null {
