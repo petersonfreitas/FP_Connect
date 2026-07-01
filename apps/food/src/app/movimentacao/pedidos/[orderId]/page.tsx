@@ -1,18 +1,28 @@
 import Link from "next/link";
 import type {
   FoodOrderContract,
+  FoodOrderFulfillmentMethod,
   FoodOrderStatus,
   FoodPaymentMethod,
   FoodPaymentStatus
 } from "@fp/types";
-import { updateFoodOrderPaymentAction, updateFoodOrderStatusAction } from "@/app/actions";
+import {
+  finalizeCounterFoodOrderPaymentAction,
+  updateInternalFoodOrderItemsAction
+} from "@/app/actions";
 import { CompanySwitcher } from "@/components/company-switcher";
+import { CounterServiceOrderForm } from "@/components/counter-service-order-form";
 import { formatMoney } from "@/components/food-forms";
 import { FoodShell } from "@/components/food-shell";
 import { EmptyFoodAccess, Notice } from "@/components/page-feedback";
 import { PendingSubmitButton } from "@/components/pending-submit-button";
 import { getFoodPageContext } from "@/lib/food-context";
-import { getFoodAccess, getFoodOrderDetail } from "@/lib/internal-api";
+import { isInternalManualFoodOrder } from "@/lib/food-order-rules";
+import {
+  getFoodAccess,
+  getFoodOrderDetail,
+  listAllFoodProducts
+} from "@/lib/internal-api";
 
 type OrderDetailPageProps = {
   params: Promise<{
@@ -20,6 +30,7 @@ type OrderDetailPageProps = {
   }>;
   searchParams?: Promise<{
     companyId?: string;
+    collect?: string;
     error?: string;
     orderUpdated?: string;
     paymentUpdated?: string;
@@ -38,20 +49,16 @@ const orderStatusLabels: Record<FoodOrderStatus, string> = {
   ready: "Pronto"
 };
 
-const orderStatusOptions = [
-  ["created", "Criado"],
-  ["accepted", "Aceito"],
-  ["preparing", "Em preparo"],
-  ["ready", "Pronto"],
-  ["out_for_delivery", "Saiu para entrega"],
-  ["delivered", "Entregue"],
-  ["cancelled", "Cancelado"]
-] as const;
-
 const paymentStatusLabels: Record<FoodPaymentStatus, string> = {
   cancelled: "Cancelado",
   paid: "Pago",
   pending: "Pendente"
+};
+
+const fulfillmentLabels: Record<FoodOrderFulfillmentMethod, string> = {
+  delivery: "Entrega",
+  dine_in: "Local",
+  pickup: "Retirada"
 };
 
 const paymentMethodLabels: Record<FoodPaymentMethod, string> = {
@@ -60,12 +67,6 @@ const paymentMethodLabels: Record<FoodPaymentMethod, string> = {
   other: "Outro",
   pix: "Pix"
 };
-
-const paymentStatusOptions = [
-  ["pending", "Pendente"],
-  ["paid", "Pago"],
-  ["cancelled", "Cancelado"]
-] as const;
 
 const paymentMethodOptions = [
   ["", "Selecione"],
@@ -94,8 +95,13 @@ export default async function OrderDetailPage({
   const ordersHref = selectedCompany
     ? `/movimentacao/pedidos?companyId=${selectedCompany.company.id}`
     : "/movimentacao/pedidos";
-  const paymentCleared = order ? isOrderPaymentCleared(order) : false;
-  const statusOptions = order ? getOrderStatusOptions(order) : orderStatusOptions;
+  const canEditCounterOrder = order ? isCounterOrderEditable(order) : false;
+  const productsResult =
+    selectedCompany && canEditCounterOrder
+      ? await listAllFoodProducts(selectedCompany.company.id)
+      : { data: null, error: null };
+  const counterReadyToCollect = order ? isCounterOrderReadyToCollect(order) : false;
+  const counterCollectText = getCounterCollectText(order?.fulfillmentMethod ?? "dine_in");
 
   return (
     <FoodShell activePath="/movimentacao/pedidos">
@@ -109,9 +115,16 @@ export default async function OrderDetailPage({
       {context.accessError ? <Notice tone="danger" message={context.accessError} /> : null}
       {foodAccessResult.error ? <Notice tone="danger" message={foodAccessResult.error} /> : null}
       {orderResult.error ? <Notice tone="danger" message={orderResult.error} /> : null}
+      {productsResult.error ? <Notice tone="danger" message={productsResult.error} /> : null}
       {query?.error ? <Notice tone="danger" message={query.error} /> : null}
-      {query?.orderUpdated ? <Notice tone="success" message="Status do pedido atualizado." /> : null}
+      {query?.orderUpdated ? <Notice tone="success" message="Pedido atualizado." /> : null}
       {query?.paymentUpdated ? <Notice tone="success" message="Pagamento do pedido atualizado." /> : null}
+      {query?.collect && counterReadyToCollect ? (
+        <Notice
+          tone="info"
+          message={`Confirme a forma de pagamento para marcar o pedido como pago e ${counterCollectText.verb}.`}
+        />
+      ) : null}
 
       <CompanySwitcher
         basePath={detailPath}
@@ -147,6 +160,7 @@ export default async function OrderDetailPage({
               </div>
               <div className="panel-heading-actions">
                 <span className="status-chip">{orderStatusLabels[order.status]}</span>
+                <span className="status-chip">{fulfillmentLabels[order.fulfillmentMethod]}</span>
                 <span className="status-chip">{paymentStatusLabels[order.paymentStatus]}</span>
                 <Link className="secondary-action compact-action" href={ordersHref}>
                   Voltar para pedidos
@@ -178,60 +192,78 @@ export default async function OrderDetailPage({
                 ) : null}
               </div>
               <div className="order-detail-block">
+                <div className="eyebrow">Atendimento</div>
+                <strong>{fulfillmentLabels[order.fulfillmentMethod]}</strong>
+                <span>{getFulfillmentDescription(order.fulfillmentMethod)}</span>
+              </div>
+              <div className="order-detail-block">
                 <div className="eyebrow">Atualizacao</div>
                 <strong>{new Date(order.updatedAt).toLocaleString("pt-BR")}</strong>
                 <span>ID: {order.id}</span>
               </div>
             </div>
-
-            <form action={updateFoodOrderStatusAction} className="order-detail-status-form">
-              <input name="companyId" type="hidden" value={selectedCompany.company.id} />
-              <input name="orderId" type="hidden" value={order.id} />
-              <input name="returnTo" type="hidden" value={detailPath} />
-              <strong>Alterar status</strong>
-              {!paymentCleared ? (
-                <span>Fluxo operacional bloqueado ate confirmacao do pagamento.</span>
-              ) : null}
-              <select defaultValue={order.status} name="status">
-                {statusOptions.map(([value, label]) => (
-                  <option key={value} value={value}>
-                    {label}
-                  </option>
-                ))}
-              </select>
-              <PendingSubmitButton className="secondary-action compact-action" pendingLabel="Salvando...">
-                Atualizar
-              </PendingSubmitButton>
-            </form>
           </section>
 
-          <section className="content-panel stack-panel">
-            <div className="panel-heading">
-              <div>
-                <h1>Pagamento manual</h1>
-                <p>Registre a confirmacao manual do pagamento sem integrar Gateway neste MVP.</p>
+          {canEditCounterOrder && productsResult.data ? (
+            <section className="content-panel stack-panel">
+              <div className="panel-heading">
+                <div>
+                  <h1>Editar pedido antes do pagamento</h1>
+                  <p>
+                    Corrija itens, quantidades, observacoes e tipo de atendimento antes de
+                    registrar a cobranca.
+                  </p>
+                </div>
+                <span>{productsResult.data?.length ?? 0} produto(s)</span>
               </div>
-              <span>{paymentStatusLabels[order.paymentStatus]}</span>
-            </div>
 
-            <form action={updateFoodOrderPaymentAction} className="store-form">
-              <input name="companyId" type="hidden" value={selectedCompany.company.id} />
-              <input name="orderId" type="hidden" value={order.id} />
-              <input name="returnTo" type="hidden" value={detailPath} />
-              <div className="form-grid">
-                <label>
-                  Status do pagamento
-                  <select defaultValue={order.paymentStatus} name="paymentStatus">
-                    {paymentStatusOptions.map(([value, label]) => (
-                      <option key={value} value={value}>
-                        {label}
-                      </option>
-                    ))}
-                  </select>
-                </label>
+              <CounterServiceOrderForm
+                action={updateInternalFoodOrderItemsAction}
+                companyId={selectedCompany.company.id}
+                customerName={order.customerName}
+                customerNote={order.customerNote}
+                customerPhone={order.customerPhone}
+                fulfillmentMethod={order.fulfillmentMethod}
+                initialItems={order.items
+                  .filter((item) => item.productId)
+                  .map((item) => ({
+                    itemNote: item.itemNote,
+                    lineId: item.id,
+                    orderItemId: item.id,
+                    productId: item.productId ?? "",
+                    quantity: item.quantity
+                  }))}
+                orderId={order.id}
+                pendingLabel="Salvando..."
+                products={productsResult.data ?? []}
+                returnTo={detailPath}
+                submitLabel="Salvar correcoes"
+                title="Correcoes do pedido"
+              />
+            </section>
+          ) : null}
+
+          {counterReadyToCollect ? (
+            <section className="content-panel stack-panel">
+              <div className="panel-heading">
+                <div>
+                  <h1>Cobranca do balcao</h1>
+                  <p>{counterCollectText.description}</p>
+                </div>
+                <span>{paymentStatusLabels[order.paymentStatus]}</span>
+              </div>
+
+              <form action={finalizeCounterFoodOrderPaymentAction} className="counter-payment-finalize">
+                <input name="companyId" type="hidden" value={selectedCompany.company.id} />
+                <input name="orderId" type="hidden" value={order.id} />
+                <input name="returnTo" type="hidden" value={detailPath} />
+                <div>
+                  <strong>Cobrar e finalizar</strong>
+                  <span>{counterCollectText.help}</span>
+                </div>
                 <label>
                   Forma de pagamento
-                  <select defaultValue={order.paymentMethod ?? ""} name="paymentMethod">
+                  <select defaultValue={order.paymentMethod ?? ""} name="paymentMethod" required>
                     {paymentMethodOptions.map(([value, label]) => (
                       <option key={value || "empty"} value={value}>
                         {label}
@@ -239,24 +271,21 @@ export default async function OrderDetailPage({
                     ))}
                   </select>
                 </label>
-              </div>
-              <label>
-                Observacao do pagamento
-                <textarea
-                  defaultValue={order.paymentNote ?? ""}
-                  maxLength={600}
-                  name="paymentNote"
-                  rows={3}
-                />
-              </label>
-              <div className="form-footer">
-                <span>Marcar como pago emite food.payment.marked_as_paid para o FP Robots.</span>
-                <PendingSubmitButton pendingLabel="Salvando...">
-                  Salvar pagamento
+                <label>
+                  Observacao do pagamento
+                  <textarea
+                    defaultValue={order.paymentNote ?? ""}
+                    maxLength={600}
+                    name="paymentNote"
+                    rows={2}
+                  />
+                </label>
+                <PendingSubmitButton className="primary-action compact-action" pendingLabel="Finalizando...">
+                  {counterCollectText.buttonLabel}
                 </PendingSubmitButton>
-              </div>
-            </form>
-          </section>
+              </form>
+            </section>
+          ) : null}
 
           <section className="content-panel stack-panel">
             <div className="panel-heading">
@@ -320,18 +349,56 @@ export default async function OrderDetailPage({
   );
 }
 
-function isOrderPaymentCleared(order: FoodOrderContract): boolean {
-  return order.paymentStatus === "paid";
+function isCounterOrderPendingPayment(order: FoodOrderContract): boolean {
+  return isInternalManualFoodOrder(order) && order.paymentStatus === "pending";
 }
 
-function getOrderStatusOptions(
-  order: FoodOrderContract
-): ReadonlyArray<readonly [FoodOrderStatus, string]> {
-  if (isOrderPaymentCleared(order)) {
-    return orderStatusOptions;
+function isCounterOrderEditable(order: FoodOrderContract): boolean {
+  return (
+    isCounterOrderPendingPayment(order) &&
+    order.status !== "cancelled" &&
+    order.status !== "delivered"
+  );
+}
+
+function isCounterOrderReadyToCollect(order: FoodOrderContract): boolean {
+  return (
+    isCounterOrderPendingPayment(order) &&
+    (order.status === "ready" || order.status === "out_for_delivery")
+  );
+}
+
+function getFulfillmentDescription(fulfillmentMethod: FoodOrderFulfillmentMethod): string {
+  if (fulfillmentMethod === "delivery") {
+    return "Pedido de balcao com entrega.";
   }
 
-  return orderStatusOptions.filter(
-    ([status]) => status === order.status || status === "created" || status === "cancelled"
-  );
+  if (fulfillmentMethod === "pickup") {
+    return "Pedido para retirada no balcao.";
+  }
+
+  return "Pedido para consumo no local.";
+}
+
+function getCounterCollectText(fulfillmentMethod: FoodOrderFulfillmentMethod): {
+  buttonLabel: string;
+  description: string;
+  help: string;
+  verb: string;
+} {
+  if (fulfillmentMethod === "delivery") {
+    return {
+      buttonLabel: "Marcar pago e entregar",
+      description: "Registre o pagamento e finalize a entrega do pedido em uma unica etapa.",
+      help: "Use esta acao para pedidos de balcao: registra o pagamento e move o pedido para Entregue em uma unica etapa.",
+      verb: "finalizar a entrega"
+    };
+  }
+
+  return {
+    buttonLabel: "Marcar pago e finalizar",
+    description: "Registre o pagamento e finalize o atendimento em uma unica etapa.",
+    help: "Use esta acao para pedidos de balcao: registra o pagamento e conclui o atendimento em uma unica etapa.",
+    verb: "finalizar o atendimento"
+  };
 }

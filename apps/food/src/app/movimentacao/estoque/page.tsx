@@ -3,6 +3,7 @@ import { FoodShell } from "@/components/food-shell";
 import { PaginationControls } from "@/components/pagination-controls";
 import { EmptyFoodAccess, Notice } from "@/components/page-feedback";
 import { PendingSubmitButton } from "@/components/pending-submit-button";
+import type { FoodStockMovementContract, FoodStockMovementType } from "@fp/types";
 import { createFoodStockEntryAction } from "@/app/actions";
 import { getFoodPageContext } from "@/lib/food-context";
 import {
@@ -149,7 +150,7 @@ export default async function StockPage({ searchParams }: StockPageProps) {
               <div className="data-table" role="table" aria-label="Movimentacoes de estoque">
                 <div className="data-row stock-movements-row data-row-head" role="row">
                   <span>Produto</span>
-                  <span>Entrada</span>
+                  <span>Movimento</span>
                   <span>Saldo</span>
                   <span>NF / lote</span>
                   <span>Data</span>
@@ -160,7 +161,7 @@ export default async function StockPage({ searchParams }: StockPageProps) {
                       <strong>{movement.productName ?? "Produto removido"}</strong>
                       {movement.expiresAt ? <small>Validade {formatDate(movement.expiresAt)}</small> : null}
                     </span>
-                    <span>+{movement.quantity}</span>
+                    <span>{formatMovementQuantity(movement)}</span>
                     <span>
                       {movement.previousQuantity} para {movement.newQuantity}
                     </span>
@@ -207,4 +208,19 @@ function formatDateTime(value: string): string {
     dateStyle: "short",
     timeStyle: "short"
   }).format(new Date(value));
+}
+
+function formatMovementQuantity(movement: FoodStockMovementContract): string {
+  const signal = movement.movementType === "sale" ? "-" : "+";
+  return `${getMovementTypeLabel(movement.movementType)} ${signal}${movement.quantity}`;
+}
+
+function getMovementTypeLabel(type: FoodStockMovementType): string {
+  const labels: Record<FoodStockMovementType, string> = {
+    adjustment: "Ajuste",
+    entry: "Entrada",
+    sale: "Venda"
+  };
+
+  return labels[type];
 }

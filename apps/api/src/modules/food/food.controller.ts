@@ -18,6 +18,7 @@ import type {
   CreateFoodOrderInput,
   CreateFoodStockEntryInput,
   FoodOrderStatus,
+  UpdateFoodOrderItemsInput,
   UpdateFoodOrderPaymentInput,
   UpdateFoodOrderStatusInput,
   UploadFoodProductImageInput,
@@ -272,9 +273,13 @@ export class FoodController {
     @Headers("x-fp-company-id") companyId: string,
     @Query("page") page: string | undefined,
     @Query("pageSize") pageSize: string | undefined,
-    @Query("status") status: string | undefined
+    @Query("status") status: string | undefined,
+    @Query("activeOnly") activeOnly: string | undefined,
+    @Query("collectableOnly") collectableOnly: string | undefined
   ) {
     return this.foodService.listOrders(companyId, {
+      activeOnly: normalizeBoolean(activeOnly),
+      collectableOnly: normalizeBoolean(collectableOnly),
       page: normalizePage(page),
       pageSize: normalizePageSize(pageSize),
       status: normalizeOptionalOrderStatus(status)
@@ -306,6 +311,21 @@ export class FoodController {
     @Param("orderId") orderId: string
   ) {
     return this.foodService.getOrderDetail(companyId, orderId);
+  }
+
+  @Patch("orders/:orderId/items")
+  @ModuleAccessPolicy({
+    applicationKey: "food",
+    companyHeader: "x-fp-company-id",
+    permissionKey: "food.access"
+  })
+  updateOrderItems(
+    @Body() input: UpdateFoodOrderItemsInput,
+    @Headers("x-fp-company-id") companyId: string,
+    @Headers("x-fp-actor-user-id") actorUserId: string,
+    @Param("orderId") orderId: string
+  ) {
+    return this.foodService.updateOrderItems(companyId, actorUserId, orderId, input);
   }
 
   @Patch("orders/:orderId/payment")
@@ -364,4 +384,8 @@ function normalizeOptionalOrderStatus(value: string | undefined): FoodOrderStatu
   }
 
   return value as FoodOrderStatus;
+}
+
+function normalizeBoolean(value: string | undefined): boolean {
+  return value === "1" || value === "true";
 }

@@ -1,4 +1,9 @@
-import type { FoodOrderContract, FoodOrderStatus } from "@fp/types";
+import type {
+  FoodOrderContract,
+  FoodOrderItemContract,
+  FoodOrderItemStatus,
+  FoodOrderStatus
+} from "@fp/types";
 import { CompanySwitcher } from "@/components/company-switcher";
 import { formatMoney } from "@/components/food-forms";
 import { FoodShell } from "@/components/food-shell";
@@ -6,6 +11,7 @@ import { OrderStatusActions } from "@/components/order-status-actions";
 import { OrderAutoRefresh } from "@/components/order-auto-refresh";
 import { EmptyFoodAccess, Notice } from "@/components/page-feedback";
 import { getFoodPageContext } from "@/lib/food-context";
+import { canAdvanceFoodOrderOperationally } from "@/lib/food-order-rules";
 import { getFoodAccess, listFoodOrders } from "@/lib/internal-api";
 
 type KitchenPageProps = {
@@ -41,8 +47,12 @@ export default async function KitchenPage({ searchParams }: KitchenPageProps) {
           })
         ])
       : [{ data: null, error: null }, { data: null, error: null }];
-  const acceptedOrders = (acceptedResult.data?.items ?? []).filter(isPaidOrder);
-  const preparingOrders = (preparingResult.data?.items ?? []).filter(isPaidOrder);
+  const acceptedOrders = (acceptedResult.data?.items ?? []).filter((order) =>
+    isKitchenOrderVisible(order, "pending")
+  );
+  const preparingOrders = (preparingResult.data?.items ?? []).filter((order) =>
+    isKitchenOrderVisible(order, "preparing")
+  );
 
   return (
     <FoodShell activePath="/movimentacao/cozinha">
@@ -93,6 +103,7 @@ export default async function KitchenPage({ searchParams }: KitchenPageProps) {
                 ["preparing", "Iniciar preparo"],
                 ["cancelled", "Cancelar"]
               ]}
+              itemStatus="pending"
             />
             <KitchenColumn
               companyId={selectedCompany.company.id}
@@ -103,6 +114,7 @@ export default async function KitchenPage({ searchParams }: KitchenPageProps) {
                 ["ready", "Marcar pronto"],
                 ["cancelled", "Cancelar"]
               ]}
+              itemStatus="preparing"
             />
           </div>
         </section>
@@ -111,20 +123,25 @@ export default async function KitchenPage({ searchParams }: KitchenPageProps) {
   );
 }
 
-function isPaidOrder(order: FoodOrderContract): boolean {
-  return order.paymentStatus === "paid";
+function isKitchenOrderVisible(
+  order: FoodOrderContract,
+  itemStatus: FoodOrderItemStatus
+): boolean {
+  return canAdvanceFoodOrderOperationally(order) && getKitchenItems(order, itemStatus).length > 0;
 }
 
 function KitchenColumn({
   actions,
   companyId,
   emptyMessage,
+  itemStatus,
   orders,
   title
 }: {
   actions: Array<[FoodOrderStatus, string]>;
   companyId: string;
   emptyMessage: string;
+  itemStatus: FoodOrderItemStatus;
   orders: FoodOrderContract[];
   title: string;
 }) {
@@ -137,40 +154,54 @@ function KitchenColumn({
 
       {orders.length > 0 ? (
         <div className="kitchen-order-list">
-          {orders.map((order) => (
-            <article className="order-card kitchen-order-card" key={order.id}>
-              <div className="order-card-heading">
-                <div>
-                  <strong>{order.orderNumber}</strong>
-                  <small>
-                    {order.customerName ?? "Cliente nao informado"} -{" "}
-                    {new Date(order.createdAt).toLocaleTimeString("pt-BR")}
-                  </small>
-                </div>
-                <span>{formatMoney(order.totalCents)}</span>
-              </div>
+          {orders.map((order) => {
+            const kitchenItems = getKitchenItems(order, itemStatus);
 
-              <div className="order-items">
-                {order.items.map((item) => (
-                  <div className="order-item-row" key={item.id}>
-                    <span>
-                      {item.quantity}x {item.productName}
-                      {item.itemNote ? (
-                        <small className="public-item-note">Obs.: {item.itemNote}</small>
-                      ) : null}
-                    </span>
-                    <strong>{formatMoney(item.totalPriceCents)}</strong>
+            return (
+              <article className="order-card kitchen-order-card" key={order.id}>
+                <div className="order-card-heading">
+                  <div>
+                    <strong>{order.orderNumber}</strong>
+                    <small>
+                      {order.customerName ?? "Cliente nao informado"} -{" "}
+                      {new Date(order.createdAt).toLocaleTimeString("pt-BR")}
+                    </small>
+                    <small>{kitchenItems.length} item(ns) para preparo</small>
                   </div>
-                ))}
-              </div>
+                  <span>{formatMoney(order.totalCents)}</span>
+                </div>
 
-              <OrderStatusActions actions={actions} companyId={companyId} orderId={order.id} />
-            </article>
-          ))}
+                <div className="order-items">
+                  {kitchenItems.map((item) => (
+                    <div className="order-item-row" key={item.id}>
+                      <span>
+                        {item.quantity}x {item.productName}
+                        {item.itemNote ? (
+                          <small className="public-item-note">Obs.: {item.itemNote}</small>
+                        ) : null}
+                      </span>
+                      <strong>{formatMoney(item.totalPriceCents)}</strong>
+                    </div>
+                  ))}
+                </div>
+
+                <OrderStatusActions actions={actions} companyId={companyId} orderId={order.id} />
+              </article>
+            );
+          })}
         </div>
       ) : (
         <div className="empty-state kitchen-empty">{emptyMessage}</div>
       )}
     </div>
+  );
+}
+
+function getKitchenItems(
+  order: FoodOrderContract,
+  itemStatus: FoodOrderItemStatus
+): FoodOrderItemContract[] {
+  return order.items.filter(
+    (item) => item.kitchenRequired && item.itemStatus === itemStatus
   );
 }

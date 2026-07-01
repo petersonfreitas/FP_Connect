@@ -1,36 +1,47 @@
 import Link from "next/link";
-import type { FoodOrderContract, FoodOrderStatus, FoodPaymentStatus } from "@fp/types";
+import type {
+  FoodOrderContract,
+  FoodOrderFulfillmentMethod,
+  FoodOrderStatus,
+  FoodPaymentStatus
+} from "@fp/types";
 import { CompanySwitcher } from "@/components/company-switcher";
 import { formatMoney } from "@/components/food-forms";
 import { FoodShell } from "@/components/food-shell";
 import { OrderAutoRefresh } from "@/components/order-auto-refresh";
 import { PaginationControls } from "@/components/pagination-controls";
 import { EmptyFoodAccess, Notice } from "@/components/page-feedback";
-import {
-  createInternalFoodOrderAction,
-  updateFoodOrderStatusAction
-} from "@/app/actions";
+import { updateFoodOrderStatusAction } from "@/app/actions";
 import { getFoodPageContext } from "@/lib/food-context";
-import {
-  getFoodAccess,
-  listAllFoodProducts,
-  listFoodOrders
-} from "@/lib/internal-api";
+import { getFoodAccess, listFoodOrders } from "@/lib/internal-api";
 import { PendingSubmitButton } from "@/components/pending-submit-button";
+import {
+  canAdvanceFoodOrderOperationally,
+  getFoodOrderOrigin,
+  isInternalManualFoodOrder,
+  type FoodOrderOrigin
+} from "@/lib/food-order-rules";
 
 type OrdersPageProps = {
   searchParams?: Promise<{
     companyId?: string;
     error?: string;
-    orderCreated?: string;
     orderUpdated?: string;
     page?: string;
+    scope?: string;
     status?: string;
   }>;
 };
 
 export const dynamic = "force-dynamic";
 const pageSize = 20;
+type OrderScope = "collectable";
+type OrderFilterOption = {
+  key: string;
+  label: string;
+  scope?: OrderScope;
+  status?: FoodOrderStatus;
+};
 
 const orderStatusLabels = {
   accepted: "Aceito",
@@ -48,26 +59,23 @@ const paymentStatusLabels: Record<FoodPaymentStatus, string> = {
   pending: "Pagamento pendente"
 };
 
-const orderStatusOptions = [
-  ["created", "Criado"],
-  ["accepted", "Aceito"],
-  ["preparing", "Em preparo"],
-  ["ready", "Pronto"],
-  ["out_for_delivery", "Saiu para entrega"],
-  ["delivered", "Entregue"],
-  ["cancelled", "Cancelado"]
-] as const;
+const fulfillmentLabels: Record<FoodOrderFulfillmentMethod, string> = {
+  delivery: "Entrega",
+  dine_in: "Local",
+  pickup: "Retirada"
+};
 
-const orderFilterOptions = [
-  ["", "Todos"],
-  ["created", "Criado"],
-  ["accepted", "Aceito"],
-  ["preparing", "Em preparo"],
-  ["ready", "Pronto"],
-  ["out_for_delivery", "Saiu para entrega"],
-  ["delivered", "Entregue"],
-  ["cancelled", "Cancelado"]
-] as const;
+const orderFilterOptions: OrderFilterOption[] = [
+  { key: "active", label: "Ativos" },
+  { key: "collectable", label: "A cobrar", scope: "collectable" },
+  { key: "created", label: "Criado", status: "created" },
+  { key: "accepted", label: "Aceito", status: "accepted" },
+  { key: "preparing", label: "Em preparo", status: "preparing" },
+  { key: "ready", label: "Pronto", status: "ready" },
+  { key: "out_for_delivery", label: "Saiu para entrega", status: "out_for_delivery" },
+  { key: "delivered", label: "Entregue", status: "delivered" },
+  { key: "cancelled", label: "Cancelado", status: "cancelled" }
+];
 
 const quickStatusOptions: Record<FoodOrderStatus, Array<[FoodOrderStatus, string]>> = {
   accepted: [
@@ -100,24 +108,28 @@ const quickStatusOptions: Record<FoodOrderStatus, Array<[FoodOrderStatus, string
 export default async function OrdersPage({ searchParams }: OrdersPageProps) {
   const params = await searchParams;
   const page = normalizePage(params?.page);
-  const statusFilter = normalizeOrderStatusFilter(params?.status);
+  const orderScope = normalizeOrderScope(params?.scope);
+  const statusFilter = orderScope ? undefined : normalizeOrderStatusFilter(params?.status);
   const context = await getFoodPageContext(params?.companyId);
   const selectedCompany = context.selectedCompany;
   const foodAccessResult = selectedCompany
     ? await getFoodAccess(selectedCompany.company.id)
     : { data: null, error: null };
-  const [productsResult, ordersResult] =
+  const ordersResult =
     selectedCompany && !foodAccessResult.error
-      ? await Promise.all([
-          listAllFoodProducts(selectedCompany.company.id),
-          listFoodOrders(selectedCompany.company.id, { page, pageSize, status: statusFilter })
-        ])
-      : [{ data: null, error: null }, { data: null, error: null }];
-  const availableProducts = (productsResult.data ?? []).filter(
-    (product) => product.status === "available"
-  );
+      ? await listFoodOrders(selectedCompany.company.id, {
+          activeOnly: !statusFilter && !orderScope,
+          collectableOnly: orderScope === "collectable",
+          page,
+          pageSize,
+          status: statusFilter
+        })
+      : { data: null, error: null };
   const pagination = ordersResult.data;
   const orders = pagination?.items ?? [];
+  const serviceHref = selectedCompany
+    ? `/movimentacao/atendimento?companyId=${selectedCompany.company.id}`
+    : "/movimentacao/atendimento";
 
   return (
     <FoodShell activePath="/movimentacao/pedidos">
@@ -130,10 +142,8 @@ export default async function OrdersPage({ searchParams }: OrdersPageProps) {
 
       {context.accessError ? <Notice tone="danger" message={context.accessError} /> : null}
       {foodAccessResult.error ? <Notice tone="danger" message={foodAccessResult.error} /> : null}
-      {productsResult.error ? <Notice tone="danger" message={productsResult.error} /> : null}
       {ordersResult.error ? <Notice tone="danger" message={ordersResult.error} /> : null}
       {params?.error ? <Notice tone="danger" message={params.error} /> : null}
-      {params?.orderCreated ? <Notice tone="success" message="Pedido interno criado com sucesso." /> : null}
       {params?.orderUpdated ? <Notice tone="success" message="Status do pedido atualizado." /> : null}
 
       <CompanySwitcher
@@ -146,85 +156,33 @@ export default async function OrdersPage({ searchParams }: OrdersPageProps) {
         <EmptyFoodAccess />
       ) : (
         <>
-          <section className="content-panel">
-            <div className="panel-heading">
-              <div>
-                <h1>Novo pedido interno</h1>
-                <p>Crie um pedido manual para validar produtos, eventos e status operacionais.</p>
-              </div>
-              <span>{availableProducts.length} produto(s) disponivel(is)</span>
-            </div>
-
-            <form action={createInternalFoodOrderAction} className="store-form">
-              <input name="companyId" type="hidden" value={selectedCompany.company.id} />
-              <input name="statusFilter" type="hidden" value={statusFilter ?? ""} />
-              <div className="form-grid">
-                <label>
-                  Cliente
-                  <input maxLength={120} name="customerName" placeholder="Cliente teste" />
-                </label>
-                <label>
-                  Telefone
-                  <input maxLength={40} name="customerPhone" placeholder="(00) 00000-0000" />
-                </label>
-              </div>
-              <label>
-                Observacao
-                <textarea maxLength={600} name="customerNote" rows={3} />
-              </label>
-
-              {availableProducts.length > 0 ? (
-                <div className="order-product-list">
-                  {availableProducts.map((product) => (
-                    <label className="order-product-row" key={product.id}>
-                      <input name="productId" type="hidden" value={product.id} />
-                      <span>
-                        <strong>{product.name}</strong>
-                        <small>{formatMoney(product.priceCents)}</small>
-                      </span>
-                      <input
-                        min={0}
-                        max={99}
-                        name={`quantity:${product.id}`}
-                        placeholder="0"
-                        type="number"
-                      />
-                    </label>
-                  ))}
-                </div>
-              ) : (
-                <div className="empty-state">Cadastre produtos disponiveis antes de criar pedidos.</div>
-              )}
-
-              <div className="form-footer">
-                <span>Criar pedido emite food.order.created para o FP Robots.</span>
-                <PendingSubmitButton disabled={availableProducts.length === 0} pendingLabel="Criando...">
-                  Criar pedido
-                </PendingSubmitButton>
-              </div>
-            </form>
-          </section>
-
           <section className="content-panel stack-panel">
             <div className="panel-heading">
               <div>
                 <h1>Pedidos criados</h1>
-                <p>Lista operacional com filtro por status e atualizacao leve a cada 30 segundos.</p>
+                <p>Acompanhe pedidos existentes, filtre por status e avance o fluxo operacional.</p>
               </div>
               <div className="panel-heading-actions">
                 <OrderAutoRefresh intervalSeconds={30} />
                 <span>{pagination?.total ?? 0} registro(s)</span>
+                <Link className="primary-action compact-action" href={serviceHref}>
+                  Novo atendimento
+                </Link>
               </div>
             </div>
 
             <nav className="status-filter-bar" aria-label="Filtro de status dos pedidos">
-              {orderFilterOptions.map(([value, label]) => (
+              {orderFilterOptions.map((option) => (
                 <Link
-                  className={value === (statusFilter ?? "") ? "status-filter active" : "status-filter"}
-                  href={getStatusFilterHref(selectedCompany.company.id, value)}
-                  key={value || "all"}
+                  className={
+                    isOrderFilterActive(option, statusFilter, orderScope)
+                      ? "status-filter active"
+                      : "status-filter"
+                  }
+                  href={getStatusFilterHref(selectedCompany.company.id, option)}
+                  key={option.key}
                 >
-                  {label}
+                  {option.label}
                 </Link>
               ))}
             </nav>
@@ -232,9 +190,10 @@ export default async function OrdersPage({ searchParams }: OrdersPageProps) {
             {orders.length > 0 ? (
               <div className="order-list">
                 {orders.map((order) => {
-                  const statusOptions = getOrderStatusOptions(order);
                   const quickActions = getQuickStatusOptions(order);
                   const paymentCleared = isOrderPaymentCleared(order);
+                  const origin = getFoodOrderOrigin(order);
+                  const collectable = isCounterOrderPendingPayment(order);
 
                   return (
                     <article className="order-card" key={order.id}>
@@ -245,12 +204,24 @@ export default async function OrdersPage({ searchParams }: OrdersPageProps) {
                             {order.customerName ?? "Cliente nao informado"} -{" "}
                             {new Date(order.createdAt).toLocaleString("pt-BR")}
                           </small>
-                          <small>{paymentStatusLabels[order.paymentStatus]}</small>
                           {!paymentCleared ? (
                             <small>Fluxo operacional bloqueado ate confirmacao do pagamento.</small>
                           ) : null}
                         </div>
-                        <span>{orderStatusLabels[order.status]}</span>
+                        <div className="order-card-badges" aria-label="Resumo do pedido">
+                          <span className={getOriginBadgeClass(origin)}>
+                            {origin === "counter" ? "Balcao" : "Online"}
+                          </span>
+                          <span className={getFulfillmentBadgeClass(order.fulfillmentMethod)}>
+                            {fulfillmentLabels[order.fulfillmentMethod]}
+                          </span>
+                          <span className={getStatusBadgeClass(order.status)}>
+                            {orderStatusLabels[order.status]}
+                          </span>
+                          <span className={getPaymentBadgeClass(order.paymentStatus)}>
+                            {paymentStatusLabels[order.paymentStatus]}
+                          </span>
+                        </div>
                       </div>
 
                       <div className="order-items">
@@ -267,28 +238,20 @@ export default async function OrdersPage({ searchParams }: OrdersPageProps) {
                         ))}
                       </div>
 
-                      <form action={updateFoodOrderStatusAction} className="order-status-form">
-                        <input name="companyId" type="hidden" value={selectedCompany.company.id} />
-                        <input name="orderId" type="hidden" value={order.id} />
-                        <input name="statusFilter" type="hidden" value={statusFilter ?? ""} />
+                      <div className="order-card-total">
                         <strong>Total: {formatMoney(order.totalCents)}</strong>
-                        <select defaultValue={order.status} name="status">
-                          {statusOptions.map(([value, label]) => (
-                            <option key={value} value={value}>
-                              {label}
-                            </option>
-                          ))}
-                        </select>
-                        <PendingSubmitButton
-                          className="secondary-action compact-action"
-                          pendingLabel="Salvando..."
-                        >
-                          Atualizar
-                        </PendingSubmitButton>
-                      </form>
+                      </div>
 
-                      {quickActions.length > 0 ? (
+                      {quickActions.length > 0 || collectable ? (
                         <div className="quick-status-actions">
+                          {collectable ? (
+                            <Link
+                              className="primary-action compact-action"
+                              href={`/movimentacao/pedidos/${order.id}?companyId=${selectedCompany.company.id}&collect=1`}
+                            >
+                              Cobrar
+                            </Link>
+                          ) : null}
                           {quickActions.map(([status, label]) => (
                             <form action={updateFoodOrderStatusAction} key={status}>
                               <input name="companyId" type="hidden" value={selectedCompany.company.id} />
@@ -331,7 +294,11 @@ export default async function OrdersPage({ searchParams }: OrdersPageProps) {
                 basePath="/movimentacao/pedidos"
                 page={pagination.page}
                 pageSize={pagination.pageSize}
-                params={{ companyId: selectedCompany.company.id, status: statusFilter }}
+                params={{
+                  companyId: selectedCompany.company.id,
+                  scope: orderScope,
+                  status: statusFilter
+                }}
                 total={pagination.total}
                 totalPages={pagination.totalPages}
               />
@@ -349,27 +316,84 @@ function normalizePage(value: string | undefined): number {
 }
 
 function isOrderPaymentCleared(order: FoodOrderContract): boolean {
-  return order.paymentStatus === "paid";
-}
-
-function getOrderStatusOptions(
-  order: FoodOrderContract
-): ReadonlyArray<readonly [FoodOrderStatus, string]> {
-  if (isOrderPaymentCleared(order)) {
-    return orderStatusOptions;
-  }
-
-  return orderStatusOptions.filter(
-    ([status]) => status === order.status || status === "created" || status === "cancelled"
-  );
+  return canAdvanceFoodOrderOperationally(order);
 }
 
 function getQuickStatusOptions(order: FoodOrderContract): Array<[FoodOrderStatus, string]> {
   if (isOrderPaymentCleared(order)) {
-    return quickStatusOptions[order.status];
+    const options = quickStatusOptions[order.status];
+    const filteredOptions = isCounterOrderPendingPayment(order)
+      ? options.filter(([status]) => status !== "delivered")
+      : options;
+    const kitchenAwareOptions = orderRequiresKitchen(order)
+      ? filteredOptions
+      : getNonKitchenQuickStatusOptions(order.status, filteredOptions);
+
+    if (order.fulfillmentMethod !== "delivery") {
+      return kitchenAwareOptions
+        .filter(([status]) => status !== "out_for_delivery")
+        .map(([status, label]) => [status, status === "delivered" ? "Finalizar" : label]);
+    }
+
+    return kitchenAwareOptions;
   }
 
   return order.status === "cancelled" ? [] : [["cancelled", "Cancelar"]];
+}
+
+function orderRequiresKitchen(order: FoodOrderContract): boolean {
+  return order.items.some((item) => item.kitchenRequired);
+}
+
+function getNonKitchenQuickStatusOptions(
+  currentStatus: FoodOrderStatus,
+  options: Array<[FoodOrderStatus, string]>
+): Array<[FoodOrderStatus, string]> {
+  const nextOptions: Array<[FoodOrderStatus, string]> = [];
+
+  for (const [status, label] of options) {
+    if (status === "preparing") {
+      continue;
+    }
+
+    if (status === "ready") {
+      nextOptions.push(["ready", "Liberar pedido"]);
+      continue;
+    }
+
+    if (currentStatus === "created" && status === "accepted") {
+      nextOptions.push(["ready", "Liberar pedido"]);
+      continue;
+    }
+
+    nextOptions.push([status, label]);
+  }
+
+  return nextOptions;
+}
+
+function isCounterOrderPendingPayment(order: FoodOrderContract): boolean {
+  return (
+    isInternalManualFoodOrder(order) &&
+    order.paymentStatus === "pending" &&
+    (order.status === "ready" || order.status === "out_for_delivery")
+  );
+}
+
+function getOriginBadgeClass(origin: FoodOrderOrigin): string {
+  return `status-chip origin-${origin}`;
+}
+
+function getPaymentBadgeClass(status: FoodPaymentStatus): string {
+  return `status-chip payment-${status}`;
+}
+
+function getFulfillmentBadgeClass(method: FoodOrderFulfillmentMethod): string {
+  return `status-chip fulfillment-${method.replaceAll("_", "-")}`;
+}
+
+function getStatusBadgeClass(status: FoodOrderStatus): string {
+  return `status-chip order-status-${status.replaceAll("_", "-")}`;
 }
 
 function normalizeOrderStatusFilter(value: string | undefined): FoodOrderStatus | undefined {
@@ -388,13 +412,37 @@ function normalizeOrderStatusFilter(value: string | undefined): FoodOrderStatus 
   return undefined;
 }
 
-function getStatusFilterHref(companyId: string, status: string): string {
+function normalizeOrderScope(value: string | undefined): OrderScope | undefined {
+  return value === "collectable" ? value : undefined;
+}
+
+function isOrderFilterActive(
+  option: OrderFilterOption,
+  statusFilter: FoodOrderStatus | undefined,
+  orderScope: OrderScope | undefined
+): boolean {
+  if (option.scope) {
+    return option.scope === orderScope;
+  }
+
+  if (option.status) {
+    return option.status === statusFilter && !orderScope;
+  }
+
+  return !statusFilter && !orderScope;
+}
+
+function getStatusFilterHref(companyId: string, option: OrderFilterOption): string {
   const params = new URLSearchParams({
     companyId
   });
 
-  if (status) {
-    params.set("status", status);
+  if (option.status) {
+    params.set("status", option.status);
+  }
+
+  if (option.scope) {
+    params.set("scope", option.scope);
   }
 
   return `/movimentacao/pedidos?${params.toString()}`;

@@ -46,6 +46,7 @@ const navigation = {
       icon: "MV",
       label: "Movimentacao",
       items: [
+        { href: "/movimentacao/atendimento", label: "Atendimento" },
         { href: "/movimentacao/pedidos", label: "Pedidos" },
         { href: "/movimentacao/cozinha", label: "Cozinha" },
         { href: "/movimentacao/entregas", label: "Entregas" },
@@ -89,7 +90,7 @@ export async function FoodShell({ activePath, children }: FoodShellProps) {
             <details
               className={isActiveNavigationGroup(activePath, group) ? "nav-group active" : "nav-group"}
               key={group.label}
-              open={shouldOpenNavigationGroup(activePath, group)}
+              open
             >
               <summary>
                 <span className="nav-group-icon" aria-hidden="true">
@@ -148,10 +149,6 @@ function getNavigationItemIcon(href: string, label: string): string {
   }
 
   return label.slice(0, 2).toUpperCase();
-}
-
-function shouldOpenNavigationGroup(activePath: string, group: FoodNavigationGroup): boolean {
-  return isActiveNavigationGroup(activePath, group) || group.label !== "Movimentacao";
 }
 
 function isActiveNavigationGroup(activePath: string, group: FoodNavigationGroup): boolean {

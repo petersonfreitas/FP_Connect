@@ -209,10 +209,11 @@ export type GatewaySmtpTestEmailContract = {
 export type FoodStoreStatus = "closed" | "implementation" | "open" | "suspended";
 export type FoodCategoryStatus = "active" | "inactive";
 export type FoodProductStatus = "available" | "hidden" | "unavailable";
-export type FoodStockMovementType = "entry";
+export type FoodStockMovementType = "adjustment" | "entry" | "sale";
 export type FoodPaymentMethod = "card" | "cash" | "other" | "pix";
 export type FoodPaymentStatus = "cancelled" | "paid" | "pending";
-export type FoodOrderFulfillmentMethod = "delivery" | "pickup";
+export type FoodOrderFulfillmentMethod = "delivery" | "dine_in" | "pickup";
+export type FoodOrderItemStatus = "cancelled" | "pending" | "preparing" | "ready";
 export type FoodCustomerStatus = "active" | "blocked" | "inactive";
 export type FoodCustomerOrigin = "counter" | "online" | "phone";
 export type FoodCustomerPreferredContactMethod =
@@ -307,6 +308,7 @@ export type FoodProductContract = {
   priceCents: number;
   status: FoodProductStatus;
   imageUrl: string | null;
+  kitchenRequired: boolean;
   stockControlEnabled: boolean;
   stockMinQuantity: number;
   stockQuantity: number;
@@ -323,6 +325,7 @@ export type UpsertFoodProductInput = {
   priceCents: number;
   status: FoodProductStatus;
   imageUrl?: string | null;
+  kitchenRequired?: boolean | null;
   stockControlEnabled?: boolean | null;
   stockMinQuantity?: number | null;
   sortOrder?: number | null;
@@ -499,6 +502,8 @@ export type FoodOrderItemContract = {
   productId: string | null;
   productName: string;
   itemNote: string | null;
+  itemStatus: FoodOrderItemStatus;
+  kitchenRequired: boolean;
   unitPriceCents: number;
   quantity: number;
   totalPriceCents: number;
@@ -560,6 +565,7 @@ export type FoodDashboardContract = {
 
 export type CreateFoodOrderItemInput = {
   itemNote?: string | null;
+  orderItemId?: string | null;
   productId: string;
   quantity: number;
 };
@@ -572,6 +578,8 @@ export type CreateFoodOrderInput = {
   customerNote?: string | null;
   items: CreateFoodOrderItemInput[];
 };
+
+export type UpdateFoodOrderItemsInput = CreateFoodOrderInput;
 
 export type EnsureFoodPublicCustomerInput = {
   authUserId: string;

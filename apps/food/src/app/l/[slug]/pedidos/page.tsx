@@ -36,6 +36,7 @@ type PublicOrderFilter = "active" | "all" | "cancelled" | "finished" | "payment_
 
 const fulfillmentLabels: Record<FoodOrderFulfillmentMethod, string> = {
   delivery: "Entrega",
+  dine_in: "Consumo no local",
   pickup: "Retirada em balcao"
 };
 

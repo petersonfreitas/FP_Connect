@@ -6,6 +6,7 @@ import type {
   CreateFoodStockEntryInput,
   CreatePublicFoodOrderInput,
   FoodCategoryStatus,
+  FoodOrderFulfillmentMethod,
   FoodOrderStatus,
   FoodPaymentMethod,
   FoodPaymentStatus,
@@ -34,6 +35,7 @@ import {
   setPrimaryPublicFoodCustomerPaymentMethod,
   saveFoodStoreHours,
   updateFoodCategory,
+  updateFoodOrderItems,
   updateFoodOrderPayment,
   updateFoodOrderStatus,
   updateFoodProduct,
@@ -145,6 +147,7 @@ export async function saveFoodProductAction(formData: FormData): Promise<void> {
     categoryId: optionalText(formData.get("categoryId")),
     description: optionalText(formData.get("description")),
     imageUrl: shouldRemoveImage ? null : optionalText(formData.get("imageUrl")),
+    kitchenRequired: formData.get("kitchenRequired") !== "false",
     name: String(formData.get("name") ?? ""),
     priceCents: parseMoneyToCents(formData.get("price")),
     slug: optionalText(formData.get("slug")),
@@ -307,28 +310,44 @@ export async function saveFoodStoreHoursAction(formData: FormData): Promise<void
 export async function createInternalFoodOrderAction(formData: FormData): Promise<void> {
   const companyId = requireCompanyId(formData);
   const statusFilter = optionalOrderStatusFilter(formData.get("statusFilter"));
-  const productIds = formData.getAll("productId").map((value) => String(value));
-  const items = productIds
-    .map((productId) => ({
-      productId,
-      quantity: optionalInteger(formData.get(`quantity:${productId}`)) ?? 0
-    }))
-    .filter((item) => item.quantity > 0);
+  const returnTo = normalizeFoodReturnPath(formData.get("returnTo"));
   const input: CreateFoodOrderInput = {
     customerName: optionalText(formData.get("customerName")),
     customerNote: optionalText(formData.get("customerNote")),
     customerPhone: optionalText(formData.get("customerPhone")),
-    items
+    fulfillmentMethod: normalizeCounterFulfillmentMethod(formData.get("fulfillmentMethod")),
+    items: parseCounterOrderItems(formData)
   };
   const result = await createFoodOrder(companyId, input);
 
   redirectWithResult(
-    "/movimentacao/pedidos",
+    returnTo,
     companyId,
     result.error,
     "orderCreated",
     { status: statusFilter }
   );
+}
+
+export async function updateInternalFoodOrderItemsAction(formData: FormData): Promise<void> {
+  const companyId = requireCompanyId(formData);
+  const orderId = String(formData.get("orderId") ?? "").trim();
+  const returnTo = normalizeFoodReturnPath(formData.get("returnTo"));
+
+  if (!orderId) {
+    redirectWithResult(returnTo, companyId, "Pedido nao informado.", "orderUpdated");
+  }
+
+  const input: CreateFoodOrderInput = {
+    customerName: optionalText(formData.get("customerName")),
+    customerNote: optionalText(formData.get("customerNote")),
+    customerPhone: optionalText(formData.get("customerPhone")),
+    fulfillmentMethod: normalizeCounterFulfillmentMethod(formData.get("fulfillmentMethod")),
+    items: parseCounterOrderItems(formData)
+  };
+  const result = await updateFoodOrderItems(companyId, orderId, input);
+
+  redirectWithResult(returnTo, companyId, result.error, "orderUpdated");
 }
 
 export async function updateFoodOrderStatusAction(formData: FormData): Promise<void> {
@@ -405,6 +424,32 @@ export async function updateFoodOrderPaymentAction(formData: FormData): Promise<
   const result = await updateFoodOrderPayment(companyId, orderId, input);
 
   redirectWithResult(returnTo, companyId, result.error, "paymentUpdated");
+}
+
+export async function finalizeCounterFoodOrderPaymentAction(formData: FormData): Promise<void> {
+  const companyId = requireCompanyId(formData);
+  const orderId = String(formData.get("orderId") ?? "").trim();
+  const returnTo = normalizeFoodReturnPath(formData.get("returnTo"));
+
+  if (!orderId) {
+    redirectWithResult(returnTo, companyId, "Pedido nao informado.", "paymentUpdated");
+  }
+
+  const paymentResult = await updateFoodOrderPayment(companyId, orderId, {
+    paymentMethod: optionalPaymentMethod(formData.get("paymentMethod")),
+    paymentNote: optionalText(formData.get("paymentNote")),
+    paymentStatus: "paid"
+  });
+
+  if (paymentResult.error) {
+    redirectWithResult(returnTo, companyId, paymentResult.error, "paymentUpdated");
+  }
+
+  const statusResult = await updateFoodOrderStatus(companyId, orderId, {
+    status: "delivered"
+  });
+
+  redirectWithResult(returnTo, companyId, statusResult.error, "paymentUpdated");
 }
 
 export async function createPublicFoodOrderAction(formData: FormData): Promise<void> {
@@ -857,6 +902,34 @@ function optionalOrderStatusFilter(value: FormDataEntryValue | null): FoodOrderS
   return status as FoodOrderStatus;
 }
 
+function parseCounterOrderItems(formData: FormData): CreateFoodOrderInput["items"] {
+  const lineIds = formData.getAll("cartLineId").map((value) => String(value));
+  const productIds =
+    lineIds.length > 0 ? lineIds : formData.getAll("productId").map((value) => String(value));
+
+  return productIds
+    .map((id) => {
+      const productId = String(
+        lineIds.length > 0 ? formData.get(`productId:${id}`) : id
+      ).trim();
+
+      return {
+        itemNote: optionalText(formData.get(`itemNote:${id}`)),
+        orderItemId: optionalText(formData.get(`orderItemId:${id}`)),
+        productId,
+        quantity: optionalInteger(formData.get(`quantity:${id}`)) ?? 0
+      };
+    })
+    .filter((item) => item.productId)
+    .filter((item) => item.quantity > 0);
+}
+
+function normalizeCounterFulfillmentMethod(
+  value: FormDataEntryValue | null
+): FoodOrderFulfillmentMethod {
+  return String(value ?? "") === "delivery" ? "delivery" : "dine_in";
+}
+
 function normalizePaymentStatus(value: FormDataEntryValue | null): FoodPaymentStatus {
   const status = String(value ?? "");
 
@@ -910,7 +983,11 @@ function optionalPaymentMethod(value: FormDataEntryValue | null): FoodPaymentMet
 function normalizeFoodReturnPath(value: FormDataEntryValue | null): string {
   const path = String(value ?? "").trim();
 
-  if (path === "/movimentacao/cozinha" || path === "/movimentacao/entregas") {
+  if (
+    path === "/movimentacao/atendimento" ||
+    path === "/movimentacao/cozinha" ||
+    path === "/movimentacao/entregas"
+  ) {
     return path;
   }
 

@@ -30,6 +30,7 @@ import type {
   FoodOrderContract,
   FoodOrderFulfillmentMethod,
   FoodOrderItemContract,
+  FoodOrderItemStatus,
   FoodOrderStatusHistoryContract,
   FoodOrderStatus,
   FoodPaymentMethod,
@@ -57,6 +58,7 @@ import type {
   PaginatedContract,
   RetryPublicFoodPaymentInput,
   SetFoodPublicCustomerPrimaryAddressInput,
+  UpdateFoodOrderItemsInput,
   UpdateFoodOrderPaymentInput,
   UpdateFoodOrderStatusInput,
   UpdateFoodPublicCustomerProfileInput,
@@ -120,6 +122,7 @@ type FoodProductRow = {
   price_cents: number;
   status: FoodProductStatus;
   image_url: string | null;
+  kitchen_required: boolean;
   stock_control_enabled: boolean;
   stock_min_quantity: number;
   stock_quantity: number;
@@ -178,6 +181,8 @@ type FoodOrderItemRow = {
   product_id: string | null;
   product_name: string;
   item_note: string | null;
+  item_status: FoodOrderItemStatus;
+  kitchen_required: boolean;
   unit_price_cents: number;
   quantity: number;
   total_price_cents: number;
@@ -297,6 +302,8 @@ type PaginationOptions = {
 };
 
 type OrderListOptions = PaginationOptions & {
+  activeOnly?: boolean;
+  collectableOnly?: boolean;
   status?: FoodOrderStatus;
 };
 
@@ -305,6 +312,16 @@ type CreateOrderOptions = {
   customerSession?: FoodPublicCustomerSessionContract | null;
   deliveryAddress?: FoodPublicCustomerAddressContract | null;
   fulfillmentMethod?: FoodOrderFulfillmentMethod;
+};
+
+type NormalizeOrderInputOptions = {
+  stockCreditsByProductId?: Map<string, number>;
+};
+
+type StockDeltaInput = {
+  notes: string;
+  productId: string;
+  quantityDelta: number;
 };
 
 const storeSelect = [
@@ -357,6 +374,7 @@ const productSelect = [
   "price_cents",
   "status",
   "image_url",
+  "kitchen_required",
   "stock_control_enabled",
   "stock_min_quantity",
   "stock_quantity",
@@ -419,6 +437,8 @@ const orderItemSelect = [
   "product_id",
   "product_name",
   "item_note",
+  "item_status",
+  "kitchen_required",
   "unit_price_cents",
   "quantity",
   "total_price_cents"
@@ -526,6 +546,15 @@ const validOrderStatuses = new Set<FoodOrderStatus>([
   "preparing",
   "ready"
 ]);
+
+const activeOrderStatuses: FoodOrderStatus[] = [
+  "accepted",
+  "created",
+  "out_for_delivery",
+  "preparing",
+  "ready"
+];
+const collectableOrderStatuses: FoodOrderStatus[] = ["out_for_delivery", "ready"];
 const validPaymentMethods = new Set<FoodPaymentMethod>(["card", "cash", "other", "pix"]);
 const validPaymentStatuses = new Set<FoodPaymentStatus>([
   "cancelled",
@@ -802,6 +831,7 @@ export class FoodService {
       company_id: companyId,
       description: normalized.description,
       image_url: normalized.imageUrl,
+      kitchen_required: normalized.kitchenRequired,
       name: normalized.name,
       price_cents: normalized.priceCents,
       slug: normalized.slug,
@@ -1007,6 +1037,67 @@ export class FoodService {
     const productsById = await this.listProductsByIds(companyId, [row.product_id]);
 
     return mapStockMovement(row, productsById.get(row.product_id) ?? null);
+  }
+
+  private async applyOrderStockDeltas(
+    companyId: string,
+    orderId: string,
+    actorUserId: string | null,
+    deltas: StockDeltaInput[]
+  ): Promise<void> {
+    if (deltas.length === 0) {
+      return;
+    }
+
+    const { error } = await this.supabase.food.rpc("apply_order_stock_deltas", {
+      deltas,
+      target_actor_user_id: actorUserId,
+      target_company_id: companyId,
+      target_order_id: orderId
+    });
+
+    if (error) {
+      throwSupabaseError(error);
+    }
+  }
+
+  private async deleteFailedOrder(companyId: string, orderId: string): Promise<void> {
+    const { error } = await this.supabase.food
+      .from("orders")
+      .delete()
+      .eq("company_id", companyId)
+      .eq("id", orderId);
+
+    if (error) {
+      this.logger.warn(
+        `Nao foi possivel remover pedido Food ${orderId} apos falha de estoque: ${error.message}`
+      );
+    }
+  }
+
+  private async revertOrderStockDeltas(
+    companyId: string,
+    orderId: string,
+    actorUserId: string | null,
+    deltas: StockDeltaInput[],
+    orderNumber: string
+  ): Promise<void> {
+    if (deltas.length === 0) {
+      return;
+    }
+
+    try {
+      await this.applyOrderStockDeltas(
+        companyId,
+        orderId,
+        actorUserId,
+        reverseStockDeltas(deltas, orderNumber)
+      );
+    } catch (error) {
+      this.logger.warn(
+        `Nao foi possivel estornar movimento de estoque do pedido Food ${orderId}: ${getErrorMessage(error)}`
+      );
+    }
   }
 
   async getMenu(companyId: string): Promise<FoodMenuContract> {
@@ -1667,7 +1758,7 @@ export class FoodService {
     fulfillmentMethod: FoodOrderFulfillmentMethod,
     deliveryAddressId: string | null | undefined
   ): FoodPublicCustomerAddressContract | null {
-    if (fulfillmentMethod === "pickup") {
+    if (fulfillmentMethod !== "delivery") {
       return null;
     }
 
@@ -1784,8 +1875,17 @@ export class FoodService {
       .is("deleted_at", null)
       .order("created_at", { ascending: false });
 
-    if (pagination.status) {
+    if (pagination.collectableOnly) {
+      query = query
+        .eq("payment_status", "pending")
+        .is("customer_account_id", null)
+        .is("customer_id", null)
+        .is("customer_store_access_id", null)
+        .in("status", collectableOrderStatuses);
+    } else if (pagination.status) {
       query = query.eq("status", pagination.status);
+    } else if (pagination.activeOnly) {
+      query = query.in("status", activeOrderStatuses);
     }
 
     const { count, data, error } = await query
@@ -1830,6 +1930,7 @@ export class FoodService {
     const store = await this.getStore(companyId);
     const normalized = await this.normalizeCreateOrderInput(companyId, input);
     const subtotalCents = normalized.items.reduce((sum, item) => sum + item.totalPriceCents, 0);
+    const initialStatus = getInitialOrderStatus(options, normalized.items);
     const orderNumber = buildOrderNumber();
     const { data: orderData, error: orderError } = await this.supabase.food
       .from("orders")
@@ -1846,9 +1947,11 @@ export class FoodService {
         delivery_address_snapshot: options.deliveryAddress
           ? buildDeliveryAddressSnapshot(options.deliveryAddress)
           : null,
-        fulfillment_method: options.fulfillmentMethod ?? "delivery",
+        fulfillment_method:
+          options.fulfillmentMethod ??
+          (options.eventSource === "internal-order-v0" ? "dine_in" : "delivery"),
         order_number: orderNumber,
-        status: "created",
+        status: initialStatus,
         store_id: store.id,
         subtotal_cents: subtotalCents,
         total_cents: subtotalCents,
@@ -1868,6 +1971,8 @@ export class FoodService {
         normalized.items.map((item) => ({
           company_id: companyId,
           item_note: item.itemNote,
+          item_status: getInitialOrderItemStatus(item.kitchenRequired),
+          kitchen_required: item.kitchenRequired,
           order_id: orderRow.id,
           product_id: item.productId,
           product_name: item.productName,
@@ -1879,6 +1984,7 @@ export class FoodService {
       .select(orderItemSelect);
 
     if (itemError) {
+      await this.deleteFailedOrder(companyId, orderRow.id);
       throwSupabaseError(itemError);
     }
 
@@ -1886,10 +1992,130 @@ export class FoodService {
       orderRow,
       ((itemData ?? []) as unknown as FoodOrderItemRow[]).map(mapOrderItem)
     );
+
+    try {
+      await this.applyOrderStockDeltas(
+        companyId,
+        order.id,
+        actorUserId,
+        buildStockDeltas([], order.items, order.orderNumber)
+      );
+    } catch (error) {
+      await this.deleteFailedOrder(companyId, order.id);
+      throw error;
+    }
+
     await this.insertOrderStatusHistory(companyId, order.id, null, order.status, actorUserId);
     await this.emitOrderCreated(companyId, actorUserId, order, options.eventSource);
 
     return order;
+  }
+
+  async updateOrderItems(
+    companyId: string,
+    actorUserId: string,
+    orderId: string,
+    input: UpdateFoodOrderItemsInput
+  ): Promise<FoodOrderContract> {
+    const current = await this.getOrderRow(companyId, orderId);
+
+    if (!isInternalManualOrderRow(current)) {
+      throw new BadRequestException("Apenas pedidos de balcao podem ser editados neste fluxo.");
+    }
+
+    if (current.payment_status !== "pending") {
+      throw new BadRequestException("Pedido ja pago nao pode ser editado.");
+    }
+
+    if (current.status === "cancelled" || current.status === "delivered") {
+      throw new BadRequestException("Pedido finalizado ou cancelado nao pode ser editado.");
+    }
+
+    const currentItems =
+      (await this.listOrderItemsByOrderIds(companyId, [current.id])).get(current.id) ?? [];
+    const stockCreditsByProductId = aggregateItemQuantitiesByProductId(currentItems);
+    const normalized = await this.normalizeCreateOrderInput(companyId, input, {
+      stockCreditsByProductId
+    });
+    const existingItemsById = new Map(currentItems.map((item) => [item.id, item]));
+    const fulfillmentMethod = normalizeFulfillmentMethod(input.fulfillmentMethod);
+    const nextItems = buildEditedOrderItems(normalized.items, current.status, existingItemsById);
+    const subtotalCents = nextItems.reduce((sum, item) => sum + item.totalPriceCents, 0);
+    const nextStatus = getOrderStatusAfterItemsEdit(current.status, nextItems);
+    const stockDeltas = buildStockDeltas(currentItems, nextItems, current.order_number);
+
+    await this.applyOrderStockDeltas(companyId, orderId, actorUserId, stockDeltas);
+
+    try {
+      const { data: orderData, error: orderError } = await this.supabase.food
+        .from("orders")
+        .update({
+          customer_name: normalized.customerName,
+          customer_note: normalized.customerNote,
+          customer_phone: normalized.customerPhone,
+          delivery_address_snapshot: null,
+          fulfillment_method: fulfillmentMethod,
+          status: nextStatus,
+          subtotal_cents: subtotalCents,
+          total_cents: subtotalCents,
+          updated_by: actorUserId
+        })
+        .eq("id", orderId)
+        .eq("company_id", companyId)
+        .is("deleted_at", null)
+        .select(orderSelect)
+        .single();
+
+      if (orderError) {
+        throwSupabaseError(orderError);
+      }
+
+      const { error: deleteError } = await this.supabase.food
+        .from("order_items")
+        .delete()
+        .eq("company_id", companyId)
+        .eq("order_id", orderId);
+
+      if (deleteError) {
+        throwSupabaseError(deleteError);
+      }
+
+      const { data: itemData, error: itemError } = await this.supabase.food
+        .from("order_items")
+        .insert(
+          nextItems.map((item) => ({
+            company_id: companyId,
+            item_note: item.itemNote,
+            item_status: item.itemStatus,
+            kitchen_required: item.kitchenRequired,
+            order_id: orderId,
+            product_id: item.productId,
+            product_name: item.productName,
+            quantity: item.quantity,
+            total_price_cents: item.totalPriceCents,
+            unit_price_cents: item.unitPriceCents
+          }))
+        )
+        .select(orderItemSelect);
+
+      if (itemError) {
+        throwSupabaseError(itemError);
+      }
+
+      return mapOrder(
+        orderData as unknown as FoodOrderRow,
+        ((itemData ?? []) as unknown as FoodOrderItemRow[]).map(mapOrderItem)
+      );
+    } catch (error) {
+      await this.revertOrderStockDeltas(
+        companyId,
+        orderId,
+        actorUserId,
+        stockDeltas,
+        current.order_number
+      );
+      throw error;
+    }
   }
 
   async updateOrderStatus(
@@ -1906,26 +2132,56 @@ export class FoodService {
       return mapOrder(current, items.get(current.id) ?? []);
     }
 
-    if (current.payment_status !== "paid" && isOperationalOrderStatus(status)) {
+    if (
+      current.payment_status !== "paid" &&
+      !isInternalManualOrderRow(current) &&
+      isOperationalOrderStatus(status)
+    ) {
       throw new BadRequestException(
         "Pedido com pagamento pendente nao pode avancar para cozinha ou entrega."
       );
     }
 
-    const { data, error } = await this.supabase.food
-      .from("orders")
-      .update({
-        status,
-        updated_by: actorUserId
-      })
-      .eq("id", orderId)
-      .eq("company_id", companyId)
-      .is("deleted_at", null)
-      .select(orderSelect)
-      .single();
+    const currentItems =
+      status === "cancelled"
+        ? (await this.listOrderItemsByOrderIds(companyId, [current.id])).get(current.id) ?? []
+        : [];
+    const cancellationStockDeltas =
+      status === "cancelled"
+        ? buildStockDeltas(currentItems, [], current.order_number)
+        : [];
 
-    if (error) {
-      throwSupabaseError(error);
+    await this.applyOrderStockDeltas(companyId, orderId, actorUserId, cancellationStockDeltas);
+
+    let data: unknown;
+    try {
+      const result = await this.supabase.food
+        .from("orders")
+        .update({
+          status,
+          updated_by: actorUserId
+        })
+        .eq("id", orderId)
+        .eq("company_id", companyId)
+        .is("deleted_at", null)
+        .select(orderSelect)
+        .single();
+
+      if (result.error) {
+        throwSupabaseError(result.error);
+      }
+
+      data = result.data;
+      await this.updateOrderItemStatusesForOrderStatus(companyId, orderId, status);
+    } catch (error) {
+      await this.revertOrderStockDeltas(
+        companyId,
+        orderId,
+        actorUserId,
+        cancellationStockDeltas,
+        current.order_number
+      );
+      throw error;
     }
 
     const orderRow = data as unknown as FoodOrderRow;
@@ -1946,6 +2202,15 @@ export class FoodService {
   ): Promise<FoodOrderContract> {
     const normalized = normalizePaymentInput(input);
     const current = await this.getOrderRow(companyId, orderId);
+    const currentItems = await this.listOrderItemsByOrderIds(companyId, [current.id]);
+    const itemsBeforeUpdate = currentItems.get(current.id) ?? [];
+    const nextStatus = shouldMarkOrderReadyAfterPayment(
+      current,
+      itemsBeforeUpdate,
+      normalized.paymentStatus
+    )
+      ? "ready"
+      : current.status;
     const paidAt =
       normalized.paymentStatus === "paid"
         ? current.paid_at ?? new Date().toISOString()
@@ -1960,6 +2225,7 @@ export class FoodService {
         payment_method: normalized.paymentMethod,
         payment_note: normalized.paymentNote,
         payment_status: normalized.paymentStatus,
+        status: nextStatus,
         updated_by: actorUserId
       })
       .eq("id", orderId)
@@ -1980,7 +2246,62 @@ export class FoodService {
       await this.emitPaymentMarkedAsPaid(companyId, actorUserId, order);
     }
 
+    if (current.status !== order.status) {
+      await this.insertOrderStatusHistory(companyId, order.id, current.status, order.status, actorUserId);
+      await this.emitOrderStatusChanged(companyId, actorUserId, order, current.status);
+    }
+
     return order;
+  }
+
+  private async updateOrderItemStatusesForOrderStatus(
+    companyId: string,
+    orderId: string,
+    status: FoodOrderStatus
+  ): Promise<void> {
+    if (status === "preparing") {
+      const { error } = await this.supabase.food
+        .from("order_items")
+        .update({ item_status: "preparing" })
+        .eq("company_id", companyId)
+        .eq("order_id", orderId)
+        .eq("kitchen_required", true)
+        .eq("item_status", "pending");
+
+      if (error) {
+        throwSupabaseError(error);
+      }
+
+      return;
+    }
+
+    if (status === "ready") {
+      const { error } = await this.supabase.food
+        .from("order_items")
+        .update({ item_status: "ready" })
+        .eq("company_id", companyId)
+        .eq("order_id", orderId)
+        .eq("kitchen_required", true)
+        .in("item_status", ["pending", "preparing"]);
+
+      if (error) {
+        throwSupabaseError(error);
+      }
+
+      return;
+    }
+
+    if (status === "cancelled") {
+      const { error } = await this.supabase.food
+        .from("order_items")
+        .update({ item_status: "cancelled" })
+        .eq("company_id", companyId)
+        .eq("order_id", orderId);
+
+      if (error) {
+        throwSupabaseError(error);
+      }
+    }
   }
 
   private async getPublicCheckoutForCompany(
@@ -2047,11 +2368,16 @@ export class FoodService {
     paymentNote: string
   ): Promise<FoodOrderContract> {
     const current = await this.getOrderRow(companyId, orderId);
+    const currentItems = await this.listOrderItemsByOrderIds(companyId, [current.id]);
+    const itemsBeforeUpdate = currentItems.get(current.id) ?? [];
 
     if (current.payment_status === "paid") {
-      const items = await this.listOrderItemsByOrderIds(companyId, [current.id]);
-      return mapOrder(current, items.get(current.id) ?? []);
+      return mapOrder(current, itemsBeforeUpdate);
     }
+
+    const nextStatus = shouldMarkOrderReadyAfterPayment(current, itemsBeforeUpdate, "paid")
+      ? "ready"
+      : current.status;
 
     const { data, error } = await this.supabase.food
       .from("orders")
@@ -2061,6 +2387,7 @@ export class FoodService {
         payment_method: paymentMethod,
         payment_note: paymentNote,
         payment_status: "paid",
+        status: nextStatus,
         updated_by: null
       })
       .eq("id", orderId)
@@ -2077,6 +2404,11 @@ export class FoodService {
     const items = await this.listOrderItemsByOrderIds(companyId, [orderRow.id]);
     const order = mapOrder(orderRow, items.get(orderRow.id) ?? []);
     await this.emitPaymentMarkedAsPaid(companyId, null, order);
+
+    if (current.status !== order.status) {
+      await this.insertOrderStatusHistory(companyId, order.id, current.status, order.status, null);
+      await this.emitOrderStatusChanged(companyId, null, order, current.status);
+    }
 
     return order;
   }
@@ -2679,7 +3011,7 @@ export class FoodService {
     store: FoodStoreRow,
     fulfillmentMethod: FoodOrderFulfillmentMethod
   ): Promise<void> {
-    if (fulfillmentMethod === "pickup") {
+    if (fulfillmentMethod !== "delivery") {
       return;
     }
 
@@ -2833,6 +3165,7 @@ export class FoodService {
       categoryId,
       description: normalizeOptionalText(input.description, "description", 800),
       imageUrl: normalizeOptionalUrl(input.imageUrl, "imageUrl", 500),
+      kitchenRequired: normalizeKitchenRequired(input.kitchenRequired),
       name,
       priceCents: normalizePriceCents(input.priceCents),
       slug: normalizeOptionalSlug(input.slug, name),
@@ -2861,7 +3194,11 @@ export class FoodService {
     }
   }
 
-  private async normalizeCreateOrderInput(companyId: string, input: CreateFoodOrderInput) {
+  private async normalizeCreateOrderInput(
+    companyId: string,
+    input: CreateFoodOrderInput,
+    options: NormalizeOrderInputOptions = {}
+  ) {
     if (!Array.isArray(input.items) || input.items.length === 0) {
       throw new BadRequestException("Pedido precisa ter ao menos um item");
     }
@@ -2872,6 +3209,7 @@ export class FoodService {
 
     const normalizedItems = input.items.map((item) => ({
       itemNote: normalizeOptionalText(item.itemNote, "itemNote", 300),
+      orderItemId: normalizeOptionalText(item.orderItemId, "orderItemId", 80),
       productId: normalizeRequiredText(item.productId, "productId", 80),
       quantity: normalizeQuantity(item.quantity)
     }));
@@ -2893,11 +3231,15 @@ export class FoodService {
           throw new BadRequestException(`Produto indisponivel: ${product.name}`);
         }
 
-        if (!hasEnoughStock(product, item.quantity)) {
+        const stockCredit = options.stockCreditsByProductId?.get(product.id) ?? 0;
+
+        if (!hasEnoughStock(product, item.quantity, stockCredit)) {
           throw new BadRequestException(buildInsufficientStockMessage(product));
         }
 
         return {
+          kitchenRequired: product.kitchenRequired,
+          orderItemId: item.orderItemId,
           productId: product.id,
           productName: product.name,
           itemNote: item.itemNote,
@@ -3199,7 +3541,7 @@ export class FoodService {
 
   private async emitOrderStatusChanged(
     companyId: string,
-    actorUserId: string,
+    actorUserId: string | null,
     order: FoodOrderContract,
     previousStatus: FoodOrderStatus
   ): Promise<void> {
@@ -3567,7 +3909,11 @@ function getFoodPaymentMethodFromGateway(
 function normalizeFulfillmentMethod(
   value: CreateFoodOrderInput["fulfillmentMethod"]
 ): FoodOrderFulfillmentMethod {
-  return value === "pickup" ? "pickup" : "delivery";
+  if (value === "dine_in" || value === "pickup") {
+    return value;
+  }
+
+  return "delivery";
 }
 
 function buildPublicOrderInput(
@@ -3771,6 +4117,200 @@ function isOperationalOrderStatus(status: FoodOrderStatus): boolean {
   );
 }
 
+function getInitialOrderStatus(
+  options: CreateOrderOptions,
+  items: Array<{ kitchenRequired: boolean }>
+): FoodOrderStatus {
+  if (options.eventSource !== "internal-order-v0") {
+    return "created";
+  }
+
+  return orderRequiresKitchen(items) ? "accepted" : "ready";
+}
+
+function aggregateItemQuantitiesByProductId(
+  items: Array<{ productId: string | null; quantity: number }>
+): Map<string, number> {
+  const quantities = new Map<string, number>();
+
+  for (const item of items) {
+    if (!item.productId) {
+      continue;
+    }
+
+    quantities.set(item.productId, (quantities.get(item.productId) ?? 0) + item.quantity);
+  }
+
+  return quantities;
+}
+
+function buildStockDeltas(
+  previousItems: Array<{ productId: string | null; quantity: number }>,
+  nextItems: Array<{ productId: string | null; quantity: number }>,
+  orderNumber: string
+): StockDeltaInput[] {
+  const previousByProductId = aggregateItemQuantitiesByProductId(previousItems);
+  const nextByProductId = aggregateItemQuantitiesByProductId(nextItems);
+  const productIds = new Set([
+    ...previousByProductId.keys(),
+    ...nextByProductId.keys()
+  ]);
+  const deltas: StockDeltaInput[] = [];
+
+  for (const productId of productIds) {
+    const previousQuantity = previousByProductId.get(productId) ?? 0;
+    const nextQuantity = nextByProductId.get(productId) ?? 0;
+    const quantityDelta = previousQuantity - nextQuantity;
+
+    if (quantityDelta === 0) {
+      continue;
+    }
+
+    deltas.push({
+      notes:
+        quantityDelta < 0
+          ? `Baixa automatica do pedido ${orderNumber}`
+          : `Ajuste automatico do pedido ${orderNumber}`,
+      productId,
+      quantityDelta
+    });
+  }
+
+  return deltas;
+}
+
+function reverseStockDeltas(deltas: StockDeltaInput[], orderNumber: string): StockDeltaInput[] {
+  return deltas.map((delta) => ({
+    ...delta,
+    notes: `Estorno automatico do pedido ${orderNumber}`,
+    quantityDelta: -delta.quantityDelta
+  }));
+}
+
+function getInitialOrderItemStatus(kitchenRequired: boolean): FoodOrderItemStatus {
+  return kitchenRequired ? "pending" : "ready";
+}
+
+function getEditedOrderItemStatus(
+  item: { kitchenRequired: boolean },
+  currentOrderStatus: FoodOrderStatus,
+  existingItem: FoodOrderItemContract | undefined
+): FoodOrderItemStatus {
+  if (!item.kitchenRequired) {
+    return "ready";
+  }
+
+  if (existingItem?.kitchenRequired && existingItem.itemStatus !== "cancelled") {
+    return existingItem.itemStatus;
+  }
+
+  return currentOrderStatus === "preparing" ? "preparing" : "pending";
+}
+
+function buildEditedOrderItems<
+  T extends {
+    itemNote: string | null;
+    kitchenRequired: boolean;
+    orderItemId: string | null;
+    productId: string;
+    productName: string;
+    quantity: number;
+    totalPriceCents: number;
+    unitPriceCents: number;
+  }
+>(
+  items: T[],
+  currentOrderStatus: FoodOrderStatus,
+  existingItemsById: Map<string, FoodOrderItemContract>
+): Array<T & { itemStatus: FoodOrderItemStatus }> {
+  return items.flatMap((item) => {
+    const existingItem = item.orderItemId ? existingItemsById.get(item.orderItemId) : undefined;
+    const itemStatus = getEditedOrderItemStatus(item, currentOrderStatus, existingItem);
+
+    if (
+      !existingItem ||
+      !item.kitchenRequired ||
+      existingItem.itemStatus !== "ready" ||
+      item.productId !== existingItem.productId ||
+      item.itemNote !== existingItem.itemNote ||
+      item.quantity <= existingItem.quantity
+    ) {
+      return [{ ...item, itemStatus }];
+    }
+
+    const readyQuantity = existingItem.quantity;
+    const pendingQuantity = item.quantity - existingItem.quantity;
+
+    return [
+      {
+        ...item,
+        quantity: readyQuantity,
+        totalPriceCents: item.unitPriceCents * readyQuantity,
+        itemStatus: "ready" as const
+      },
+      {
+        ...item,
+        orderItemId: null,
+        quantity: pendingQuantity,
+        totalPriceCents: item.unitPriceCents * pendingQuantity,
+        itemStatus: "pending" as const
+      }
+    ];
+  });
+}
+
+function getOrderStatusAfterItemsEdit(
+  currentStatus: FoodOrderStatus,
+  items: Array<{ itemStatus: FoodOrderItemStatus; kitchenRequired: boolean }>
+): FoodOrderStatus {
+  if (currentStatus === "cancelled" || currentStatus === "delivered") {
+    return currentStatus;
+  }
+
+  const hasPendingKitchenItems = items.some(
+    (item) =>
+      item.kitchenRequired &&
+      (item.itemStatus === "pending" || item.itemStatus === "preparing")
+  );
+
+  if (!hasPendingKitchenItems && (currentStatus === "accepted" || currentStatus === "preparing")) {
+    return "ready";
+  }
+
+  if (
+    hasPendingKitchenItems &&
+    (currentStatus === "ready" || currentStatus === "out_for_delivery")
+  ) {
+    return "accepted";
+  }
+
+  return currentStatus;
+}
+
+function isInternalManualOrderRow(order: FoodOrderRow): boolean {
+  return (
+    !order.customer_account_id &&
+    !order.customer_id &&
+    !order.customer_store_access_id
+  );
+}
+
+function orderRequiresKitchen(items: Array<{ kitchenRequired: boolean }>): boolean {
+  return items.some((item) => item.kitchenRequired);
+}
+
+function shouldMarkOrderReadyAfterPayment(
+  order: FoodOrderRow,
+  items: FoodOrderItemContract[],
+  nextPaymentStatus: FoodPaymentStatus
+): boolean {
+  return (
+    nextPaymentStatus === "paid" &&
+    (order.status === "created" || order.status === "accepted") &&
+    !orderRequiresKitchen(items)
+  );
+}
+
 function normalizePaymentInput(input: UpdateFoodOrderPaymentInput): {
   paymentMethod: FoodPaymentMethod | null;
   paymentNote: string | null;
@@ -3967,6 +4507,10 @@ function normalizeStockControlEnabled(value: unknown): boolean {
   return value === true;
 }
 
+function normalizeKitchenRequired(value: unknown): boolean {
+  return value !== false;
+}
+
 function normalizeStockQuantity(value: unknown): number {
   if (value === undefined || value === null || value === "") {
     return 0;
@@ -4032,8 +4576,12 @@ function normalizeOptionalDate(value: unknown, field: string): string | null {
   return normalized;
 }
 
-function hasEnoughStock(product: FoodProductContract, quantity: number): boolean {
-  return !product.stockControlEnabled || quantity <= product.stockQuantity;
+function hasEnoughStock(
+  product: FoodProductContract,
+  quantity: number,
+  stockCredit = 0
+): boolean {
+  return !product.stockControlEnabled || quantity <= product.stockQuantity + stockCredit;
 }
 
 function buildInsufficientStockMessage(product: FoodProductContract): string {
@@ -4145,6 +4693,7 @@ function mapProduct(row: FoodProductRow): FoodProductContract {
     description: row.description,
     id: row.id,
     imageUrl: row.image_url,
+    kitchenRequired: row.kitchen_required,
     name: row.name,
     priceCents: row.price_cents,
     slug: row.slug,
@@ -4217,6 +4766,8 @@ function mapOrderItem(row: FoodOrderItemRow): FoodOrderItemContract {
     companyId: row.company_id,
     id: row.id,
     itemNote: row.item_note,
+    itemStatus: row.item_status,
+    kitchenRequired: row.kitchen_required,
     orderId: row.order_id,
     productId: row.product_id,
     productName: row.product_name,
@@ -4387,4 +4938,8 @@ function buildOrderNumber(): string {
 
 function throwSupabaseError(error: { message?: string }): never {
   throw new BadRequestException(error.message ?? "Erro ao consultar FP Food");
+}
+
+function getErrorMessage(error: unknown): string {
+  return error instanceof Error ? error.message : "Erro desconhecido";
 }

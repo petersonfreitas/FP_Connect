@@ -117,10 +117,48 @@ export function setPublicCartProduct(
   publicSlug: string,
   input: PublicCartItem
 ): PublicCartItem[] {
-  return setPublicCartLineQuantity(publicSlug, input.lineId, input.quantity, {
-    itemNote: input.itemNote ?? null,
-    productId: input.productId
-  });
+  const currentItems = readPublicCart(publicSlug);
+  const nextQuantity = normalizeQuantity(input.quantity);
+
+  if (nextQuantity <= 0) {
+    return writePublicCart(
+      publicSlug,
+      currentItems.filter((item) => item.lineId !== input.lineId)
+    );
+  }
+
+  const normalizedItem: PublicCartItem = {
+    itemNote: normalizeItemNote(input.itemNote),
+    lineId: input.lineId,
+    productId: input.productId,
+    quantity: nextQuantity
+  };
+  const nextItems: PublicCartItem[] = [];
+  let shouldAppendItem = true;
+
+  for (const item of currentItems) {
+    if (item.lineId === normalizedItem.lineId) {
+      nextItems.push(normalizedItem);
+      shouldAppendItem = false;
+      continue;
+    }
+
+    if (
+      item.productId === normalizedItem.productId &&
+      item.itemNote === normalizedItem.itemNote
+    ) {
+      normalizedItem.quantity = normalizeQuantity(normalizedItem.quantity + item.quantity);
+      continue;
+    }
+
+    nextItems.push(item);
+  }
+
+  if (shouldAppendItem) {
+    nextItems.push(normalizedItem);
+  }
+
+  return writePublicCart(publicSlug, nextItems);
 }
 
 export function clearPublicCart(publicSlug: string): PublicCartItem[] {

@@ -1,6 +1,10 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
-import type { FoodOrderStatus, FoodPaymentStatus } from "@fp/types";
+import type {
+  FoodOrderFulfillmentMethod,
+  FoodOrderStatus,
+  FoodPaymentStatus
+} from "@fp/types";
 import { Notice } from "@/components/page-feedback";
 import { PublicCustomerMenu } from "@/components/public-customer-menu";
 import { PublicOrderPaymentRetry } from "@/components/public-order-payment-retry";
@@ -44,6 +48,12 @@ const paymentStatusLabels: Record<FoodPaymentStatus, string> = {
   pending: "Pagamento pendente"
 };
 
+const fulfillmentLabels: Record<FoodOrderFulfillmentMethod, string> = {
+  delivery: "Entrega",
+  dine_in: "Consumo no local",
+  pickup: "Retirada em balcao"
+};
+
 const statusSteps = [
   ["created", "Enviado"],
   ["accepted", "Aceito"],
@@ -52,6 +62,7 @@ const statusSteps = [
   ["out_for_delivery", "Saiu para entrega"],
   ["delivered", "Entregue"]
 ] as const;
+type StatusStep = (typeof statusSteps)[number];
 
 export const dynamic = "force-dynamic";
 
@@ -87,6 +98,7 @@ export default async function PublicOrderPage({
   const order = orderResult.data;
   const ordersHref = storeOrdersUrl(storeContext);
   const orderDate = formatDateTime(order.createdAt);
+  const visibleStatusSteps = getVisibleStatusSteps(order.fulfillmentMethod);
   const customerSessionResult = currentUser
     ? await ensurePublicFoodCustomerStoreAccess(storeContext.publicSlug, {
         authUserId: currentUser.id,
@@ -176,7 +188,7 @@ export default async function PublicOrderPage({
           </div>
         </div>
         <div className="public-status-steps">
-          {statusSteps.map(([status, label]) => (
+          {visibleStatusSteps.map(([status, label]) => (
             <div
               className={isStepActive(order.status, status) ? "status-step active" : "status-step"}
               key={status}
@@ -204,12 +216,8 @@ export default async function PublicOrderPage({
           </article>
           <article className="public-order-info-card">
             <div className="eyebrow">Recebimento</div>
-            <h2>{order.fulfillmentMethod === "pickup" ? "Retirada em balcao" : "Entrega"}</h2>
-            <p>
-              {order.fulfillmentMethod === "pickup"
-                ? "A loja avisara quando estiver pronto."
-                : "Entrega no endereco selecionado."}
-            </p>
+            <h2>{fulfillmentLabels[order.fulfillmentMethod]}</h2>
+            <p>{getFulfillmentDescription(order.fulfillmentMethod)}</p>
             {order.deliveryAddress ? (
               <p>
                 {order.deliveryAddress.street}, {order.deliveryAddress.number} -{" "}
@@ -262,6 +270,14 @@ export default async function PublicOrderPage({
   );
 }
 
+function getVisibleStatusSteps(fulfillmentMethod: FoodOrderFulfillmentMethod): StatusStep[] {
+  if (fulfillmentMethod === "delivery") {
+    return [...statusSteps];
+  }
+
+  return statusSteps.filter(([status]) => status !== "out_for_delivery");
+}
+
 function isStepActive(currentStatus: keyof typeof orderStatusLabels, step: string): boolean {
   if (currentStatus === "cancelled") {
     return false;
@@ -269,6 +285,18 @@ function isStepActive(currentStatus: keyof typeof orderStatusLabels, step: strin
 
   const order = ["created", "accepted", "preparing", "ready", "out_for_delivery", "delivered"];
   return order.indexOf(step) <= order.indexOf(currentStatus);
+}
+
+function getFulfillmentDescription(fulfillmentMethod: FoodOrderFulfillmentMethod): string {
+  if (fulfillmentMethod === "delivery") {
+    return "Entrega no endereco selecionado.";
+  }
+
+  if (fulfillmentMethod === "pickup") {
+    return "A loja avisara quando estiver pronto para retirada.";
+  }
+
+  return "Pedido para consumo no local.";
 }
 
 function StatusChip({
