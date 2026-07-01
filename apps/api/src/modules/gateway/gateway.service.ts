@@ -525,7 +525,7 @@ export class GatewayService {
     received: true;
     status: GatewayPaymentRequestStatus | null;
   }> {
-    this.validateMercadoPagoWebhookSignature(input);
+    const signatureValid = this.tryValidateMercadoPagoWebhookSignature(input);
 
     const resourceId = normalizeMercadoPagoWebhookResourceId(input);
     const notificationType = normalizeMercadoPagoWebhookType(input);
@@ -569,6 +569,18 @@ export class GatewayService {
 
     if (!accessToken) {
       throw new BadRequestException("Access Token Mercado Pago nao configurado.");
+    }
+
+    if (!signatureValid) {
+      this.logger.warn(
+        JSON.stringify({
+          event: "gateway.webhook.sandbox_signature_fallback",
+          applicationId: parseOptionalString(input.body.application_id),
+          liveMode: input.body.live_mode,
+          paymentRequestId: paymentRequestRow.id,
+          providerReference: paymentRequestRow.provider_reference
+        })
+      );
     }
 
     const paymentRequest = await this.reconcileMercadoPagoPaymentRequest({
@@ -1421,6 +1433,27 @@ export class GatewayService {
       .catch(() => undefined);
   }
 
+  private tryValidateMercadoPagoWebhookSignature(input: GatewayMercadoPagoWebhookInput): boolean {
+    try {
+      this.validateMercadoPagoWebhookSignature(input);
+      return true;
+    } catch (error) {
+      const signature = parseMercadoPagoSignature(input.signature);
+      const canUseSandboxFallback = Boolean(
+        this.config.mercadoPagoWebhookSecret &&
+          signature.ts &&
+          signature.v1 &&
+          isMercadoPagoSandboxWebhook(input)
+      );
+
+      if (error instanceof UnauthorizedException && canUseSandboxFallback) {
+        return false;
+      }
+
+      throw error;
+    }
+  }
+
   private validateMercadoPagoWebhookSignature(input: GatewayMercadoPagoWebhookInput): void {
     const secret = this.config.mercadoPagoWebhookSecret;
 
@@ -2216,6 +2249,10 @@ function normalizeMercadoPagoWebhookType(input: GatewayMercadoPagoWebhookInput):
   }
 
   return parseOptionalString(input.body.type)?.toLowerCase() ?? null;
+}
+
+function isMercadoPagoSandboxWebhook(input: GatewayMercadoPagoWebhookInput): boolean {
+  return input.body.live_mode === false;
 }
 
 function parseMercadoPagoSignatureVersions(signature: string | null): string[] {
