@@ -5,7 +5,7 @@ import {
   NotFoundException,
   UnauthorizedException
 } from "@nestjs/common";
-import { createHmac, randomBytes, timingSafeEqual } from "node:crypto";
+import { createHash, createHmac, randomBytes, timingSafeEqual } from "node:crypto";
 import net from "node:net";
 import readline from "node:readline";
 import tls from "node:tls";
@@ -1485,11 +1485,16 @@ export class GatewayService {
           event: "gateway.webhook.signature_invalid",
           action: parseOptionalString(input.body.action),
           dataIdCandidateCount: dataIdCandidates.length,
+          dataIdCandidateFingerprints: getMercadoPagoWebhookDataIdDiagnostics(input),
           dataIdSources: getMercadoPagoWebhookDataIdSources(input),
           hasDataId: Boolean(normalizeMercadoPagoWebhookResourceId(input)),
           hasRequestId: Boolean(parseOptionalString(input.xRequestId)),
+          queryBodyDataIdMatch: getMercadoPagoWebhookQueryBodyDataIdMatch(input),
+          requestIdFingerprint: fingerprintForLog(parseOptionalString(input.xRequestId)),
           sdkFailureReasons: sdkValidation.failureReasons,
+          secretFingerprint: fingerprintForLog(secret),
           secretLength: secret.length,
+          signatureTimestamp: signature.ts,
           signatureVersions: parseMercadoPagoSignatureVersions(input.signature),
           notificationType: normalizeMercadoPagoWebhookType(input),
           requestIdCandidateCount: requestIdCandidates.length
@@ -2087,6 +2092,53 @@ function getMercadoPagoWebhookDataIdSources(input: GatewayMercadoPagoWebhookInpu
   return sources;
 }
 
+function getMercadoPagoWebhookDataIdDiagnostics(
+  input: GatewayMercadoPagoWebhookInput
+): Array<{ fingerprint: string | null; source: string }> {
+  const diagnostics: Array<{ fingerprint: string | null; source: string }> = [];
+  const queryDataId = parseOptionalString(input.dataId);
+  const bodyDataId = getMercadoPagoWebhookBodyDataId(input);
+
+  if (queryDataId) {
+    diagnostics.push({
+      fingerprint: fingerprintForLog(queryDataId),
+      source: "query"
+    });
+  }
+
+  if (bodyDataId) {
+    diagnostics.push({
+      fingerprint: fingerprintForLog(bodyDataId),
+      source: "body"
+    });
+  }
+
+  return diagnostics;
+}
+
+function getMercadoPagoWebhookQueryBodyDataIdMatch(
+  input: GatewayMercadoPagoWebhookInput
+): boolean | null {
+  const queryDataId = parseOptionalString(input.dataId);
+  const bodyDataId = getMercadoPagoWebhookBodyDataId(input);
+
+  if (!queryDataId || !bodyDataId) {
+    return null;
+  }
+
+  return queryDataId.toLowerCase() === bodyDataId.toLowerCase();
+}
+
+function getMercadoPagoWebhookBodyDataId(input: GatewayMercadoPagoWebhookInput): string | null {
+  const bodyData = input.body.data;
+
+  if (typeof bodyData === "object" && bodyData && "id" in bodyData) {
+    return parseOptionalString((bodyData as { id?: unknown }).id);
+  }
+
+  return null;
+}
+
 function getMercadoPagoWebhookSignatureDataIdCandidates(
   input: GatewayMercadoPagoWebhookInput
 ): Array<string | null> {
@@ -2161,6 +2213,14 @@ function parseMercadoPagoSignature(signature: string | null): {
   }
 
   return parsed;
+}
+
+function fingerprintForLog(value: string | null | undefined): string | null {
+  if (!value) {
+    return null;
+  }
+
+  return createHash("sha256").update(value).digest("hex").slice(0, 12);
 }
 
 function buildMercadoPagoWebhookSignatureManifest({

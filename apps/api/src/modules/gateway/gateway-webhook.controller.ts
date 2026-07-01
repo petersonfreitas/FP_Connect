@@ -32,6 +32,12 @@ function readMercadoPagoQueryDataId(query: Record<string, unknown>): string | nu
     return flatDataId;
   }
 
+  const snakeDataId = readQueryString(query, "data_id");
+
+  if (snakeDataId) {
+    return snakeDataId;
+  }
+
   const data = query.data;
 
   if (data && typeof data === "object" && !Array.isArray(data)) {
