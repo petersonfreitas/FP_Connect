@@ -1418,6 +1418,16 @@ export class GatewayService {
 
     if (!secret) {
       if (this.config.nodeEnv === "production") {
+        this.logger.warn(
+          JSON.stringify({
+            event: "gateway.webhook.secret_missing",
+            action: parseOptionalString(input.body.action),
+            hasDataId: Boolean(normalizeMercadoPagoWebhookResourceId(input)),
+            hasRequestId: Boolean(parseOptionalString(input.xRequestId)),
+            hasSignatureHeader: Boolean(parseOptionalString(input.signature)),
+            notificationType: normalizeMercadoPagoWebhookType(input)
+          })
+        );
         throw new UnauthorizedException("MERCADO_PAGO_WEBHOOK_SECRET nao configurado.");
       }
 
