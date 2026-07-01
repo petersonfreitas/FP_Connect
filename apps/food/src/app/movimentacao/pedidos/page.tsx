@@ -280,6 +280,13 @@ export default async function OrdersPage({ searchParams }: OrdersPageProps) {
                         >
                           Ver detalhes
                         </Link>
+                        <Link
+                          className="secondary-action compact-action"
+                          href={`/movimentacao/pedidos/${order.id}/imprimir?companyId=${selectedCompany.company.id}`}
+                          target="_blank"
+                        >
+                          Imprimir
+                        </Link>
                       </div>
                     </article>
                   );

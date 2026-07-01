@@ -1175,6 +1175,10 @@ textarea {
   gap: 10px;
 }
 
+.order-list {
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 360px), 1fr));
+}
+
 .order-product-row {
   align-items: center;
   background: #f8fbfa;
@@ -1462,6 +1466,7 @@ textarea {
 .order-card-footer {
   border-top: 1px solid var(--line);
   display: flex;
+  gap: 8px;
   justify-content: flex-end;
   padding-top: 14px;
 }
@@ -1617,10 +1622,97 @@ textarea {
   background: #ffffff;
 }
 
+.kitchen-card-actions {
+  border-top: 1px solid var(--line);
+  display: grid;
+  gap: 10px;
+  padding-top: 14px;
+}
+
 .kitchen-empty {
   margin: 0;
   max-width: none;
   padding: 18px;
+}
+
+.print-shell {
+  background: #f6f8f7;
+  min-height: 100vh;
+  padding: 24px;
+}
+
+.print-actions {
+  display: flex;
+  gap: 10px;
+  justify-content: center;
+  margin: 0 auto 18px;
+  max-width: 360px;
+}
+
+.thermal-ticket {
+  background: #ffffff;
+  color: #111111;
+  display: grid;
+  font-family: Arial, sans-serif;
+  font-size: 12px;
+  gap: 10px;
+  line-height: 1.35;
+  margin: 0 auto;
+  max-width: 320px;
+  padding: 14px;
+  width: 80mm;
+}
+
+.thermal-ticket-header,
+.thermal-ticket-footer {
+  align-items: center;
+  display: grid;
+  gap: 3px;
+  justify-items: center;
+  text-align: center;
+}
+
+.thermal-ticket-header strong {
+  font-size: 15px;
+}
+
+.thermal-ticket-section {
+  border-top: 1px dashed #111111;
+  display: grid;
+  gap: 5px;
+  padding-top: 10px;
+}
+
+.thermal-ticket-row,
+.thermal-ticket-item {
+  display: flex;
+  gap: 10px;
+  justify-content: space-between;
+}
+
+.thermal-ticket-items {
+  display: grid;
+  gap: 8px;
+}
+
+.thermal-ticket-item div {
+  display: grid;
+  gap: 2px;
+}
+
+.thermal-ticket-item span,
+.thermal-ticket-section > span,
+.thermal-ticket-footer span {
+  overflow-wrap: anywhere;
+}
+
+.thermal-ticket-total {
+  font-size: 14px;
+}
+
+.thermal-ticket-footer {
+  border-top: 1px dashed #111111;
+  padding-top: 10px;
 }
 
 .login-screen {
@@ -3275,6 +3367,12 @@ textarea {
     grid-template-columns: 1fr;
   }
 
+  .order-card-footer,
+  .print-actions {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
   .dashboard-grid,
   .dashboard-metrics-grid,
   .compact-dashboard-grid,
@@ -3379,5 +3477,37 @@ textarea {
 
   .public-hero h1 {
     font-size: 34px;
+  }
+}
+
+@media print {
+  @page {
+    margin: 0;
+    size: 80mm auto;
+  }
+
+  html,
+  body {
+    background: #ffffff;
+    margin: 0;
+    padding: 0;
+  }
+
+  .no-print {
+    display: none !important;
+  }
+
+  .print-shell {
+    background: #ffffff;
+    min-height: auto;
+    padding: 0;
+  }
+
+  .thermal-ticket {
+    box-shadow: none;
+    margin: 0;
+    max-width: none;
+    padding: 3mm;
+    width: 74mm;
   }
 }

@@ -162,6 +162,13 @@ export default async function OrderDetailPage({
                 <span className="status-chip">{orderStatusLabels[order.status]}</span>
                 <span className="status-chip">{fulfillmentLabels[order.fulfillmentMethod]}</span>
                 <span className="status-chip">{paymentStatusLabels[order.paymentStatus]}</span>
+                <Link
+                  className="secondary-action compact-action"
+                  href={`/movimentacao/pedidos/${order.id}/imprimir?companyId=${selectedCompany.company.id}`}
+                  target="_blank"
+                >
+                  Imprimir pedido
+                </Link>
                 <Link className="secondary-action compact-action" href={ordersHref}>
                   Voltar para pedidos
                 </Link>

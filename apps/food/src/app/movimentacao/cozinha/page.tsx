@@ -4,6 +4,7 @@ import type {
   FoodOrderItemStatus,
   FoodOrderStatus
 } from "@fp/types";
+import Link from "next/link";
 import { CompanySwitcher } from "@/components/company-switcher";
 import { formatMoney } from "@/components/food-forms";
 import { FoodShell } from "@/components/food-shell";
@@ -185,7 +186,16 @@ function KitchenColumn({
                   ))}
                 </div>
 
-                <OrderStatusActions actions={actions} companyId={companyId} orderId={order.id} />
+                <div className="kitchen-card-actions">
+                  <Link
+                    className="secondary-action compact-action"
+                    href={`/movimentacao/pedidos/${order.id}/imprimir?companyId=${companyId}&mode=kitchen&itemStatus=${itemStatus}`}
+                    target="_blank"
+                  >
+                    Imprimir cozinha
+                  </Link>
+                  <OrderStatusActions actions={actions} companyId={companyId} orderId={order.id} />
+                </div>
               </article>
             );
           })}
