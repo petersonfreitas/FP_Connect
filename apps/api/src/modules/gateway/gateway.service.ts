@@ -1485,11 +1485,13 @@ export class GatewayService {
         JSON.stringify({
           event: "gateway.webhook.signature_invalid",
           action: parseOptionalString(input.body.action),
+          applicationId: parseOptionalString(input.body.application_id),
           dataIdCandidateCount: dataIdCandidates.length,
           dataIdCandidateFingerprints: getMercadoPagoWebhookDataIdDiagnostics(input),
           dataIdSources: getMercadoPagoWebhookDataIdSources(input),
           hasDataId: Boolean(normalizeMercadoPagoWebhookResourceId(input)),
           hasRequestId: Boolean(parseOptionalString(input.xRequestId)),
+          liveMode: typeof input.body.live_mode === "boolean" ? input.body.live_mode : null,
           queryBodyDataIdMatch: getMercadoPagoWebhookQueryBodyDataIdMatch(input),
           requestIdCandidateFingerprints: getMercadoPagoWebhookRequestIdDiagnostics(input),
           requestIdFingerprint: fingerprintForLog(parseOptionalString(input.xRequestId)),
