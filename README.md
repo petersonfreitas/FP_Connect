@@ -62,6 +62,8 @@ O foco atual deixou de ser criacao de shells e passou a ser amadurecimento produ
 
 O FP Robots ja possui base funcional com catalogo de eventos, event log, regras simples, execucoes e reprocessamento basico. O FP Gateway ja concentra provedores, Mercado Pago, pagamentos Pix/cartao via Orders API, webhook V0, SMTP laboratorio/fallback e eventos `gateway.*`. O FP Food ja opera em frontend separado com loja, cardapio, imagens de produtos, carrinho editavel, pedidos, atendimento de balcao, cozinha por item, estoque direto, entrega simples, vitrine publica, login/cadastro de consumidor, enderecos, Meus pedidos e checkout Mercado Pago via Gateway.
 
+A evolucao de mesa/comanda no FP Food ja possui base tecnica inicial com `food.dining_tables`, `food.table_sessions`, endpoints internos para listar/cadastrar mesas, abrir comandas e alterar status, e tela operacional inicial em `Movimentacao > Mesas`. Itens incrementais de comanda, fechamento com pagamento unico e lotes de cozinha ainda ficam como proximos blocos.
+
 Nota de arquitetura: o FP Robots orquestra eventos, regras, acoes, execucoes, falhas e reprocessamentos. O FP Gateway encapsula provedores externos como Mercado Pago, SMTP e futuros canais como WhatsApp, Instagram, Facebook, Ads, PagSeguro e equivalentes, sem transferir para ele a decisao de negocio dos modulos consumidores.
 
 ## Comandos
@@ -200,7 +202,13 @@ Para recuperacao de senha e aceite de convite, cadastre a URL abaixo em Supabase
 http://localhost:3000/login/atualizar-senha
 ```
 
-Em producao, cadastre a mesma rota usando o dominio real definido em `FP_WEB_URL`.
+Em producao, cadastre a mesma rota usando o dominio real definido em `FP_WEB_URL`, por exemplo:
+
+```text
+https://fp-connect-web.vercel.app/login/atualizar-senha
+```
+
+Se o Supabase redirecionar um link de recuperacao para `/login` ou para a raiz com `#access_token`, o Web redireciona defensivamente para `/login/atualizar-senha` preservando o fragmento do token.
 
 O cadastro de usuarios do Admin Console usa `inviteUserByEmail` no backend Nest com service role. O link enviado pelo Supabase direciona para `/login/atualizar-senha`, onde o usuario define a senha inicial. Ao definir a senha, o servidor ativa o perfil e os vinculos pendentes no `core`. O reenvio de convite e permitido somente para usuarios e vinculos ainda pendentes.
 
@@ -271,6 +279,12 @@ Endpoints internos atuais do FP Food operacional:
 - `POST /api/food/stock/entries`
 - `GET /api/food/menu`
 - `GET /api/food/dashboard`
+- `GET /api/food/dining-tables`
+- `POST /api/food/dining-tables`
+- `PATCH /api/food/dining-tables/:tableId`
+- `GET /api/food/table-sessions?page=1&pageSize=20`
+- `POST /api/food/table-sessions`
+- `PATCH /api/food/table-sessions/:sessionId/status`
 - `GET /api/food/orders?page=1&pageSize=20`
 - `POST /api/food/orders`
 - `GET /api/food/orders/:orderId`

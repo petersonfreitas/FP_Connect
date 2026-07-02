@@ -2,10 +2,12 @@
 
 import { redirect } from "next/navigation";
 import type {
+  CreateFoodTableSessionInput,
   CreateFoodOrderInput,
   CreateFoodStockEntryInput,
   CreatePublicFoodOrderInput,
   FoodCategoryStatus,
+  FoodDiningTableStatus,
   FoodOrderFulfillmentMethod,
   FoodOrderStatus,
   FoodPaymentMethod,
@@ -14,18 +16,22 @@ import type {
   FoodCustomerPreferredContactMethod,
   FoodStoreHourKind,
   FoodStoreStatus,
+  FoodTableSessionStatus,
   UpdateFoodOrderPaymentInput,
   UpdateFoodOrderStatusInput,
   UpsertFoodCategoryInput,
+  UpsertFoodDiningTableInput,
   UpsertFoodProductInput,
   UpsertFoodStoreHoursInput,
   UpsertFoodStoreInput
 } from "@fp/types";
 import {
+  createFoodDiningTable,
   createFoodOrder,
   createFoodCategory,
   createFoodProduct,
   createFoodStockEntry,
+  createFoodTableSession,
   createPublicFoodOrder,
   deletePublicFoodCustomerAddress,
   deletePublicFoodCustomerPaymentMethod,
@@ -35,10 +41,12 @@ import {
   setPrimaryPublicFoodCustomerPaymentMethod,
   saveFoodStoreHours,
   updateFoodCategory,
+  updateFoodDiningTable,
   updateFoodOrderItems,
   updateFoodOrderPayment,
   updateFoodOrderStatus,
   updateFoodProduct,
+  updateFoodTableSessionStatus,
   uploadFoodProductImage,
   updatePublicFoodCustomerAddress,
   updatePublicFoodCustomerProfile,
@@ -64,6 +72,18 @@ const validProductStatuses = new Set<FoodProductStatus>([
   "available",
   "hidden",
   "unavailable"
+]);
+const validDiningTableStatuses = new Set<FoodDiningTableStatus>([
+  "available",
+  "awaiting_payment",
+  "inactive",
+  "occupied"
+]);
+const validTableSessionStatuses = new Set<FoodTableSessionStatus>([
+  "awaiting_payment",
+  "cancelled",
+  "closed",
+  "open"
 ]);
 const validOrderStatuses = new Set<FoodOrderStatus>([
   "accepted",
@@ -257,6 +277,55 @@ export async function createFoodStockEntryAction(formData: FormData): Promise<vo
     result.error,
     "stockEntryCreated"
   );
+}
+
+export async function saveFoodDiningTableAction(formData: FormData): Promise<void> {
+  const companyId = requireCompanyId(formData);
+  const tableId = optionalText(formData.get("tableId"));
+  const input: UpsertFoodDiningTableInput = {
+    displayName: String(formData.get("displayName") ?? ""),
+    sortOrder: optionalInteger(formData.get("sortOrder")),
+    status: normalizeDiningTableStatus(formData.get("status"))
+  };
+  const result = tableId
+    ? await updateFoodDiningTable(companyId, tableId, input)
+    : await createFoodDiningTable(companyId, input);
+
+  redirectWithResult(
+    "/movimentacao/mesas",
+    companyId,
+    result.error,
+    tableId ? "tableUpdated" : "tableCreated"
+  );
+}
+
+export async function openFoodTableSessionAction(formData: FormData): Promise<void> {
+  const companyId = requireCompanyId(formData);
+  const input: CreateFoodTableSessionInput = {
+    customerName: optionalText(formData.get("customerName")),
+    customerNote: optionalText(formData.get("customerNote")),
+    customerPhone: optionalText(formData.get("customerPhone")),
+    diningTableId: String(formData.get("diningTableId") ?? "")
+  };
+  const result = await createFoodTableSession(companyId, input);
+
+  redirectWithResult("/movimentacao/mesas", companyId, result.error, "sessionOpened");
+}
+
+export async function updateFoodTableSessionStatusAction(
+  formData: FormData
+): Promise<void> {
+  const companyId = requireCompanyId(formData);
+  const sessionId = String(formData.get("sessionId") ?? "").trim();
+  const status = normalizeTableSessionStatus(formData.get("status"));
+
+  if (!sessionId) {
+    redirectWithResult("/movimentacao/mesas", companyId, "Comanda nao informada.", "sessionUpdated");
+  }
+
+  const result = await updateFoodTableSessionStatus(companyId, sessionId, { status });
+
+  redirectWithResult("/movimentacao/mesas", companyId, result.error, "sessionUpdated");
 }
 
 export async function saveFoodStoreHoursAction(formData: FormData): Promise<void> {
@@ -880,6 +949,26 @@ function normalizeProductStatus(value: FormDataEntryValue | null): FoodProductSt
   }
 
   return status as FoodProductStatus;
+}
+
+function normalizeDiningTableStatus(value: FormDataEntryValue | null): FoodDiningTableStatus {
+  const status = String(value ?? "");
+
+  if (!validDiningTableStatuses.has(status as FoodDiningTableStatus)) {
+    return "available";
+  }
+
+  return status as FoodDiningTableStatus;
+}
+
+function normalizeTableSessionStatus(value: FormDataEntryValue | null): FoodTableSessionStatus {
+  const status = String(value ?? "");
+
+  if (!validTableSessionStatuses.has(status as FoodTableSessionStatus)) {
+    return "open";
+  }
+
+  return status as FoodTableSessionStatus;
 }
 
 function normalizeOrderStatus(value: FormDataEntryValue | null): FoodOrderStatus {

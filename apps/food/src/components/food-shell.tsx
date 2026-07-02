@@ -42,11 +42,12 @@ const navigation = {
       ]
     },
     {
-      description: "Pedido, cozinha e entrega",
+      description: "Pedido, mesas, cozinha e entrega",
       icon: "MV",
       label: "Movimentacao",
       items: [
         { href: "/movimentacao/atendimento", label: "Atendimento" },
+        { href: "/movimentacao/mesas", label: "Mesas" },
         { href: "/movimentacao/pedidos", label: "Pedidos" },
         { href: "/movimentacao/cozinha", label: "Cozinha" },
         { href: "/movimentacao/entregas", label: "Entregas" },

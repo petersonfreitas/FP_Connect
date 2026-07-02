@@ -2,6 +2,7 @@ import "server-only";
 
 import type {
   AdminCurrentUserAccessContract,
+  CreateFoodTableSessionInput,
   CreateFoodStockEntryInput,
   CreatePublicFoodCheckoutContract,
   CreatePublicFoodCheckoutInput,
@@ -10,6 +11,7 @@ import type {
   EnsureFoodPublicCustomerInput,
   FoodCategoryContract,
   FoodDashboardContract,
+  FoodDiningTableContract,
   FoodMenuContract,
   FoodOrderContract,
   FoodOrderDetailContract,
@@ -20,11 +22,14 @@ import type {
   FoodStockMovementContract,
   FoodStoreContract,
   FoodStoreHourContract,
+  FoodTableSessionContract,
+  FoodTableSessionStatus,
   ListPublicFoodCustomerOrdersInput,
   ModuleAccessContract,
   PaginatedContract,
   RetryPublicFoodPaymentInput,
   SetFoodPublicCustomerPrimaryAddressInput,
+  UpdateFoodTableSessionStatusInput,
   UpdateFoodOrderItemsInput,
   UpdateFoodOrderPaymentInput,
   UpdateFoodOrderStatusInput,
@@ -35,6 +40,7 @@ import type {
   ValidatePublicFoodCartInput,
   FoodPublicCartValidationContract,
   UpsertFoodCategoryInput,
+  UpsertFoodDiningTableInput,
   UpsertFoodProductInput,
   UpsertFoodStoreHoursInput,
   UpsertFoodStoreInput
@@ -59,7 +65,7 @@ type PaginationParams = {
   collectableOnly?: boolean;
   page?: number;
   pageSize?: number;
-  status?: FoodOrderStatus;
+  status?: FoodOrderStatus | FoodTableSessionStatus;
 };
 
 export async function getCurrentAdminAccess(): Promise<
@@ -280,6 +286,84 @@ export async function createFoodStockEntry(
       "X-FP-Company-Id": companyId
     },
     method: "POST"
+  });
+}
+
+export async function listFoodDiningTables(
+  companyId: string
+): Promise<InternalApiResult<FoodDiningTableContract[]>> {
+  return fetchInternal<FoodDiningTableContract[]>("food/dining-tables", {
+    headers: {
+      "X-FP-Company-Id": companyId
+    }
+  });
+}
+
+export async function createFoodDiningTable(
+  companyId: string,
+  input: UpsertFoodDiningTableInput
+): Promise<InternalApiResult<FoodDiningTableContract>> {
+  return fetchInternal<FoodDiningTableContract>("food/dining-tables", {
+    body: JSON.stringify(input),
+    headers: {
+      "X-FP-Company-Id": companyId
+    },
+    method: "POST"
+  });
+}
+
+export async function updateFoodDiningTable(
+  companyId: string,
+  tableId: string,
+  input: UpsertFoodDiningTableInput
+): Promise<InternalApiResult<FoodDiningTableContract>> {
+  return fetchInternal<FoodDiningTableContract>(`food/dining-tables/${tableId}`, {
+    body: JSON.stringify(input),
+    headers: {
+      "X-FP-Company-Id": companyId
+    },
+    method: "PATCH"
+  });
+}
+
+export async function listFoodTableSessions(
+  companyId: string,
+  pagination: PaginationParams = {}
+): Promise<InternalApiResult<PaginatedContract<FoodTableSessionContract>>> {
+  return fetchInternal<PaginatedContract<FoodTableSessionContract>>(
+    `food/table-sessions${formatPaginationSearch(pagination)}`,
+    {
+      headers: {
+        "X-FP-Company-Id": companyId
+      }
+    }
+  );
+}
+
+export async function createFoodTableSession(
+  companyId: string,
+  input: CreateFoodTableSessionInput
+): Promise<InternalApiResult<FoodTableSessionContract>> {
+  return fetchInternal<FoodTableSessionContract>("food/table-sessions", {
+    body: JSON.stringify(input),
+    headers: {
+      "X-FP-Company-Id": companyId
+    },
+    method: "POST"
+  });
+}
+
+export async function updateFoodTableSessionStatus(
+  companyId: string,
+  sessionId: string,
+  input: UpdateFoodTableSessionStatusInput
+): Promise<InternalApiResult<FoodTableSessionContract>> {
+  return fetchInternal<FoodTableSessionContract>(`food/table-sessions/${sessionId}/status`, {
+    body: JSON.stringify(input),
+    headers: {
+      "X-FP-Company-Id": companyId
+    },
+    method: "PATCH"
   });
 }
 

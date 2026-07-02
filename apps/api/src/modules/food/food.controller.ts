@@ -15,14 +15,18 @@ import { ModuleAccessGuard } from "../../auth/module-access.guard";
 import { ModuleAccessPolicy } from "../../auth/module-access-policy.decorator";
 import { buildModuleAccessResponse } from "../../auth/module-access-response";
 import type {
+  CreateFoodTableSessionInput,
   CreateFoodOrderInput,
   CreateFoodStockEntryInput,
+  FoodTableSessionStatus,
   FoodOrderStatus,
+  UpdateFoodTableSessionStatusInput,
   UpdateFoodOrderItemsInput,
   UpdateFoodOrderPaymentInput,
   UpdateFoodOrderStatusInput,
   UploadFoodProductImageInput,
   UpsertFoodCategoryInput,
+  UpsertFoodDiningTableInput,
   UpsertFoodProductInput,
   UpsertFoodStoreHoursInput,
   UpsertFoodStoreInput
@@ -37,6 +41,12 @@ const validOrderStatuses = new Set<FoodOrderStatus>([
   "out_for_delivery",
   "preparing",
   "ready"
+]);
+const validTableSessionStatuses = new Set<FoodTableSessionStatus>([
+  "awaiting_payment",
+  "cancelled",
+  "closed",
+  "open"
 ]);
 
 @Controller("food")
@@ -263,6 +273,93 @@ export class FoodController {
     return this.foodService.getDashboard(companyId);
   }
 
+  @Get("dining-tables")
+  @ModuleAccessPolicy({
+    applicationKey: "food",
+    companyHeader: "x-fp-company-id",
+    permissionKey: "food.access"
+  })
+  listDiningTables(@Headers("x-fp-company-id") companyId: string) {
+    return this.foodService.listDiningTables(companyId);
+  }
+
+  @Post("dining-tables")
+  @ModuleAccessPolicy({
+    applicationKey: "food",
+    companyHeader: "x-fp-company-id",
+    permissionKey: "food.access"
+  })
+  createDiningTable(
+    @Body() input: UpsertFoodDiningTableInput,
+    @Headers("x-fp-company-id") companyId: string,
+    @Headers("x-fp-actor-user-id") actorUserId: string
+  ) {
+    return this.foodService.upsertDiningTable(companyId, actorUserId, input);
+  }
+
+  @Patch("dining-tables/:tableId")
+  @ModuleAccessPolicy({
+    applicationKey: "food",
+    companyHeader: "x-fp-company-id",
+    permissionKey: "food.access"
+  })
+  updateDiningTable(
+    @Body() input: UpsertFoodDiningTableInput,
+    @Headers("x-fp-company-id") companyId: string,
+    @Headers("x-fp-actor-user-id") actorUserId: string,
+    @Param("tableId") tableId: string
+  ) {
+    return this.foodService.upsertDiningTable(companyId, actorUserId, input, tableId);
+  }
+
+  @Get("table-sessions")
+  @ModuleAccessPolicy({
+    applicationKey: "food",
+    companyHeader: "x-fp-company-id",
+    permissionKey: "food.access"
+  })
+  listTableSessions(
+    @Headers("x-fp-company-id") companyId: string,
+    @Query("page") page: string | undefined,
+    @Query("pageSize") pageSize: string | undefined,
+    @Query("status") status: string | undefined
+  ) {
+    return this.foodService.listTableSessions(companyId, {
+      page: normalizePage(page),
+      pageSize: normalizePageSize(pageSize),
+      status: normalizeOptionalTableSessionStatus(status)
+    });
+  }
+
+  @Post("table-sessions")
+  @ModuleAccessPolicy({
+    applicationKey: "food",
+    companyHeader: "x-fp-company-id",
+    permissionKey: "food.access"
+  })
+  createTableSession(
+    @Body() input: CreateFoodTableSessionInput,
+    @Headers("x-fp-company-id") companyId: string,
+    @Headers("x-fp-actor-user-id") actorUserId: string
+  ) {
+    return this.foodService.createTableSession(companyId, actorUserId, input);
+  }
+
+  @Patch("table-sessions/:sessionId/status")
+  @ModuleAccessPolicy({
+    applicationKey: "food",
+    companyHeader: "x-fp-company-id",
+    permissionKey: "food.access"
+  })
+  updateTableSessionStatus(
+    @Body() input: UpdateFoodTableSessionStatusInput,
+    @Headers("x-fp-company-id") companyId: string,
+    @Headers("x-fp-actor-user-id") actorUserId: string,
+    @Param("sessionId") sessionId: string
+  ) {
+    return this.foodService.updateTableSessionStatus(companyId, actorUserId, sessionId, input);
+  }
+
   @Get("orders")
   @ModuleAccessPolicy({
     applicationKey: "food",
@@ -384,6 +481,20 @@ function normalizeOptionalOrderStatus(value: string | undefined): FoodOrderStatu
   }
 
   return value as FoodOrderStatus;
+}
+
+function normalizeOptionalTableSessionStatus(
+  value: string | undefined
+): FoodTableSessionStatus | undefined {
+  if (!value) {
+    return undefined;
+  }
+
+  if (!validTableSessionStatuses.has(value as FoodTableSessionStatus)) {
+    throw new BadRequestException("status da comanda Food invalido");
+  }
+
+  return value as FoodTableSessionStatus;
 }
 
 function normalizeBoolean(value: string | undefined): boolean {

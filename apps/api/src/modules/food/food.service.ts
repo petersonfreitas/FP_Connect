@@ -13,6 +13,7 @@ import type { GatewayPaymentRequestContract } from "../gateway/gateway.contracts
 import { RobotsService } from "../robots/robots.service";
 import { SupabaseService } from "../../supabase/supabase.service";
 import type {
+  CreateFoodTableSessionInput,
   CreateFoodStockEntryInput,
   CreatePublicFoodCheckoutContract,
   CreatePublicFoodCheckoutInput,
@@ -25,6 +26,8 @@ import type {
   FoodCustomerPreferredContactMethod,
   FoodCustomerStatus,
   FoodDashboardContract,
+  FoodDiningTableContract,
+  FoodDiningTableStatus,
   FoodOrderDetailContract,
   FoodMenuContract,
   FoodOrderContract,
@@ -54,10 +57,13 @@ import type {
   FoodStoreStatus,
   FoodStockMovementContract,
   FoodStockMovementType,
+  FoodTableSessionContract,
+  FoodTableSessionStatus,
   ListPublicFoodCustomerOrdersInput,
   PaginatedContract,
   RetryPublicFoodPaymentInput,
   SetFoodPublicCustomerPrimaryAddressInput,
+  UpdateFoodTableSessionStatusInput,
   UpdateFoodOrderItemsInput,
   UpdateFoodOrderPaymentInput,
   UpdateFoodOrderStatusInput,
@@ -66,6 +72,7 @@ import type {
   UploadFoodProductImageInput,
   UpsertFoodPublicCustomerAddressInput,
   UpsertFoodCategoryInput,
+  UpsertFoodDiningTableInput,
   UpsertFoodProductInput,
   UpsertFoodStoreHoursInput,
   UpsertFoodStoreInput,
@@ -146,6 +153,34 @@ type FoodStockMovementRow = {
   product_id: string;
   quantity: number;
   store_id: string | null;
+};
+
+type FoodDiningTableRow = {
+  id: string;
+  company_id: string;
+  store_id: string | null;
+  display_name: string;
+  status: FoodDiningTableStatus;
+  sort_order: number;
+  created_at: string;
+  updated_at: string;
+};
+
+type FoodTableSessionRow = {
+  id: string;
+  company_id: string;
+  store_id: string | null;
+  dining_table_id: string;
+  order_id: string | null;
+  session_number: string;
+  status: FoodTableSessionStatus;
+  customer_name: string | null;
+  customer_phone: string | null;
+  customer_note: string | null;
+  opened_at: string;
+  closed_at: string | null;
+  created_at: string;
+  updated_at: string;
 };
 
 type FoodOrderRow = {
@@ -307,6 +342,10 @@ type OrderListOptions = PaginationOptions & {
   status?: FoodOrderStatus;
 };
 
+type TableSessionListOptions = PaginationOptions & {
+  status?: FoodTableSessionStatus;
+};
+
 type CreateOrderOptions = {
   eventSource: "internal-order-v0" | "public-store-v0";
   customerSession?: FoodPublicCustomerSessionContract | null;
@@ -402,6 +441,34 @@ const stockMovementSelect = [
   "notes",
   "created_by",
   "created_at"
+].join(",");
+
+const diningTableSelect = [
+  "id",
+  "company_id",
+  "store_id",
+  "display_name",
+  "status",
+  "sort_order",
+  "created_at",
+  "updated_at"
+].join(",");
+
+const tableSessionSelect = [
+  "id",
+  "company_id",
+  "store_id",
+  "dining_table_id",
+  "order_id",
+  "session_number",
+  "status",
+  "customer_name",
+  "customer_phone",
+  "customer_note",
+  "opened_at",
+  "closed_at",
+  "created_at",
+  "updated_at"
 ].join(",");
 
 const orderSelect = [
@@ -561,6 +628,19 @@ const validPaymentStatuses = new Set<FoodPaymentStatus>([
   "paid",
   "pending"
 ]);
+const validDiningTableStatuses = new Set<FoodDiningTableStatus>([
+  "available",
+  "awaiting_payment",
+  "inactive",
+  "occupied"
+]);
+const validTableSessionStatuses = new Set<FoodTableSessionStatus>([
+  "awaiting_payment",
+  "cancelled",
+  "closed",
+  "open"
+]);
+const activeTableSessionStatuses: FoodTableSessionStatus[] = ["awaiting_payment", "open"];
 const validStoreHourKinds = new Set<FoodStoreHourKind>(["delivery", "ordering"]);
 const validCustomerContactMethods = new Set<FoodCustomerPreferredContactMethod>([
   "cellphone",
@@ -1037,6 +1117,240 @@ export class FoodService {
     const productsById = await this.listProductsByIds(companyId, [row.product_id]);
 
     return mapStockMovement(row, productsById.get(row.product_id) ?? null);
+  }
+
+  async listDiningTables(companyId: string): Promise<FoodDiningTableContract[]> {
+    const store = await this.findStore(companyId);
+
+    if (!store) {
+      return [];
+    }
+
+    const { data, error } = await this.supabase.food
+      .from("dining_tables")
+      .select(diningTableSelect)
+      .eq("company_id", companyId)
+      .eq("store_id", store.id)
+      .is("deleted_at", null)
+      .order("sort_order", { ascending: true })
+      .order("display_name", { ascending: true });
+
+    if (error) {
+      throwSupabaseError(error);
+    }
+
+    return ((data ?? []) as unknown as FoodDiningTableRow[]).map(mapDiningTable);
+  }
+
+  async upsertDiningTable(
+    companyId: string,
+    actorUserId: string,
+    input: UpsertFoodDiningTableInput,
+    tableId?: string
+  ): Promise<FoodDiningTableContract> {
+    const store = await this.findStore(companyId);
+
+    if (!store) {
+      throw new NotFoundException("Loja Food ainda nao configurada");
+    }
+
+    const normalizedTableId = tableId ? normalizeUuid(tableId, "tableId") : null;
+    const currentTable = normalizedTableId
+      ? await this.findDiningTableById(companyId, normalizedTableId)
+      : null;
+
+    if (normalizedTableId && !currentTable) {
+      throw new NotFoundException("Mesa Food nao encontrada");
+    }
+
+    const normalized = normalizeDiningTableInput(input, currentTable?.status);
+    const row = {
+      company_id: companyId,
+      display_name: normalized.displayName,
+      sort_order: normalized.sortOrder,
+      status: normalized.status,
+      store_id: store.id,
+      updated_by: actorUserId
+    };
+
+    const { data, error } = normalizedTableId
+      ? await this.supabase.food
+          .from("dining_tables")
+          .update(row)
+          .eq("id", normalizedTableId)
+          .eq("company_id", companyId)
+          .is("deleted_at", null)
+          .select(diningTableSelect)
+          .single()
+      : await this.supabase.food
+          .from("dining_tables")
+          .insert({
+            ...row,
+            created_by: actorUserId
+          })
+          .select(diningTableSelect)
+          .single();
+
+    if (error) {
+      throwSupabaseError(error);
+    }
+
+    return mapDiningTable(data as unknown as FoodDiningTableRow);
+  }
+
+  async listTableSessions(
+    companyId: string,
+    pagination: TableSessionListOptions
+  ): Promise<PaginatedContract<FoodTableSessionContract>> {
+    const from = (pagination.page - 1) * pagination.pageSize;
+    const to = from + pagination.pageSize - 1;
+    let query = this.supabase.food
+      .from("table_sessions")
+      .select(tableSessionSelect, { count: "exact" })
+      .eq("company_id", companyId)
+      .is("deleted_at", null)
+      .order("opened_at", { ascending: false });
+
+    if (pagination.status) {
+      query = query.eq("status", pagination.status);
+    }
+
+    const { count, data, error } = await query.range(from, to);
+
+    if (error) {
+      throwSupabaseError(error);
+    }
+
+    const rows = (data ?? []) as unknown as FoodTableSessionRow[];
+    const tablesById = await this.listDiningTablesByIds(
+      companyId,
+      rows.map((row) => row.dining_table_id)
+    );
+
+    return toPaginated(
+      rows.map((row) => mapTableSession(row, tablesById.get(row.dining_table_id) ?? null)),
+      pagination,
+      count ?? 0
+    );
+  }
+
+  async createTableSession(
+    companyId: string,
+    actorUserId: string,
+    input: CreateFoodTableSessionInput
+  ): Promise<FoodTableSessionContract> {
+    const normalized = normalizeCreateTableSessionInput(input);
+    const table = await this.findDiningTableById(companyId, normalized.diningTableId);
+
+    if (!table) {
+      throw new NotFoundException("Mesa Food nao encontrada");
+    }
+
+    if (table.status === "inactive") {
+      throw new BadRequestException("Mesa Food esta inativa");
+    }
+
+    const activeSession = await this.findActiveTableSessionByTableId(companyId, table.id);
+
+    if (activeSession) {
+      throw new BadRequestException("Mesa Food ja possui comanda aberta");
+    }
+
+    const { data, error } = await this.supabase.food
+      .from("table_sessions")
+      .insert({
+        company_id: companyId,
+        customer_name: normalized.customerName,
+        customer_note: normalized.customerNote,
+        customer_phone: normalized.customerPhone,
+        dining_table_id: table.id,
+        opened_by: actorUserId,
+        session_number: buildTableSessionNumber(),
+        status: "open",
+        store_id: table.store_id
+      })
+      .select(tableSessionSelect)
+      .single();
+
+    if (error) {
+      throwSupabaseError(error);
+    }
+
+    const { error: tableError } = await this.supabase.food
+      .from("dining_tables")
+      .update({
+        status: "occupied",
+        updated_by: actorUserId
+      })
+      .eq("id", table.id)
+      .eq("company_id", companyId)
+      .is("deleted_at", null);
+
+    if (tableError) {
+      throwSupabaseError(tableError);
+    }
+
+    const updatedTable = await this.findDiningTableById(companyId, table.id);
+    return mapTableSession(
+      data as unknown as FoodTableSessionRow,
+      updatedTable ? mapDiningTable(updatedTable) : null
+    );
+  }
+
+  async updateTableSessionStatus(
+    companyId: string,
+    actorUserId: string,
+    sessionId: string,
+    input: UpdateFoodTableSessionStatusInput
+  ): Promise<FoodTableSessionContract> {
+    const normalizedSessionId = normalizeUuid(sessionId, "sessionId");
+    const nextStatus = normalizeTableSessionStatus(input.status);
+    const current = await this.findTableSessionById(companyId, normalizedSessionId);
+
+    if (!current) {
+      throw new NotFoundException("Comanda Food nao encontrada");
+    }
+
+    ensureTableSessionTransition(current.status, nextStatus);
+
+    const isFinalStatus = nextStatus === "cancelled" || nextStatus === "closed";
+    const { data, error } = await this.supabase.food
+      .from("table_sessions")
+      .update({
+        closed_at: isFinalStatus ? new Date().toISOString() : current.closed_at,
+        closed_by: isFinalStatus ? actorUserId : null,
+        status: nextStatus
+      })
+      .eq("id", current.id)
+      .eq("company_id", companyId)
+      .is("deleted_at", null)
+      .select(tableSessionSelect)
+      .single();
+
+    if (error) {
+      throwSupabaseError(error);
+    }
+
+    const tableStatus = getDiningTableStatusForSessionStatus(nextStatus);
+    const { error: tableError } = await this.supabase.food
+      .from("dining_tables")
+      .update({
+        status: tableStatus,
+        updated_by: actorUserId
+      })
+      .eq("id", current.dining_table_id)
+      .eq("company_id", companyId)
+      .is("deleted_at", null);
+
+    if (tableError) {
+      throwSupabaseError(tableError);
+    }
+
+    const table = await this.findDiningTableById(companyId, current.dining_table_id);
+    return mapTableSession(
+      data as unknown as FoodTableSessionRow,
+      table ? mapDiningTable(table) : null
+    );
   }
 
   private async applyOrderStockDeltas(
@@ -2949,6 +3263,94 @@ export class FoodService {
     return (data as unknown as FoodStoreRow | null) ?? null;
   }
 
+  private async findDiningTableById(
+    companyId: string,
+    tableId: string
+  ): Promise<FoodDiningTableRow | null> {
+    const normalizedTableId = normalizeUuid(tableId, "tableId");
+    const { data, error } = await this.supabase.food
+      .from("dining_tables")
+      .select(diningTableSelect)
+      .eq("company_id", companyId)
+      .eq("id", normalizedTableId)
+      .is("deleted_at", null)
+      .maybeSingle();
+
+    if (error) {
+      throwSupabaseError(error);
+    }
+
+    return (data as unknown as FoodDiningTableRow | null) ?? null;
+  }
+
+  private async listDiningTablesByIds(
+    companyId: string,
+    tableIds: string[]
+  ): Promise<Map<string, FoodDiningTableContract>> {
+    const uniqueIds = [...new Set(tableIds.filter(Boolean))];
+
+    if (uniqueIds.length === 0) {
+      return new Map();
+    }
+
+    const { data, error } = await this.supabase.food
+      .from("dining_tables")
+      .select(diningTableSelect)
+      .eq("company_id", companyId)
+      .in("id", uniqueIds)
+      .is("deleted_at", null);
+
+    if (error) {
+      throwSupabaseError(error);
+    }
+
+    return new Map(
+      ((data ?? []) as unknown as FoodDiningTableRow[]).map((row) => [
+        row.id,
+        mapDiningTable(row)
+      ])
+    );
+  }
+
+  private async findActiveTableSessionByTableId(
+    companyId: string,
+    tableId: string
+  ): Promise<FoodTableSessionRow | null> {
+    const { data, error } = await this.supabase.food
+      .from("table_sessions")
+      .select(tableSessionSelect)
+      .eq("company_id", companyId)
+      .eq("dining_table_id", tableId)
+      .in("status", activeTableSessionStatuses)
+      .is("deleted_at", null)
+      .maybeSingle();
+
+    if (error) {
+      throwSupabaseError(error);
+    }
+
+    return (data as unknown as FoodTableSessionRow | null) ?? null;
+  }
+
+  private async findTableSessionById(
+    companyId: string,
+    sessionId: string
+  ): Promise<FoodTableSessionRow | null> {
+    const { data, error } = await this.supabase.food
+      .from("table_sessions")
+      .select(tableSessionSelect)
+      .eq("company_id", companyId)
+      .eq("id", sessionId)
+      .is("deleted_at", null)
+      .maybeSingle();
+
+    if (error) {
+      throwSupabaseError(error);
+    }
+
+    return (data as unknown as FoodTableSessionRow | null) ?? null;
+  }
+
   private async listStoreHoursByStore(
     companyId: string,
     storeId: string
@@ -4049,6 +4451,55 @@ function normalizeProductStatus(value: unknown): FoodProductStatus {
   return value as FoodProductStatus;
 }
 
+function normalizeDiningTableStatus(
+  value: unknown,
+  fallback: FoodDiningTableStatus = "available"
+): FoodDiningTableStatus {
+  if (value === undefined || value === null || value === "") {
+    return fallback;
+  }
+
+  if (
+    typeof value !== "string" ||
+    !validDiningTableStatuses.has(value as FoodDiningTableStatus)
+  ) {
+    throw new BadRequestException("status da mesa Food invalido");
+  }
+
+  return value as FoodDiningTableStatus;
+}
+
+function normalizeTableSessionStatus(value: unknown): FoodTableSessionStatus {
+  if (
+    typeof value !== "string" ||
+    !validTableSessionStatuses.has(value as FoodTableSessionStatus)
+  ) {
+    throw new BadRequestException("status da comanda Food invalido");
+  }
+
+  return value as FoodTableSessionStatus;
+}
+
+function normalizeDiningTableInput(
+  input: UpsertFoodDiningTableInput,
+  currentStatus?: FoodDiningTableStatus
+) {
+  return {
+    displayName: normalizeRequiredText(input.displayName, "displayName", 80),
+    sortOrder: normalizeSortOrder(input.sortOrder),
+    status: normalizeDiningTableStatus(input.status, currentStatus ?? "available")
+  };
+}
+
+function normalizeCreateTableSessionInput(input: CreateFoodTableSessionInput) {
+  return {
+    customerName: normalizeOptionalText(input.customerName, "customerName", 120),
+    customerNote: normalizeOptionalText(input.customerNote, "customerNote", 600),
+    customerPhone: normalizeOptionalText(input.customerPhone, "customerPhone", 40),
+    diningTableId: normalizeUuid(input.diningTableId, "diningTableId")
+  };
+}
+
 function normalizeProductImageInput(input: UploadFoodProductImageInput): {
   buffer: Buffer;
   contentType: string;
@@ -4297,6 +4748,44 @@ function isInternalManualOrderRow(order: FoodOrderRow): boolean {
 
 function orderRequiresKitchen(items: Array<{ kitchenRequired: boolean }>): boolean {
   return items.some((item) => item.kitchenRequired);
+}
+
+function ensureTableSessionTransition(
+  currentStatus: FoodTableSessionStatus,
+  nextStatus: FoodTableSessionStatus
+): void {
+  if (currentStatus === nextStatus) {
+    return;
+  }
+
+  if (currentStatus === "closed" || currentStatus === "cancelled") {
+    throw new BadRequestException("Comanda Food ja foi finalizada");
+  }
+
+  const allowed: Record<FoodTableSessionStatus, FoodTableSessionStatus[]> = {
+    awaiting_payment: ["cancelled", "closed", "open"],
+    cancelled: [],
+    closed: [],
+    open: ["awaiting_payment", "cancelled"]
+  };
+
+  if (!allowed[currentStatus].includes(nextStatus)) {
+    throw new BadRequestException("Transicao de comanda Food invalida");
+  }
+}
+
+function getDiningTableStatusForSessionStatus(
+  status: FoodTableSessionStatus
+): FoodDiningTableStatus {
+  if (status === "awaiting_payment") {
+    return "awaiting_payment";
+  }
+
+  if (status === "open") {
+    return "occupied";
+  }
+
+  return "available";
 }
 
 function shouldMarkOrderReadyAfterPayment(
@@ -4730,6 +5219,42 @@ function mapStockMovement(
   };
 }
 
+function mapDiningTable(row: FoodDiningTableRow): FoodDiningTableContract {
+  return {
+    companyId: row.company_id,
+    createdAt: row.created_at,
+    displayName: row.display_name,
+    id: row.id,
+    sortOrder: row.sort_order,
+    status: row.status,
+    storeId: row.store_id,
+    updatedAt: row.updated_at
+  };
+}
+
+function mapTableSession(
+  row: FoodTableSessionRow,
+  diningTable: FoodDiningTableContract | null
+): FoodTableSessionContract {
+  return {
+    closedAt: row.closed_at,
+    companyId: row.company_id,
+    createdAt: row.created_at,
+    customerName: row.customer_name,
+    customerNote: row.customer_note,
+    customerPhone: row.customer_phone,
+    diningTable,
+    diningTableId: row.dining_table_id,
+    id: row.id,
+    openedAt: row.opened_at,
+    orderId: row.order_id,
+    sessionNumber: row.session_number,
+    status: row.status,
+    storeId: row.store_id,
+    updatedAt: row.updated_at
+  };
+}
+
 function mapOrder(row: FoodOrderRow, items: FoodOrderItemContract[]): FoodOrderContract {
   return {
     companyId: row.company_id,
@@ -4934,6 +5459,14 @@ function buildOrderNumber(): string {
   const suffix = `${now.getTime()}`.slice(-6);
 
   return `PED-${date}-${suffix}`;
+}
+
+function buildTableSessionNumber(): string {
+  const now = new Date();
+  const date = now.toISOString().slice(0, 10).replace(/-/g, "");
+  const suffix = `${now.getTime()}`.slice(-6);
+
+  return `CMD-${date}-${suffix}`;
 }
 
 function throwSupabaseError(error: { message?: string }): never {

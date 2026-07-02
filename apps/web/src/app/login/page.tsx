@@ -4,6 +4,7 @@ import { redirect } from "next/navigation";
 import { PendingSubmitButton } from "@/components/pending-submit-button";
 import { signInAction } from "@/lib/auth-actions";
 import { getCurrentUser } from "@/lib/auth";
+import { RecoveryHashRedirect } from "./recovery-hash-redirect";
 
 type LoginPageProps = {
   searchParams?: Promise<{
@@ -27,6 +28,7 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
 
   return (
     <main className="login-screen">
+      <RecoveryHashRedirect />
       <section className="login-panel" aria-label="Acesso ao FP Connect">
         <Image src="/brand/logo.png" alt="FP WebTech" width={250} height={88} priority />
         <div>

@@ -570,6 +570,30 @@ textarea {
   color: #475569;
 }
 
+.status-chip.table-status-available,
+.status-chip.session-status-closed {
+  background: #dcfce7;
+  color: #166534;
+}
+
+.status-chip.table-status-occupied,
+.status-chip.session-status-open {
+  background: #dbeafe;
+  color: #1d4ed8;
+}
+
+.status-chip.table-status-awaiting-payment,
+.status-chip.session-status-awaiting-payment {
+  background: #fff7ed;
+  color: #9a3412;
+}
+
+.status-chip.table-status-inactive,
+.status-chip.session-status-cancelled {
+  background: #fee2e2;
+  color: #991b1b;
+}
+
 .dashboard-grid {
   display: grid;
   gap: 24px;
@@ -1016,6 +1040,10 @@ textarea {
   grid-template-columns: minmax(220px, 1.3fr) 100px 130px minmax(180px, 1fr) 150px;
 }
 
+.table-sessions-row {
+  grid-template-columns: minmax(160px, 1.1fr) minmax(110px, 0.8fr) minmax(150px, 0.9fr) minmax(160px, 1fr) 150px 150px;
+}
+
 .data-row:last-child {
   border-bottom: 0;
 }
@@ -1226,6 +1254,99 @@ textarea {
   color: var(--muted);
   line-height: 1.5;
   margin: 0;
+}
+
+.table-create-form {
+  align-items: end;
+  background: #f8fbfa;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  display: grid;
+  gap: 14px;
+  grid-template-columns: minmax(220px, 1fr) 120px 180px max-content;
+  margin: 22px 0;
+  padding: 16px;
+}
+
+.dining-table-grid {
+  display: grid;
+  gap: 14px;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 280px), 1fr));
+}
+
+.dining-table-card {
+  background: #f8fbfa;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  display: grid;
+  gap: 14px;
+  padding: 16px;
+}
+
+.dining-table-card-heading {
+  align-items: start;
+  display: flex;
+  gap: 12px;
+  justify-content: space-between;
+}
+
+.dining-table-card-heading > div {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+
+.dining-table-card-heading strong {
+  font-size: 1.25rem;
+}
+
+.dining-table-card-heading small,
+.table-session-summary small {
+  color: var(--muted);
+}
+
+.table-session-summary {
+  background: #ffffff;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  display: grid;
+  gap: 5px;
+  padding: 12px;
+}
+
+.table-session-summary span {
+  color: var(--muted);
+  font-size: 0.78rem;
+  font-weight: 900;
+}
+
+.table-action-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.table-inline-details {
+  border-top: 1px solid var(--line);
+  display: grid;
+  gap: 12px;
+  padding-top: 12px;
+}
+
+.table-inline-details summary {
+  color: var(--accent);
+  cursor: pointer;
+  font-weight: 900;
+}
+
+.table-session-form {
+  display: grid;
+  gap: 12px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.table-session-form button {
+  justify-self: start;
 }
 
 .counter-service-layout {
@@ -3315,7 +3436,9 @@ textarea {
   }
 
   .counter-service-layout,
-  .counter-cart-row {
+  .counter-cart-row,
+  .table-create-form,
+  .table-session-form {
     grid-template-columns: 1fr;
   }
 
@@ -3335,6 +3458,7 @@ textarea {
   }
 
   .stock-movements-row,
+  .table-sessions-row,
   .public-review-row {
     align-items: start;
     grid-template-columns: 1fr;
@@ -3348,6 +3472,7 @@ textarea {
     grid-template-columns: 1fr;
   }
 
+  .dining-table-card-heading,
   .order-card-heading,
   .order-item-row,
   .order-card-total,

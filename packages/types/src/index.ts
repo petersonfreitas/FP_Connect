@@ -214,6 +214,12 @@ export type FoodPaymentMethod = "card" | "cash" | "other" | "pix";
 export type FoodPaymentStatus = "cancelled" | "paid" | "pending";
 export type FoodOrderFulfillmentMethod = "delivery" | "dine_in" | "pickup";
 export type FoodOrderItemStatus = "cancelled" | "pending" | "preparing" | "ready";
+export type FoodDiningTableStatus =
+  | "available"
+  | "awaiting_payment"
+  | "inactive"
+  | "occupied";
+export type FoodTableSessionStatus = "awaiting_payment" | "cancelled" | "closed" | "open";
 export type FoodCustomerStatus = "active" | "blocked" | "inactive";
 export type FoodCustomerOrigin = "counter" | "online" | "phone";
 export type FoodCustomerPreferredContactMethod =
@@ -367,6 +373,52 @@ export type CreateFoodStockEntryInput = {
   notes?: string | null;
   productId: string;
   quantity: number;
+};
+
+export type FoodDiningTableContract = {
+  companyId: string;
+  createdAt: string;
+  displayName: string;
+  id: string;
+  sortOrder: number;
+  status: FoodDiningTableStatus;
+  storeId: string | null;
+  updatedAt: string;
+};
+
+export type UpsertFoodDiningTableInput = {
+  displayName: string;
+  sortOrder?: number | null;
+  status?: FoodDiningTableStatus | null;
+};
+
+export type FoodTableSessionContract = {
+  closedAt: string | null;
+  companyId: string;
+  createdAt: string;
+  customerName: string | null;
+  customerNote: string | null;
+  customerPhone: string | null;
+  diningTable: FoodDiningTableContract | null;
+  diningTableId: string;
+  id: string;
+  openedAt: string;
+  orderId: string | null;
+  sessionNumber: string;
+  status: FoodTableSessionStatus;
+  storeId: string | null;
+  updatedAt: string;
+};
+
+export type CreateFoodTableSessionInput = {
+  customerName?: string | null;
+  customerNote?: string | null;
+  customerPhone?: string | null;
+  diningTableId: string;
+};
+
+export type UpdateFoodTableSessionStatusInput = {
+  status: FoodTableSessionStatus;
 };
 
 export type FoodMenuCategoryContract = FoodCategoryContract & {
